@@ -6,12 +6,12 @@
     <title>Finanzas Priel</title>
     <style>
         :root {
-            --bg-color: #f4f6f9;
+            --bg-color: #f8f9fa;
             --sidebar-bg: #ffffff;
-            --text-main: #333333;
-            --text-muted: #777777;
-            --primary-color: #3b5bdb;
-            --card-border: #e0e4e8;
+            --text-main: #202124;
+            --text-muted: #5f6368;
+            --primary-color: #000000;
+            --card-border: #e8eaed;
         }
 
         body {
@@ -36,9 +36,9 @@
 
         .logo {
             text-align: center;
-            font-size: 24px;
-            font-weight: bold;
-            color: var(--primary-color);
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--text-main);
             margin-bottom: 30px;
         }
 
@@ -47,11 +47,14 @@
             border: none;
             padding: 15px 20px;
             text-align: left;
-            font-size: 16px;
+            font-size: 15px;
             color: var(--text-main);
             cursor: pointer;
             transition: 0.2s;
-            border-left: 4px solid transparent;
+            border-left: 3px solid transparent;
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
 
         .nav-btn:hover {
@@ -59,10 +62,9 @@
         }
 
         .nav-btn.active {
-            color: var(--primary-color);
-            font-weight: bold;
-            border-left: 4px solid var(--primary-color);
-            background-color: #f0f4ff;
+            font-weight: 600;
+            border-left: 3px solid var(--primary-color);
+            background-color: #f1f3f4;
         }
 
         .user-info {
@@ -92,14 +94,16 @@
         .title h1 {
             margin: 0;
             font-size: 24px;
+            font-weight: 600;
         }
 
         .selectors select {
-            padding: 8px;
-            border-radius: 6px;
+            padding: 8px 12px;
+            border-radius: 8px;
             border: 1px solid var(--card-border);
             font-size: 14px;
             margin-left: 10px;
+            outline: none;
         }
 
         /* Views */
@@ -115,31 +119,66 @@
 
         .card {
             background-color: #ffffff;
-            border-radius: 10px;
+            border-radius: 12px;
             padding: 20px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
             border: 1px solid var(--card-border);
         }
 
-        .card h3, .card h2 { margin-top: 0; color: var(--text-muted); font-size: 14px; }
-        .card h2 { font-size: 18px; color: var(--text-main); margin-bottom: 15px;}
-        .card .value { font-size: 24px; font-weight: bold; color: var(--text-main); }
+        .card h3, .card h2 { margin-top: 0; color: var(--text-muted); font-size: 13px; font-weight: 500;}
+        .card h2 { font-size: 16px; color: var(--text-main); font-weight: 600; margin-bottom: 15px;}
+        .card .value { font-size: 28px; font-weight: bold; color: var(--text-main); margin-top: 10px;}
         
-        table { width: 100%; border-collapse: collapse; text-align: left; margin-top: 10px; }
-        th { padding: 10px 0; border-bottom: 2px solid var(--card-border); }
-        td { padding: 10px 0; border-bottom: 1px solid #eee; }
-        button { cursor: pointer; padding: 5px 10px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; margin-top: 15px; font-size: 14px; }
+        th { padding: 12px 0; border-bottom: 2px solid var(--card-border); color: var(--text-muted); font-weight: 500; }
+        td { padding: 12px 0; border-bottom: 1px solid #f1f3f4; }
+        
+        /* Formularios y Botones Negros Redondeados */
+        input {
+            padding: 10px;
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            outline: none;
+        }
+
+        .btn-black {
+            background-color: #000000;
+            color: #ffffff;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-black:hover {
+            background-color: #333333;
+        }
+
+        .btn-delete {
+            background-color: #fce8e6;
+            color: #d93025;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
 
     <!-- Pantalla de Login -->
-    <div id="login-screen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; width: 100vw; background-color: var(--bg-color); position: absolute; top: 0; left: 0; z-index: 1000;">
-        <div style="background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center;">
-            <h1 style="color: var(--primary-color); margin-top: 0; font-size: 28px;">Finanzas Priel</h1>
-            <p style="color: var(--text-muted); margin-bottom: 30px;">Inicia sesión para acceder al panel</p>
-            <button id="login-btn-main" style="background: #4285F4; color: white; border: none; padding: 12px 24px; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer;">
-                Iniciar sesión con Google
+    <div id="login-screen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; width: 100vw; background-color: #ffffff; position: absolute; top: 0; left: 0; z-index: 1000;">
+        <div style="background: #f4f6f9; padding: 40px; border-radius: 16px; text-align: center; width: 280px;">
+            <h1 style="color: var(--text-main); margin-top: 0; font-size: 22px; font-weight: 600;">Finanzas Priel</h1>
+            
+            <button id="login-btn-main" style="background: #ffffff; color: var(--text-main); border: 1px solid var(--card-border); padding: 12px 20px; border-radius: 10px; font-size: 15px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; margin-top: 30px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google Logo" style="width: 18px; height: 18px;">
+                Ingresar con Google
             </button>
         </div>
     </div>
@@ -150,13 +189,13 @@
         <!-- Panel Izquierdo -->
         <nav class="sidebar">
             <div class="logo">Finanzas Priel</div>
-            <button class="nav-btn active" onclick="switchView('resumen', this)">Resumen</button>
-            <button class="nav-btn" onclick="switchView('ingresos', this)">Ingresos</button>
-            <button class="nav-btn" onclick="switchView('gastos', this)">Gastos</button>
+            <button class="nav-btn active" onclick="switchView('resumen', this)">㗊 Resumen</button>
+            <button class="nav-btn" onclick="switchView('ingresos', this)">💲 Ingresos</button>
+            <button class="nav-btn" onclick="switchView('gastos', this)">🧾 Gastos</button>
             
             <div class="user-info">
                 <span id="user-email">No autenticado</span><br>
-                <a href="#" id="logout-btn" style="color: red; text-decoration: none; margin-top: 10px; display: none;">Salir</a>
+                <a href="#" id="logout-btn" style="color: #d93025; text-decoration: none; margin-top: 10px; display: none; font-weight: 500;">Salir</a>
             </div>
         </nav>
 
@@ -192,20 +231,20 @@
             <!-- Vista 1: Resumen -->
             <div id="resumen" class="view active">
                 <div class="cards-grid">
-                    <div class="card" style="border-top: 4px solid var(--primary-color);">
-                        <h3>1. Ingresos y Distribución</h3>
+                    <div class="card">
+                        <h3>Ingresos y Distribución</h3>
                         <div class="value" id="res-ingresos-dist" style="font-size: 16px;">$0.00</div>
                     </div>
-                    <div class="card" style="border-top: 4px solid #f03e3e;">
-                        <h3>2. Gastos Fijos y TC (ARS)</h3>
+                    <div class="card">
+                        <h3>Gastos Fijos y TC (ARS)</h3>
                         <div class="value" id="res-gastos-fijos">$0.00</div>
                     </div>
-                    <div class="card" style="border-top: 4px solid #37b24d;">
-                        <h3>3. Ingresos del Mes</h3>
+                    <div class="card">
+                        <h3>Ingresos del Mes</h3>
                         <div class="value" id="res-ingresos-mes">$0.00</div>
                     </div>
-                    <div class="card" style="border-top: 4px solid #f59f00;">
-                        <h3>4. Total Gastos vs Ingresos</h3>
+                    <div class="card">
+                        <h3>Total Gastos vs Ingresos</h3>
                         <div class="value" id="res-balance">$0.00</div>
                     </div>
                 </div>
@@ -215,18 +254,18 @@
             <div id="ingresos" class="view">
                 <div class="card" style="margin-bottom: 20px;">
                     <h2>Distribución de Objetivos (%)</h2>
-                    <label>Reserva: <input type="number" id="porcentaje-reserva" value="10" min="0" max="100"></label>
-                    <label style="margin-left: 10px;">Equipamiento: <input type="number" id="porcentaje-equipamiento" value="20" min="0" max="100"></label>
-                    <label style="margin-left: 10px;">Operativo: <input type="number" id="porcentaje-operativo" value="70" min="0" max="100"></label>
-                    <button id="btn-guardar-distribucion" style="margin-left: 20px;">Guardar %</button>
+                    <label>Reserva: <input type="number" id="porcentaje-reserva" value="10" min="0" max="100" style="width: 60px;"></label>
+                    <label style="margin-left: 15px;">Equipamiento: <input type="number" id="porcentaje-equipamiento" value="20" min="0" max="100" style="width: 60px;"></label>
+                    <label style="margin-left: 15px;">Operativo: <input type="number" id="porcentaje-operativo" value="70" min="0" max="100" style="width: 60px;"></label>
+                    <button id="btn-guardar-distribucion" class="btn-black" style="margin-left: 20px;">Guardar %</button>
                 </div>
 
                 <div class="card">
                     <h2>Gestión de Ingresos</h2>
-                    <form id="form-ingresos" style="margin-bottom: 20px; display: flex; gap: 10px;">
+                    <form id="form-ingresos" style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center;">
                         <input type="text" id="ingreso-nombre" placeholder="Origen (ej. Cuotas)" required>
                         <input type="number" id="ingreso-monto" placeholder="Monto ARS" required step="0.01">
-                        <button type="submit">Agregar</button>
+                        <button type="submit" class="btn-black">Agregar</button>
                     </form>
 
                     <table>
@@ -246,25 +285,25 @@
             <div id="gastos" class="view">
                 <div class="card" style="margin-bottom: 20px;">
                     <h2>Configuración de Dólar</h2>
-                    <label>Dólar Débito: <input type="number" id="usd-debito" value="0"></label>
-                    <label style="margin-left: 20px;">Dólar Impuesto: <input type="number" id="usd-impuesto" value="0"></label>
-                    <button id="btn-guardar-dolar" style="margin-left: 20px;">Guardar Valores</button>
+                    <label>Dólar Débito: <input type="number" id="usd-debito" value="0" style="width: 100px;"></label>
+                    <label style="margin-left: 20px;">Dólar Impuesto: <input type="number" id="usd-impuesto" value="0" style="width: 100px;"></label>
+                    <button id="btn-guardar-dolar" class="btn-black" style="margin-left: 20px;">Guardar Valores</button>
                 </div>
 
                 <div class="card">
                     <h2>Gestión de Gastos</h2>
-                    <form id="form-gastos" style="margin-bottom: 20px; display: flex; gap: 10px;">
+                    <form id="form-gastos" style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center;">
                         <input type="text" id="gasto-nombre" placeholder="Nombre (ej. Zoom)" required>
-                        <input type="number" id="gasto-monto" placeholder="Monto" required step="0.01">
-                        <select id="gasto-moneda">
+                        <input type="number" id="gasto-monto" placeholder="Monto" required step="0.01" style="width: 120px;">
+                        <select id="gasto-moneda" style="padding: 10px; border-radius: 8px; border: 1px solid var(--card-border);">
                             <option value="ARS">ARS</option>
                             <option value="USD">USD</option>
                         </select>
-                        <select id="gasto-tipo">
+                        <select id="gasto-tipo" style="padding: 10px; border-radius: 8px; border: 1px solid var(--card-border);">
                             <option value="Fijo">Fijo</option>
                             <option value="Tarjeta">Tarjeta de Crédito</option>
                         </select>
-                        <button type="submit">Agregar</button>
+                        <button type="submit" class="btn-black">Agregar</button>
                     </form>
 
                     <table>
@@ -323,7 +362,7 @@
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(viewId).classList.add('active');
             element.classList.add('active');
-            document.getElementById('view-title').innerText = element.innerText;
+            document.getElementById('view-title').innerText = element.innerText.replace(/[^\w\s]/gi, '').trim(); // Quita el emoji del título
         };
 
         // Autenticación con manejo de pantallas
@@ -421,7 +460,7 @@
                     <td>$${data.monto.toFixed(2)} ${data.moneda}</td>
                     <td>${data.tipo}</td>
                     <td>$${costoArs.toFixed(2)} ARS</td>
-                    <td><button onclick="borrarRegistro('gastos', '${d.id}')">Borrar</button></td>
+                    <td><button class="btn-delete" onclick="borrarRegistro('gastos', '${d.id}')">Eliminar</button></td>
                 `;
                 tabla.appendChild(tr);
             });
@@ -480,7 +519,7 @@
                 tr.innerHTML = `
                     <td>${data.nombre}</td>
                     <td>$${data.monto.toFixed(2)}</td>
-                    <td><button onclick="borrarRegistro('ingresos', '${d.id}')">Borrar</button></td>
+                    <td><button class="btn-delete" onclick="borrarRegistro('ingresos', '${d.id}')">Eliminar</button></td>
                 `;
                 tabla.appendChild(tr);
             });
@@ -491,10 +530,12 @@
 
             document.getElementById('res-ingresos-mes').innerText = `$${totalIngresosGlobal.toFixed(2)}`;
             document.getElementById('res-ingresos-dist').innerHTML = `
-                Total: $${totalIngresosGlobal.toFixed(2)}<br>
-                <span style="font-size: 12px; color: var(--text-muted);">
-                Res: $${vRes.toFixed(2)} | Eq: $${vEq.toFixed(2)} | Op: $${vOp.toFixed(2)}
-                </span>
+                <div style="margin-bottom: 8px;">Total: $${totalIngresosGlobal.toFixed(2)}</div>
+                <div style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
+                Reserva: $${vRes.toFixed(2)}<br>
+                Equipamiento: $${vEq.toFixed(2)}<br>
+                Operativo: $${vOp.toFixed(2)}
+                </div>
             `;
         }
 
@@ -502,7 +543,7 @@
             const balance = totalIngresosGlobal - totalGastosGlobal;
             const bElement = document.getElementById('res-balance');
             bElement.innerText = `$${balance.toFixed(2)}`;
-            bElement.style.color = balance >= 0 ? '#37b24d' : '#f03e3e';
+            bElement.style.color = balance >= 0 ? '#137333' : '#d93025';
         }
 
         window.borrarRegistro = async function(coleccion, id) {
