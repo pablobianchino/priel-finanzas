@@ -193,12 +193,35 @@
             </div>
         </div>
 
-        <div id="ingresos" class="view">
-            <div class="card">
-                <h2>Configuración de Ingresos</h2>
-                <p>Aquí irá la tabla de ingresos y porcentajes de distribución.</p>
-                </div>
-        </div>
+       <div id="ingresos" class="view">
+    <div class="card" style="margin-bottom: 20px;">
+        <h2>Distribución de Objetivos (%)</h2>
+        <label>Reserva: <input type="number" id="porcentaje-reserva" value="10" min="0" max="100"></label>
+        <label style="margin-left: 10px;">Equipamiento: <input type="number" id="porcentaje-equipamiento" value="20" min="0" max="100"></label>
+        <label style="margin-left: 10px;">Operativo: <input type="number" id="porcentaje-operativo" value="70" min="0" max="100"></label>
+        <button id="btn-guardar-distribucion" style="margin-left: 20px;">Guardar %</button>
+    </div>
+
+    <div class="card">
+        <h2>Gestión de Ingresos</h2>
+        <form id="form-ingresos" style="margin-bottom: 20px; display: flex; gap: 10px;">
+            <input type="text" id="ingreso-nombre" placeholder="Origen (ej. Cuotas)" required>
+            <input type="number" id="ingreso-monto" placeholder="Monto ARS" required step="0.01">
+            <button type="submit">Agregar</button>
+        </form>
+
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 2px solid var(--card-border);">
+                    <th style="padding: 10px 0;">Origen</th>
+                    <th>Monto ARS</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-ingresos"></tbody>
+        </table>
+    </div>
+</div>
 
         <div id="gastos" class="view">
     <div class="card" style="margin-bottom: 20px;">
@@ -459,6 +482,127 @@ const originalCargarDatos = cargarDatosFinancieros;
 cargarDatosFinancieros = async function() {
     await originalCargarDatos();
     await cargarGastos();
+}
+
+        // Elementos de Ingresos
+const btnGuardarDist = document.getElementById('btn-guardar-distribucion');
+const inputPorcReserva = document.getElementById('porcentaje-reserva');
+const inputPorcEquip = document.getElementById('porcentaje-equipamiento');
+const inputPorcOperativo = document.getElementById('porcentaje-operativo');
+const formIngresos = document.getElementById('form-ingresos');
+const tablaIngresos = document.getElementById('tabla-ingresos');
+
+// Guardar porcentajes de distribución
+btnGuardarDist.addEventListener('click', async () => {
+    const mesId = `${anioSelector.value}-${mesSelector.value}`;
+    const docRef = doc(db, "finanzas", mesId);
+    
+    await setDoc(docRef, {
+        configuracion: {
+            porc_reserva: parseFloat(inputPorcReserva.value) || 0,
+            porc_equipamiento: parseFloat(inputPorcEquip.value) || 0,
+            porc_operativo: parseFloat(inputPorcOperativo.value) || 0
+        }
+    }, { merge: true });
+    
+    cargarIngresos();
+});
+
+// Agregar nuevo ingreso
+formIngresos.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const mesId = `${anioSelector.value}-${mesSelector.value}`;
+    const ingresosRef = collection(db, "finanzas", mesId, "ingresos");
+
+    await addDoc(ingresosRef, {
+        nombre: document.getElementById('ingreso-nombre').value,
+        monto: parseFloat(document.getElementById('ingreso-monto').value)
+    });
+
+    formIngresos.reset();
+    cargarIngresos();
+});
+
+// Leer y renderizar ingresos
+async function cargarIngresos() {
+    const mesId = `${anioSelector.value}-${mesSelector.value}`;
+    
+    // Obtener porcentajes
+    const docRef = doc(db, "finanzas", mesId);
+    const docSnap = await getDoc(docRef);
+    let pReserva = 10; let pEquip = 20; let pOperativo = 70;
+    
+    if (docSnap.exists() && docSnap.data().configuracion) {
+        const config = docSnap.data().configuracion;
+        pReserva = config.porc_reserva ?? pReserva;
+        pEquip = config.porc_equipamiento ?? pEquip;
+        pOperativo = config.porc_operativo ?? pOperativo;
+        
+        inputPorcReserva.value = pReserva;
+        inputPorcEquip.value = pEquip;
+        inputPorcOperativo.value = pOperativo;
+    }
+
+    // Obtener lista de ingresos
+    const ingresosRef = collection(db, "finanzas", mesId, "ingresos");
+    const querySnapshot = await getDocs(ingresosRef);
+    
+    tablaIngresos.innerHTML = '';
+    let totalIngresos = 0;
+
+    querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        totalIngresos += data.monto;
+
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = "1px solid #eee";
+        tr.innerHTML = `
+            <td style="padding: 10px 0;">${data.nombre}</td>
+            <td>$${data.monto.toFixed(2)}</td>
+            <td><button data-id="${docSnap.id}" class="btn-borrar-ingreso">Borrar</button></td>
+        `;
+        tablaIngresos.appendChild(tr);
+    });
+
+    // Calcular distribución
+    const valReserva = totalIngresos * (pReserva / 100);
+    const valEquip = totalIngresos * (pEquip / 100);
+    const valOperativo = totalIngresos * (pOperativo / 100);
+
+    // Actualizar tarjetas 1 y 3 del Resumen
+    document.getElementById('res-ingresos-mes').innerText = `$${totalIngresos.toFixed(2)}`;
+    
+    document.getElementById('res-ingresos-dist').innerHTML = `
+        Total: $${totalIngresos.toFixed(2)}<br>
+        <span style="font-size: 14px; color: var(--text-muted);">
+        Reserva: $${valReserva.toFixed(2)} | Equip: $${valEquip.toFixed(2)} | Oper: $${valOperativo.toFixed(2)}
+        </span>
+    `;
+
+    // Actualizar tarjeta 4 (Balance)
+    const totalGastosTexto = document.getElementById('res-gastos-fijos').innerText.replace('$', '');
+    const totalGastos = parseFloat(totalGastosTexto) || 0;
+    const balance = totalIngresos - totalGastos;
+    
+    const balanceEl = document.getElementById('res-balance');
+    balanceEl.innerText = `$${balance.toFixed(2)}`;
+    balanceEl.style.color = balance >= 0 ? '#37b24d' : '#f03e3e';
+
+    // Asignar evento a botones de borrar ingresos
+    document.querySelectorAll('.btn-borrar-ingreso').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const ingresoId = e.target.getAttribute('data-id');
+            await deleteDoc(doc(db, "finanzas", mesId, "ingresos", ingresoId));
+            cargarIngresos();
+        });
+    });
+}
+
+// Interceptar la carga de gastos para asegurar que ingresos y balances se calculen en cadena
+const cargaDatosFinal = cargarGastos;
+cargarGastos = async function() {
+    await cargaDatosFinal();
+    await cargarIngresos(); 
 }
 </script>
 </body>
