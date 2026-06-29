@@ -212,25 +212,116 @@
         </div>
     </main>
 
-    <script>
-        // Lógica simple para cambiar entre vistas
-        function switchView(viewId, element) {
-            // Ocultar todas las vistas
-            document.querySelectorAll('.view').forEach(view => {
-                view.classList.remove('active');
-            });
-            // Remover clase 'active' de todos los botones
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
+    <script type="module">
+    // Importar las funciones de Firebase
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-            // Activar la vista y el botón seleccionado
-            document.getElementById(viewId).classList.add('active');
-            element.classList.add('active');
+    // Configuración de tu proyecto (Cópialo desde la consola de Firebase)
+    const firebaseConfig = {
+  apiKey: "AIzaSyC8S5y_TJJFiL6Sqqwp6f2uidh4OiHDbnM",
+  authDomain: "priel-finanzas.firebaseapp.com",
+  projectId: "priel-finanzas",
+  storageBucket: "priel-finanzas.firebasestorage.app",
+  messagingSenderId: "732838355206",
+  appId: "1:732838355206:web:89030db6e12b371478fe87",
+  measurementId: "G-632D4L0458"
+};
 
-            // Actualizar título
-            document.getElementById('view-title').innerText = element.innerText;
+    // Inicializar Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+
+    // Elementos del DOM
+    const loginBtn = document.getElementById('login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    const userEmailSpan = document.getElementById('user-email');
+    const mesSelector = document.getElementById('mes-selector');
+    const anioSelector = document.getElementById('anio-selector');
+
+    // Lógica de Autenticación
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            userEmailSpan.innerText = user.email;
+            loginBtn.style.display = 'none';
+            logoutBtn.style.display = 'inline-block';
+            
+            // Cargar datos al iniciar sesión
+            cargarDatosFinancieros();
+        } else {
+            userEmailSpan.innerText = 'No autenticado';
+            loginBtn.style.display = 'inline-block';
+            logoutBtn.style.display = 'none';
+            
+            // Limpiar la interfaz si no hay sesión
+            limpiarInterfaz();
         }
-    </script>
+    });
+
+    // Eventos de Login / Logout
+    loginBtn.addEventListener('click', async () => {
+        try {
+            await signInWithPopup(auth, provider);
+        } catch (error) {
+            console.error("Error en login:", error);
+        }
+    });
+
+    logoutBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        try {
+            await signOut(auth);
+        } catch (error) {
+            console.error("Error al salir:", error);
+        }
+    });
+
+    // Detectar cambios en el mes/año
+    mesSelector.addEventListener('change', cargarDatosFinancieros);
+    anioSelector.addEventListener('change', cargarDatosFinancieros);
+
+    // Función base para lectura de datos (Firestore)
+    async function cargarDatosFinancieros() {
+        if (!auth.currentUser) return;
+
+        const mesId = `${anioSelector.value}-${mesSelector.value}`;
+        console.log(`Consultando datos para: ${mesId}`);
+
+        try {
+            // Ejemplo de referencia al documento del mes seleccionado
+            const docRef = doc(db, "finanzas", mesId);
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+                console.log("Datos encontrados:", docSnap.data());
+                // Aquí se inyectarán los datos en las tablas
+            } else {
+                console.log("No hay datos para este mes. Se creará un registro nuevo al guardar.");
+                limpiarInterfaz();
+            }
+        } catch (error) {
+            console.error("Error leyendo Firestore:", error);
+        }
+    }
+
+    function limpiarInterfaz() {
+        document.getElementById('res-ingresos-dist').innerText = "$0.00";
+        document.getElementById('res-gastos-fijos').innerText = "$0.00";
+        document.getElementById('res-ingresos-mes').innerText = "$0.00";
+        document.getElementById('res-balance').innerText = "$0.00";
+    }
+
+    // Exponer la función switchView al ámbito global para los botones del menú
+    window.switchView = function(viewId, element) {
+        document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(viewId).classList.add('active');
+        element.classList.add('active');
+        document.getElementById('view-title').innerText = element.innerText;
+    };
+</script>
 </body>
 </html>
