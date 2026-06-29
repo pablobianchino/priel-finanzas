@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Financiero</title>
+    <style>
+        :root {
+            --bg-color: #f4f6f9;
+            --sidebar-bg: #ffffff;
+            --text-main: #333333;
+            --text-muted: #777777;
+            --primary-color: #3b5bdb;
+            --card-border: #e0e4e8;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 250px;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--card-border);
+            display: flex;
+            flex-direction: column;
+            padding: 20px 0;
+        }
+
+        .logo {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 30px;
+        }
+
+        .nav-btn {
+            background: none;
+            border: none;
+            padding: 15px 20px;
+            text-align: left;
+            font-size: 16px;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: 0.2s;
+            border-left: 4px solid transparent;
+        }
+
+        .nav-btn:hover {
+            background-color: var(--bg-color);
+        }
+
+        .nav-btn.active {
+            color: var(--primary-color);
+            font-weight: bold;
+            border-left: 4px solid var(--primary-color);
+            background-color: #f0f4ff;
+        }
+
+        .user-info {
+            margin-top: auto;
+            padding: 20px;
+            font-size: 12px;
+            color: var(--text-muted);
+            border-top: 1px solid var(--card-border);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .title h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .selectors select {
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid var(--card-border);
+            font-size: 14px;
+            margin-left: 10px;
+        }
+
+        /* Views */
+        .view {
+            display: none;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        /* Cards Grid for Resumen */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            border: 1px solid var(--card-border);
+        }
+
+        .card h3 {
+            margin-top: 0;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .card .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--text-main);
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="sidebar">
+        <div class="logo">Finanzas</div>
+        <button class="nav-btn active" onclick="switchView('resumen', this)">Resumen</button>
+        <button class="nav-btn" onclick="switchView('ingresos', this)">Ingresos</button>
+        <button class="nav-btn" onclick="switchView('gastos', this)">Gastos</button>
+        
+        <div class="user-info">
+            <span id="user-email">usuario@gmail.com</span><br>
+            <a href="#" style="color: red; text-decoration: none; margin-top: 10px; display: inline-block;">Salir</a>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <div class="topbar">
+            <div class="title">
+                <h1 id="view-title">Dashboard</h1>
+            </div>
+            <div class="selectors">
+                <button id="login-btn">Login con Google</button>
+                <select id="mes-selector">
+                    <option value="01">Enero</option>
+                    <option value="07" selected>Julio</option>
+                    <option value="12">Diciembre</option>
+                </select>
+                <select id="anio-selector">
+                    <option value="2025">2025</option>
+                    <option value="2026" selected>2026</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="resumen" class="view active">
+            <div class="cards-grid">
+                <div class="card" style="border-top: 4px solid var(--primary-color);">
+                    <h3>1. Ingresos y Distribución</h3>
+                    <div class="value" id="res-ingresos-dist">$0.00</div>
+                </div>
+                <div class="card" style="border-top: 4px solid #f03e3e;">
+                    <h3>2. Gastos Fijos y TC</h3>
+                    <div class="value" id="res-gastos-fijos">$0.00</div>
+                </div>
+                <div class="card" style="border-top: 4px solid #37b24d;">
+                    <h3>3. Ingresos del Mes (Subdivisión)</h3>
+                    <div class="value" id="res-ingresos-mes">$0.00</div>
+                </div>
+                <div class="card" style="border-top: 4px solid #f59f00;">
+                    <h3>4. Total Gastos vs Ingresos</h3>
+                    <div class="value" id="res-balance">$0.00</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="ingresos" class="view">
+            <div class="card">
+                <h2>Configuración de Ingresos</h2>
+                <p>Aquí irá la tabla de ingresos y porcentajes de distribución.</p>
+                </div>
+        </div>
+
+        <div id="gastos" class="view">
+            <div class="card">
+                <h2>Gestión de Gastos</h2>
+                <div style="margin-bottom: 20px;">
+                    <label>Dólar Débito: <input type="number" id="usd-debito" placeholder="Ej: 1000"></label>
+                    <label style="margin-left: 20px;">Dólar Impuesto: <input type="number" id="usd-impuesto" placeholder="Ej: 300"></label>
+                </div>
+                <p>Aquí irá la tabla de gastos fijos y tarjetas.</p>
+                </div>
+        </div>
+    </main>
+
+    <script>
+        // Lógica simple para cambiar entre vistas
+        function switchView(viewId, element) {
+            // Ocultar todas las vistas
+            document.querySelectorAll('.view').forEach(view => {
+                view.classList.remove('active');
+            });
+            // Remover clase 'active' de todos los botones
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Activar la vista y el botón seleccionado
+            document.getElementById(viewId).classList.add('active');
+            element.classList.add('active');
+
+            // Actualizar título
+            document.getElementById('view-title').innerText = element.innerText;
+        }
+    </script>
+</body>
+</html>
