@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Financiero</title>
+    <title>Finanzas Priel</title>
     <style>
         :root {
             --bg-color: #f4f6f9;
@@ -133,9 +133,10 @@
 </head>
 <body>
 
+    <!-- Pantalla de Login -->
     <div id="login-screen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; width: 100vw; background-color: var(--bg-color); position: absolute; top: 0; left: 0; z-index: 1000;">
         <div style="background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center;">
-            <h1 style="color: var(--primary-color); margin-top: 0; font-size: 28px;">Finanzas</h1>
+            <h1 style="color: var(--primary-color); margin-top: 0; font-size: 28px;">Finanzas Priel</h1>
             <p style="color: var(--text-muted); margin-bottom: 30px;">Inicia sesión para acceder al panel</p>
             <button id="login-btn-main" style="background: #4285F4; color: white; border: none; padding: 12px 24px; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer;">
                 Iniciar sesión con Google
@@ -143,10 +144,12 @@
         </div>
     </div>
 
+    <!-- Contenedor Principal (Oculto hasta el login) -->
     <div id="app-container" style="display: none; width: 100%; height: 100%;">
         
+        <!-- Panel Izquierdo -->
         <nav class="sidebar">
-            <div class="logo">Finanzas</div>
+            <div class="logo">Finanzas Priel</div>
             <button class="nav-btn active" onclick="switchView('resumen', this)">Resumen</button>
             <button class="nav-btn" onclick="switchView('ingresos', this)">Ingresos</button>
             <button class="nav-btn" onclick="switchView('gastos', this)">Gastos</button>
@@ -157,6 +160,7 @@
             </div>
         </nav>
 
+        <!-- Panel Principal -->
         <main class="main-content">
             <div class="topbar">
                 <div class="title">
@@ -185,6 +189,7 @@
                 </div>
             </div>
 
+            <!-- Vista 1: Resumen -->
             <div id="resumen" class="view active">
                 <div class="cards-grid">
                     <div class="card" style="border-top: 4px solid var(--primary-color);">
@@ -206,6 +211,7 @@
                 </div>
             </div>
 
+            <!-- Vista 2: Ingresos -->
             <div id="ingresos" class="view">
                 <div class="card" style="margin-bottom: 20px;">
                     <h2>Distribución de Objetivos (%)</h2>
@@ -236,6 +242,7 @@
                 </div>
             </div>
 
+            <!-- Vista 3: Gastos -->
             <div id="gastos" class="view">
                 <div class="card" style="margin-bottom: 20px;">
                     <h2>Configuración de Dólar</h2>
