@@ -201,22 +201,50 @@
         </div>
 
         <div id="gastos" class="view">
-            <div class="card">
-                <h2>Gestión de Gastos</h2>
-                <div style="margin-bottom: 20px;">
-                    <label>Dólar Débito: <input type="number" id="usd-debito" placeholder="Ej: 1000"></label>
-                    <label style="margin-left: 20px;">Dólar Impuesto: <input type="number" id="usd-impuesto" placeholder="Ej: 300"></label>
-                </div>
-                <p>Aquí irá la tabla de gastos fijos y tarjetas.</p>
-                </div>
-        </div>
+    <div class="card" style="margin-bottom: 20px;">
+        <h2>Configuración de Dólar</h2>
+        <label>Dólar Débito: <input type="number" id="usd-debito" value="0"></label>
+        <label style="margin-left: 20px;">Dólar Impuesto: <input type="number" id="usd-impuesto" value="0"></label>
+        <button id="btn-guardar-dolar" style="margin-left: 20px;">Guardar Valores</button>
+    </div>
+
+    <div class="card">
+        <h2>Gestión de Gastos</h2>
+        <form id="form-gastos" style="margin-bottom: 20px; display: flex; gap: 10px;">
+            <input type="text" id="gasto-nombre" placeholder="Nombre (ej. Zoom)" required>
+            <input type="number" id="gasto-monto" placeholder="Monto" required step="0.01">
+            <select id="gasto-moneda">
+                <option value="ARS">ARS</option>
+                <option value="USD">USD</option>
+            </select>
+            <select id="gasto-tipo">
+                <option value="Fijo">Fijo</option>
+                <option value="Tarjeta">Tarjeta de Crédito</option>
+            </select>
+            <button type="submit">Agregar</button>
+        </form>
+
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 2px solid var(--card-border);">
+                    <th style="padding: 10px 0;">Nombre</th>
+                    <th>Monto Original</th>
+                    <th>Tipo</th>
+                    <th>Costo ARS</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-gastos"></tbody>
+        </table>
+    </div>
+</div>
     </main>
 
     <script type="module">
     // Importar las funciones de Firebase
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, setDoc, collection, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     // Configuración de tu proyecto (Cópialo desde la consola de Firebase)
     const firebaseConfig = {
@@ -322,6 +350,116 @@
         element.classList.add('active');
         document.getElementById('view-title').innerText = element.innerText;
     };
+
+                          // Elementos de Gastos
+const btnGuardarDolar = document.getElementById('btn-guardar-dolar');
+const inputUsdDebito = document.getElementById('usd-debito');
+const inputUsdImpuesto = document.getElementById('usd-impuesto');
+const formGastos = document.getElementById('form-gastos');
+const tablaGastos = document.getElementById('tabla-gastos');
+
+// Variables de estado
+let gastosActuales = [];
+
+// Guardar configuración del dólar
+btnGuardarDolar.addEventListener('click', async () => {
+    const mesId = `${anioSelector.value}-${mesSelector.value}`;
+    const docRef = doc(db, "finanzas", mesId);
+    
+    await setDoc(docRef, {
+        configuracion: {
+            dolar_debito: parseFloat(inputUsdDebito.value) || 0,
+            dolar_impuesto: parseFloat(inputUsdImpuesto.value) || 0
+        }
+    }, { merge: true });
+    
+    alert("Valores del dólar actualizados");
+    cargarGastos(); // Recalcular tabla
+});
+
+// Agregar nuevo gasto
+formGastos.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const mesId = `${anioSelector.value}-${mesSelector.value}`;
+    const gastosRef = collection(db, "finanzas", mesId, "gastos");
+
+    await addDoc(gastosRef, {
+        nombre: document.getElementById('gasto-nombre').value,
+        monto: parseFloat(document.getElementById('gasto-monto').value),
+        moneda: document.getElementById('gasto-moneda').value,
+        tipo: document.getElementById('gasto-tipo').value
+    });
+
+    formGastos.reset();
+    cargarGastos();
+});
+
+// Leer y renderizar gastos
+async function cargarGastos() {
+    const mesId = `${anioSelector.value}-${mesSelector.value}`;
+    
+    // 1. Obtener valores del dólar
+    const docRef = doc(db, "finanzas", mesId);
+    const docSnap = await getDoc(docRef);
+    let dDebito = 0; let dImpuesto = 0;
+    
+    if (docSnap.exists() && docSnap.data().configuracion) {
+        dDebito = docSnap.data().configuracion.dolar_debito || 0;
+        dImpuesto = docSnap.data().configuracion.dolar_impuesto || 0;
+        inputUsdDebito.value = dDebito;
+        inputUsdImpuesto.value = dImpuesto;
+    }
+
+    // 2. Obtener lista de gastos
+    const gastosRef = collection(db, "finanzas", mesId, "gastos");
+    const querySnapshot = await getDocs(gastosRef);
+    
+    tablaGastos.innerHTML = '';
+    let totalGastosArs = 0;
+
+    querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        let costoArs = data.monto;
+
+        // Cálculo de conversión si es USD
+        if (data.moneda === 'USD') {
+            costoArs = data.monto * (dDebito + dImpuesto);
+        }
+
+        totalGastosArs += costoArs;
+
+        // Renderizar fila
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = "1px solid #eee";
+        tr.innerHTML = `
+            <td style="padding: 10px 0;">${data.nombre}</td>
+            <td>$${data.monto.toFixed(2)} ${data.moneda}</td>
+            <td>${data.tipo}</td>
+            <td>$${costoArs.toFixed(2)} ARS</td>
+            <td><button data-id="${docSnap.id}" class="btn-borrar">Borrar</button></td>
+        `;
+        tablaGastos.appendChild(tr);
+    });
+
+    // Actualizar el total en la tarjeta de Resumen
+    document.getElementById('res-gastos-fijos').innerText = `$${totalGastosArs.toFixed(2)}`;
+
+    // Asignar evento a los botones de borrar
+    document.querySelectorAll('.btn-borrar').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const gastoId = e.target.getAttribute('data-id');
+            await deleteDoc(doc(db, "finanzas", mesId, "gastos", gastoId));
+            cargarGastos();
+        });
+    });
+}
+
+// Modificar la función cargarDatosFinancieros existente para que dispare cargarGastos
+const originalCargarDatos = cargarDatosFinancieros;
+cargarDatosFinancieros = async function() {
+    await originalCargarDatos();
+    await cargarGastos();
+}
 </script>
 </body>
 </html>
