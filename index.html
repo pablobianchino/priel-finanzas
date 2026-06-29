@@ -133,153 +133,165 @@
 </head>
 <body>
 
-    <nav class="sidebar">
-        <div class="logo">Finanzas</div>
-        <button class="nav-btn active" onclick="switchView('resumen', this)">Resumen</button>
-        <button class="nav-btn" onclick="switchView('ingresos', this)">Ingresos</button>
-        <button class="nav-btn" onclick="switchView('gastos', this)">Gastos</button>
+    <div id="login-screen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; width: 100vw; background-color: var(--bg-color); position: absolute; top: 0; left: 0; z-index: 1000;">
+        <div style="background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center;">
+            <h1 style="color: var(--primary-color); margin-top: 0; font-size: 28px;">Finanzas</h1>
+            <p style="color: var(--text-muted); margin-bottom: 30px;">Inicia sesión para acceder al panel</p>
+            <button id="login-btn-main" style="background: #4285F4; color: white; border: none; padding: 12px 24px; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer;">
+                Iniciar sesión con Google
+            </button>
+        </div>
+    </div>
+
+    <div id="app-container" style="display: none; width: 100%; height: 100%;">
         
-        <div class="user-info">
-            <span id="user-email">No autenticado</span><br>
-            <a href="#" id="logout-btn" style="color: red; text-decoration: none; margin-top: 10px; display: none;">Salir</a>
-        </div>
-    </nav>
-
-    <main class="main-content">
-        <div class="topbar">
-            <div class="title">
-                <h1 id="view-title">Resumen</h1>
+        <nav class="sidebar">
+            <div class="logo">Finanzas</div>
+            <button class="nav-btn active" onclick="switchView('resumen', this)">Resumen</button>
+            <button class="nav-btn" onclick="switchView('ingresos', this)">Ingresos</button>
+            <button class="nav-btn" onclick="switchView('gastos', this)">Gastos</button>
+            
+            <div class="user-info">
+                <span id="user-email">No autenticado</span><br>
+                <a href="#" id="logout-btn" style="color: red; text-decoration: none; margin-top: 10px; display: none;">Salir</a>
             </div>
-            <div class="selectors">
-                <button id="login-btn">Login con Google</button>
-                <select id="mes-selector">
-                    <option value="01">Enero</option>
-                    <option value="02">Febrero</option>
-                    <option value="03">Marzo</option>
-                    <option value="04">Abril</option>
-                    <option value="05">Mayo</option>
-                    <option value="06">Junio</option>
-                    <option value="07" selected>Julio</option>
-                    <option value="08">Agosto</option>
-                    <option value="09">Septiembre</option>
-                    <option value="10">Octubre</option>
-                    <option value="11">Noviembre</option>
-                    <option value="12">Diciembre</option>
-                </select>
-                <select id="anio-selector">
-                    <option value="2025">2025</option>
-                    <option value="2026" selected>2026</option>
-                    <option value="2027">2027</option>
-                </select>
-            </div>
-        </div>
+        </nav>
 
-        <div id="resumen" class="view active">
-            <div class="cards-grid">
-                <div class="card" style="border-top: 4px solid var(--primary-color);">
-                    <h3>1. Ingresos y Distribución</h3>
-                    <div class="value" id="res-ingresos-dist" style="font-size: 16px;">$0.00</div>
+        <main class="main-content">
+            <div class="topbar">
+                <div class="title">
+                    <h1 id="view-title">Resumen</h1>
                 </div>
-                <div class="card" style="border-top: 4px solid #f03e3e;">
-                    <h3>2. Gastos Fijos y TC (ARS)</h3>
-                    <div class="value" id="res-gastos-fijos">$0.00</div>
-                </div>
-                <div class="card" style="border-top: 4px solid #37b24d;">
-                    <h3>3. Ingresos del Mes</h3>
-                    <div class="value" id="res-ingresos-mes">$0.00</div>
-                </div>
-                <div class="card" style="border-top: 4px solid #f59f00;">
-                    <h3>4. Total Gastos vs Ingresos</h3>
-                    <div class="value" id="res-balance">$0.00</div>
-                </div>
-            </div>
-        </div>
-
-        <div id="ingresos" class="view">
-            <div class="card" style="margin-bottom: 20px;">
-                <h2>Distribución de Objetivos (%)</h2>
-                <label>Reserva: <input type="number" id="porcentaje-reserva" value="10" min="0" max="100"></label>
-                <label style="margin-left: 10px;">Equipamiento: <input type="number" id="porcentaje-equipamiento" value="20" min="0" max="100"></label>
-                <label style="margin-left: 10px;">Operativo: <input type="number" id="porcentaje-operativo" value="70" min="0" max="100"></label>
-                <button id="btn-guardar-distribucion" style="margin-left: 20px;">Guardar %</button>
-            </div>
-
-            <div class="card">
-                <h2>Gestión de Ingresos</h2>
-                <form id="form-ingresos" style="margin-bottom: 20px; display: flex; gap: 10px;">
-                    <input type="text" id="ingreso-nombre" placeholder="Origen (ej. Cuotas)" required>
-                    <input type="number" id="ingreso-monto" placeholder="Monto ARS" required step="0.01">
-                    <button type="submit">Agregar</button>
-                </form>
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Origen</th>
-                            <th>Monto ARS</th>
-                            <th>Acción</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabla-ingresos"></tbody>
-                </table>
-            </div>
-        </div>
-
-        <div id="gastos" class="view">
-            <div class="card" style="margin-bottom: 20px;">
-                <h2>Configuración de Dólar</h2>
-                <label>Dólar Débito: <input type="number" id="usd-debito" value="0"></label>
-                <label style="margin-left: 20px;">Dólar Impuesto: <input type="number" id="usd-impuesto" value="0"></label>
-                <button id="btn-guardar-dolar" style="margin-left: 20px;">Guardar Valores</button>
-            </div>
-
-            <div class="card">
-                <h2>Gestión de Gastos</h2>
-                <form id="form-gastos" style="margin-bottom: 20px; display: flex; gap: 10px;">
-                    <input type="text" id="gasto-nombre" placeholder="Nombre (ej. Zoom)" required>
-                    <input type="number" id="gasto-monto" placeholder="Monto" required step="0.01">
-                    <select id="gasto-moneda">
-                        <option value="ARS">ARS</option>
-                        <option value="USD">USD</option>
+                <div class="selectors">
+                    <select id="mes-selector">
+                        <option value="01">Enero</option>
+                        <option value="02">Febrero</option>
+                        <option value="03">Marzo</option>
+                        <option value="04">Abril</option>
+                        <option value="05">Mayo</option>
+                        <option value="06">Junio</option>
+                        <option value="07" selected>Julio</option>
+                        <option value="08">Agosto</option>
+                        <option value="09">Septiembre</option>
+                        <option value="10">Octubre</option>
+                        <option value="11">Noviembre</option>
+                        <option value="12">Diciembre</option>
                     </select>
-                    <select id="gasto-tipo">
-                        <option value="Fijo">Fijo</option>
-                        <option value="Tarjeta">Tarjeta de Crédito</option>
+                    <select id="anio-selector">
+                        <option value="2025">2025</option>
+                        <option value="2026" selected>2026</option>
+                        <option value="2027">2027</option>
                     </select>
-                    <button type="submit">Agregar</button>
-                </form>
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Nombre</th>
-                            <th>Monto Original</th>
-                            <th>Tipo</th>
-                            <th>Costo ARS</th>
-                            <th>Acción</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabla-gastos"></tbody>
-                </table>
+                </div>
             </div>
-        </div>
-    </main>
+
+            <div id="resumen" class="view active">
+                <div class="cards-grid">
+                    <div class="card" style="border-top: 4px solid var(--primary-color);">
+                        <h3>1. Ingresos y Distribución</h3>
+                        <div class="value" id="res-ingresos-dist" style="font-size: 16px;">$0.00</div>
+                    </div>
+                    <div class="card" style="border-top: 4px solid #f03e3e;">
+                        <h3>2. Gastos Fijos y TC (ARS)</h3>
+                        <div class="value" id="res-gastos-fijos">$0.00</div>
+                    </div>
+                    <div class="card" style="border-top: 4px solid #37b24d;">
+                        <h3>3. Ingresos del Mes</h3>
+                        <div class="value" id="res-ingresos-mes">$0.00</div>
+                    </div>
+                    <div class="card" style="border-top: 4px solid #f59f00;">
+                        <h3>4. Total Gastos vs Ingresos</h3>
+                        <div class="value" id="res-balance">$0.00</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="ingresos" class="view">
+                <div class="card" style="margin-bottom: 20px;">
+                    <h2>Distribución de Objetivos (%)</h2>
+                    <label>Reserva: <input type="number" id="porcentaje-reserva" value="10" min="0" max="100"></label>
+                    <label style="margin-left: 10px;">Equipamiento: <input type="number" id="porcentaje-equipamiento" value="20" min="0" max="100"></label>
+                    <label style="margin-left: 10px;">Operativo: <input type="number" id="porcentaje-operativo" value="70" min="0" max="100"></label>
+                    <button id="btn-guardar-distribucion" style="margin-left: 20px;">Guardar %</button>
+                </div>
+
+                <div class="card">
+                    <h2>Gestión de Ingresos</h2>
+                    <form id="form-ingresos" style="margin-bottom: 20px; display: flex; gap: 10px;">
+                        <input type="text" id="ingreso-nombre" placeholder="Origen (ej. Cuotas)" required>
+                        <input type="number" id="ingreso-monto" placeholder="Monto ARS" required step="0.01">
+                        <button type="submit">Agregar</button>
+                    </form>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Origen</th>
+                                <th>Monto ARS</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-ingresos"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="gastos" class="view">
+                <div class="card" style="margin-bottom: 20px;">
+                    <h2>Configuración de Dólar</h2>
+                    <label>Dólar Débito: <input type="number" id="usd-debito" value="0"></label>
+                    <label style="margin-left: 20px;">Dólar Impuesto: <input type="number" id="usd-impuesto" value="0"></label>
+                    <button id="btn-guardar-dolar" style="margin-left: 20px;">Guardar Valores</button>
+                </div>
+
+                <div class="card">
+                    <h2>Gestión de Gastos</h2>
+                    <form id="form-gastos" style="margin-bottom: 20px; display: flex; gap: 10px;">
+                        <input type="text" id="gasto-nombre" placeholder="Nombre (ej. Zoom)" required>
+                        <input type="number" id="gasto-monto" placeholder="Monto" required step="0.01">
+                        <select id="gasto-moneda">
+                            <option value="ARS">ARS</option>
+                            <option value="USD">USD</option>
+                        </select>
+                        <select id="gasto-tipo">
+                            <option value="Fijo">Fijo</option>
+                            <option value="Tarjeta">Tarjeta de Crédito</option>
+                        </select>
+                        <button type="submit">Agregar</button>
+                    </form>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Monto Original</th>
+                                <th>Tipo</th>
+                                <th>Costo ARS</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-gastos"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-        // REEMPLAZAR CON TU CONFIGURACIÓN DE FIREBASE
+        // Configuración de Firebase
         const firebaseConfig = {
-  apiKey: "AIzaSyC8S5y_TJJFiL6Sqqwp6f2uidh4OiHDbnM",
-  authDomain: "priel-finanzas.firebaseapp.com",
-  projectId: "priel-finanzas",
-  storageBucket: "priel-finanzas.firebasestorage.app",
-  messagingSenderId: "732838355206",
-  appId: "1:732838355206:web:89030db6e12b371478fe87",
-  measurementId: "G-632D4L0458"
-};
+            apiKey: "AIzaSyC8S5y_TJJFiL6Sqqwp6f2uidh4OiHDbnM",
+            authDomain: "priel-finanzas.firebaseapp.com",
+            projectId: "priel-finanzas",
+            storageBucket: "priel-finanzas.firebasestorage.app",
+            messagingSenderId: "732838355206",
+            appId: "1:732838355206:web:89030db6e12b371478fe87",
+            measurementId: "G-632D4L0458"
+        };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -287,7 +299,9 @@
         const provider = new GoogleAuthProvider();
 
         // Referencias del DOM
-        const loginBtn = document.getElementById('login-btn');
+        const loginScreen = document.getElementById('login-screen');
+        const appContainer = document.getElementById('app-container');
+        const loginBtnMain = document.getElementById('login-btn-main');
         const logoutBtn = document.getElementById('logout-btn');
         const userEmailSpan = document.getElementById('user-email');
         const mesSelector = document.getElementById('mes-selector');
@@ -305,22 +319,24 @@
             document.getElementById('view-title').innerText = element.innerText;
         };
 
-        // Autenticación
+        // Autenticación con manejo de pantallas
         onAuthStateChanged(auth, (user) => {
             if (user) {
+                loginScreen.style.display = 'none';
+                appContainer.style.display = 'flex';
                 userEmailSpan.innerText = user.email;
-                loginBtn.style.display = 'none';
                 logoutBtn.style.display = 'inline-block';
                 actualizarDashboard();
             } else {
+                loginScreen.style.display = 'flex';
+                appContainer.style.display = 'none';
                 userEmailSpan.innerText = 'No autenticado';
-                loginBtn.style.display = 'inline-block';
                 logoutBtn.style.display = 'none';
                 limpiarInterfaz();
             }
         });
 
-        loginBtn.addEventListener('click', () => signInWithPopup(auth, provider));
+        loginBtnMain.addEventListener('click', () => signInWithPopup(auth, provider));
         logoutBtn.addEventListener('click', (e) => { e.preventDefault(); signOut(auth); });
         
         mesSelector.addEventListener('change', actualizarDashboard);
