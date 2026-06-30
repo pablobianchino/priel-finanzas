@@ -120,7 +120,7 @@
 
         .card {
             background-color: #ffffff;
-            border-radius: 12px;
+            border-radius: 8px;
             padding: 20px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.04);
             border: 1px solid var(--card-border);
@@ -275,19 +275,26 @@
             <!-- Vista 1: Resumen -->
             <div id="resumen" class="view active">
                 <div class="cards-grid">
-                    <div class="card">
+                    <div class="card" style="border-top: 4px solid #f29900;">
                         <h3>Ingresos y Distribución</h3>
-                        <div class="value" id="res-ingresos-dist" style="font-size: 16px;">$0.00</div>
+                        <div id="res-ingresos-dist">
+                            <div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: var(--text-main);">Total: $0.00</div>
+                            <div style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+                                <span style="color: var(--text-main);">Reserva:</span> $0.00<br>
+                                <span style="color: var(--text-main);">Equipamiento:</span> $0.00<br>
+                                <span style="color: var(--text-main);">Operativo:</span> $0.00
+                            </div>
+                        </div>
                     </div>
-                    <div class="card">
+                    <div class="card" style="border-top: 4px solid #174ea6;">
                         <h3>Gastos Totales (ARS)</h3>
                         <div class="value" id="res-gastos-fijos">$0.00</div>
                     </div>
-                    <div class="card">
+                    <div class="card" style="border-top: 4px solid #34A853;">
                         <h3>Ingresos del Mes</h3>
                         <div class="value" id="res-ingresos-mes">$0.00</div>
                     </div>
-                    <div class="card">
+                    <div class="card" style="border-top: 4px solid #EA4335;">
                         <h3>Total Gastos vs Ingresos</h3>
                         <div class="value" id="res-balance">$0.00</div>
                     </div>
@@ -332,7 +339,6 @@
             <!-- Vista 3: Gastos -->
             <div id="gastos" class="view">
                 
-                <!-- Tarjeta de Sumarizado Superior -->
                 <div class="card" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; background-color: #f1f3f4; border:none;">
                     <div>
                         <h3 style="margin:0; color:var(--text-muted); font-size: 14px;">Resumen del Mes</h3>
@@ -373,7 +379,6 @@
                             <button type="submit" class="btn-black">Agregar</button>
                         </div>
 
-                        <!-- Configuración de Compartir -->
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <input type="checkbox" id="add-gasto-compartir" style="width: 16px; height: 16px; cursor: pointer;" onchange="toggleDivisor('add')">
                             <label for="add-gasto-compartir" style="font-size: 14px; cursor: pointer;">Compartir gasto</label>
@@ -387,7 +392,6 @@
                             </select>
                         </div>
 
-                        <!-- Campos extras para tarjeta -->
                         <div id="add-campos-tarjeta" style="display: none; gap: 10px; align-items: center; flex-wrap: wrap;">
                             <select id="add-gasto-tarjeta">
                                 <option value="VISA">VISA</option>
@@ -560,7 +564,6 @@
         document.getElementById('filtro-tarjeta').addEventListener('change', renderTablaGastos);
         document.getElementById('filtro-texto-ingresos').addEventListener('input', renderTablaIngresos);
 
-        // Funciones UI Generales
         window.toggleCamposTarjeta = function(prefix) {
             const tipo = document.getElementById(`${prefix}-gasto-tipo`).value;
             document.getElementById(`${prefix}-campos-tarjeta`).style.display = tipo === 'Tarjeta' ? 'flex' : 'none';
@@ -578,7 +581,13 @@
         }
 
         function limpiarInterfaz() {
-            document.getElementById('res-ingresos-dist').innerText = "$0.00";
+            document.getElementById('res-ingresos-dist').innerHTML = `
+                <div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: var(--text-main);">Total: $0.00</div>
+                <div style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+                    <span style="color: var(--text-main);">Reserva:</span> $0.00<br>
+                    <span style="color: var(--text-main);">Equipamiento:</span> $0.00<br>
+                    <span style="color: var(--text-main);">Operativo:</span> $0.00
+                </div>`;
             document.getElementById('res-gastos-fijos').innerText = "$0.00";
             document.getElementById('res-ingresos-mes').innerText = "$0.00";
             document.getElementById('res-balance').innerText = "$0.00";
@@ -593,7 +602,6 @@
             calcularBalance();
         }
 
-        // --- LÓGICA DE GASTOS ---
         document.getElementById('btn-guardar-dolar').addEventListener('click', async () => {
             const docRef = doc(db, "finanzas", obtenerMesId());
             await setDoc(docRef, {
@@ -605,7 +613,6 @@
             actualizarDashboard();
         });
 
-        // Formulario de Agregar
         document.getElementById('form-gastos-agregar').addEventListener('submit', async (e) => {
             e.preventDefault();
             await procesarGuardadoGasto('add', null);
@@ -614,7 +621,6 @@
             toggleDivisor('add');
         });
 
-        // Formulario de Edición (Modal)
         document.getElementById('form-gastos-editar').addEventListener('submit', async (e) => {
             e.preventDefault();
             const idGasto = document.getElementById('edit-gasto-id').value;
@@ -687,12 +693,10 @@
             const verTarjeta = document.getElementById('filtro-tarjeta').checked;
 
             listaGastos.forEach((data) => {
-                // Filtros visuales (no afectan el total real de la tarjeta, pero aplicamos los filtros para la vista)
                 if (data.tipo === 'Fijo' && !verFijo) return;
                 if (data.tipo === 'Tarjeta' && !verTarjeta) return;
                 if (textoBuscar && !data.nombre.toLowerCase().includes(textoBuscar)) return;
 
-                // Cálculo matemático
                 let costoArsBase = data.monto;
                 if (data.moneda === 'USD') {
                     let vImpuesto = data.monto * dImpuesto;
@@ -708,7 +712,6 @@
                 if (data.tipo === 'Fijo') subtotalFijos += costoFinalArs;
                 if (data.tipo === 'Tarjeta') subtotalTarjetas += costoFinalArs;
 
-                // Formateo de texto de detalle
                 let detalleTexto = data.tipo;
                 if (data.tipo === 'Tarjeta') {
                     detalleTexto = `${data.tarjeta} (Cuota ${data.cuotas_pagadas}/${data.cuotas_totales})`;
@@ -717,7 +720,6 @@
                     detalleTexto += ` [Dividido en ${divisor}]`;
                 }
 
-                // Construcción de la fila
                 const tr = document.createElement('tr');
                 
                 const tdNombre = document.createElement('td');
@@ -761,7 +763,6 @@
                 tabla.appendChild(tr);
             });
 
-            // Actualizar tarjetas de resumen
             document.getElementById('res-gastos-fijos').innerText = `$${totalGastosGlobal.toFixed(2)}`;
             document.getElementById('sum-gastos-total').innerText = `$${totalGastosGlobal.toFixed(2)}`;
             document.getElementById('sum-gastos-fijos').innerText = `$${subtotalFijos.toFixed(2)}`;
@@ -950,12 +951,13 @@
             const vOp = totalIngresosGlobal * (pOp / 100);
 
             document.getElementById('res-ingresos-mes').innerText = `$${totalIngresosGlobal.toFixed(2)}`;
+            
             document.getElementById('res-ingresos-dist').innerHTML = `
-                <div style="margin-bottom: 8px;">Total: $${totalIngresosGlobal.toFixed(2)}</div>
-                <div style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
-                Reserva: $${vRes.toFixed(2)}<br>
-                Equipamiento: $${vEq.toFixed(2)}<br>
-                Operativo: $${vOp.toFixed(2)}
+                <div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: var(--text-main);">Total: $${totalIngresosGlobal.toFixed(2)}</div>
+                <div style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+                    <span style="color: var(--text-main);">Reserva:</span> $${vRes.toFixed(2)}<br>
+                    <span style="color: var(--text-main);">Equipamiento:</span> $${vEq.toFixed(2)}<br>
+                    <span style="color: var(--text-main);">Operativo:</span> $${vOp.toFixed(2)}
                 </div>
             `;
             calcularBalance();
