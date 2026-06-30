@@ -133,7 +133,7 @@
         th { padding: 12px 0; border-bottom: 2px solid var(--card-border); color: var(--text-muted); font-weight: 500; }
         td { padding: 12px 0; border-bottom: 1px solid #f1f3f4; }
         
-        /* Formularios y Botones Negros Redondeados */
+        /* Formularios y Botones */
         input {
             padding: 10px;
             border: 1px solid var(--card-border);
@@ -167,6 +167,18 @@
             cursor: pointer;
             font-weight: 600;
         }
+
+        .btn-edit {
+            background-color: #e8eaed;
+            color: #202124;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-right: 5px;
+        }
     </style>
 </head>
 <body>
@@ -183,10 +195,9 @@
         </div>
     </div>
 
-    <!-- Contenedor Principal (Oculto hasta el login) -->
+    <!-- Contenedor Principal -->
     <div id="app-container" style="display: none; width: 100%; height: 100%;">
         
-        <!-- Panel Izquierdo -->
         <nav class="sidebar">
             <div class="logo">Finanzas Priel</div>
             <button class="nav-btn active" onclick="switchView('resumen', this)">㗊 Resumen</button>
@@ -199,7 +210,6 @@
             </div>
         </nav>
 
-        <!-- Panel Principal -->
         <main class="main-content">
             <div class="topbar">
                 <div class="title">
@@ -291,28 +301,51 @@
                 </div>
 
                 <div class="card">
-                    <h2>Gestión de Gastos</h2>
-                    <form id="form-gastos" style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center;">
-                        <input type="text" id="gasto-nombre" placeholder="Nombre (ej. Zoom)" required>
-                        <input type="number" id="gasto-monto" placeholder="Monto" required step="0.01" style="width: 120px;">
-                        <select id="gasto-moneda" style="padding: 10px; border-radius: 8px; border: 1px solid var(--card-border);">
-                            <option value="ARS">ARS</option>
-                            <option value="USD">USD</option>
-                        </select>
-                        <select id="gasto-tipo" style="padding: 10px; border-radius: 8px; border: 1px solid var(--card-border);">
-                            <option value="Fijo">Fijo</option>
-                            <option value="Tarjeta">Tarjeta de Crédito</option>
-                        </select>
-                        <button type="submit" class="btn-black">Agregar</button>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h2 style="margin: 0;">Gestión de Gastos</h2>
+                        <button onclick="copiarMesAnterior()" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">Importar Mes Anterior</button>
+                    </div>
+                    
+                    <form id="form-gastos" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
+                        <input type="hidden" id="gasto-id">
+                        
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <input type="text" id="gasto-nombre" placeholder="Nombre (ej. Zoom)" required>
+                            <input type="number" id="gasto-monto" placeholder="Monto Cuota/Total" required step="0.01" style="width: 130px;">
+                            <select id="gasto-moneda" style="padding: 10px; border-radius: 8px; border: 1px solid var(--card-border);">
+                                <option value="ARS">ARS</option>
+                                <option value="USD">USD</option>
+                            </select>
+                            <select id="gasto-tipo" style="padding: 10px; border-radius: 8px; border: 1px solid var(--card-border);">
+                                <option value="Fijo">Fijo</option>
+                                <option value="Tarjeta">Tarjeta de Crédito</option>
+                            </select>
+                            <button type="submit" id="btn-submit-gasto" class="btn-black">Agregar</button>
+                            <button type="button" id="btn-cancelar-edicion" class="btn-delete" style="display: none;">Cancelar</button>
+                        </div>
+
+                        <!-- Campos extras para tarjeta -->
+                        <div id="campos-tarjeta" style="display: none; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <select id="gasto-tarjeta" style="padding: 10px; border-radius: 8px; border: 1px solid var(--card-border);">
+                                <option value="VISA">VISA</option>
+                                <option value="MASTERCARD">MASTERCARD</option>
+                                <option value="MP">MP</option>
+                            </select>
+                            <input type="number" id="gasto-cuotas-totales" placeholder="Cuotas Totales" min="1" style="width: 120px;">
+                            <input type="number" id="gasto-cuotas-pagadas" placeholder="Cuotas Pagadas" min="1" style="width: 120px;">
+                            <label style="font-size: 14px; color: var(--text-muted); display: flex; align-items: center; gap: 5px;">
+                                Dividir monto en: <input type="number" id="gasto-divisor" value="1" min="1" style="width: 60px;">
+                            </label>
+                        </div>
                     </form>
 
                     <table>
                         <thead>
                             <tr>
                                 <th>Nombre</th>
-                                <th>Monto Original</th>
-                                <th>Tipo</th>
-                                <th>Costo ARS</th>
+                                <th>Monto Ingresado</th>
+                                <th>Detalle</th>
+                                <th>Costo Final (ARS)</th>
                                 <th>Acción</th>
                             </tr>
                         </thead>
@@ -326,7 +359,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, collection, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         // Configuración de Firebase
         const firebaseConfig = {
@@ -355,6 +388,7 @@
         
         let totalGastosGlobal = 0;
         let totalIngresosGlobal = 0;
+        window.gastosDataList = {}; // Cache para edición
 
         // Navegación
         window.switchView = function(viewId, element) {
@@ -362,10 +396,10 @@
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(viewId).classList.add('active');
             element.classList.add('active');
-            document.getElementById('view-title').innerText = element.innerText.replace(/[^\w\s]/gi, '').trim(); // Quita el emoji del título
+            document.getElementById('view-title').innerText = element.innerText.replace(/[^\w\s]/gi, '').trim();
         };
 
-        // Autenticación con manejo de pantallas
+        // Autenticación
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 loginScreen.style.display = 'none';
@@ -399,6 +433,7 @@
             document.getElementById('res-balance').innerText = "$0.00";
             document.getElementById('tabla-gastos').innerHTML = "";
             document.getElementById('tabla-ingresos').innerHTML = "";
+            resetFormGasto();
         }
 
         async function actualizarDashboard() {
@@ -408,7 +443,14 @@
             calcularBalance();
         }
 
-        // --- GASTOS ---
+        // --- LÓGICA DE GASTOS ---
+        
+        // Mostrar/Ocultar campos de tarjeta
+        document.getElementById('gasto-tipo').addEventListener('change', (e) => {
+            const camposTarjeta = document.getElementById('campos-tarjeta');
+            camposTarjeta.style.display = e.target.value === 'Tarjeta' ? 'flex' : 'none';
+        });
+
         document.getElementById('btn-guardar-dolar').addEventListener('click', async () => {
             const docRef = doc(db, "finanzas", obtenerMesId());
             await setDoc(docRef, {
@@ -422,15 +464,47 @@
 
         document.getElementById('form-gastos').addEventListener('submit', async (e) => {
             e.preventDefault();
-            await addDoc(collection(db, "finanzas", obtenerMesId(), "gastos"), {
+            const idGasto = document.getElementById('gasto-id').value;
+            const tipo = document.getElementById('gasto-tipo').value;
+            
+            let datosGasto = {
                 nombre: document.getElementById('gasto-nombre').value,
                 monto: parseFloat(document.getElementById('gasto-monto').value),
                 moneda: document.getElementById('gasto-moneda').value,
-                tipo: document.getElementById('gasto-tipo').value
-            });
-            document.getElementById('form-gastos').reset();
+                tipo: tipo
+            };
+
+            if (tipo === 'Tarjeta') {
+                datosGasto.tarjeta = document.getElementById('gasto-tarjeta').value;
+                datosGasto.cuotas_totales = parseInt(document.getElementById('gasto-cuotas-totales').value) || 1;
+                datosGasto.cuotas_pagadas = parseInt(document.getElementById('gasto-cuotas-pagadas').value) || 1;
+                datosGasto.divisor = parseInt(document.getElementById('gasto-divisor').value) || 1;
+            } else {
+                datosGasto.divisor = 1;
+            }
+
+            if (idGasto) {
+                // Actualizar existente
+                const docRef = doc(db, "finanzas", obtenerMesId(), "gastos", idGasto);
+                await updateDoc(docRef, datosGasto);
+            } else {
+                // Crear nuevo
+                await addDoc(collection(db, "finanzas", obtenerMesId(), "gastos"), datosGasto);
+            }
+            
+            resetFormGasto();
             actualizarDashboard();
         });
+
+        document.getElementById('btn-cancelar-edicion').addEventListener('click', resetFormGasto);
+
+        function resetFormGasto() {
+            document.getElementById('form-gastos').reset();
+            document.getElementById('gasto-id').value = "";
+            document.getElementById('btn-submit-gasto').innerText = "Agregar";
+            document.getElementById('btn-cancelar-edicion').style.display = "none";
+            document.getElementById('campos-tarjeta').style.display = "none";
+        }
 
         async function cargarGastos() {
             const mesId = obtenerMesId();
@@ -448,19 +522,37 @@
             const tabla = document.getElementById('tabla-gastos');
             tabla.innerHTML = '';
             totalGastosGlobal = 0;
+            window.gastosDataList = {};
 
             querySnapshot.forEach((d) => {
                 const data = d.data();
-                let costoArs = data.moneda === 'USD' ? data.monto * (dDebito + dImpuesto) : data.monto;
-                totalGastosGlobal += costoArs;
+                window.gastosDataList[d.id] = data; // Guardar en caché para edición
+
+                // Cálculo de ARS base
+                let costoArsBase = data.moneda === 'USD' ? data.monto * (dDebito + dImpuesto) : data.monto;
+                // Aplicar divisor si corresponde
+                let divisor = data.divisor || 1;
+                let costoFinalArs = costoArsBase / divisor;
+                
+                totalGastosGlobal += costoFinalArs;
+
+                // Formatear detalles
+                let detalleTexto = data.tipo;
+                if (data.tipo === 'Tarjeta') {
+                    detalleTexto = `${data.tarjeta} (Cuota ${data.cuotas_pagadas}/${data.cuotas_totales})`;
+                    if (divisor > 1) detalleTexto += ` div/${divisor}`;
+                }
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${data.nombre}</td>
                     <td>$${data.monto.toFixed(2)} ${data.moneda}</td>
-                    <td>${data.tipo}</td>
-                    <td>$${costoArs.toFixed(2)} ARS</td>
-                    <td><button class="btn-delete" onclick="borrarRegistro('gastos', '${d.id}')">Eliminar</button></td>
+                    <td>${detalleTexto}</td>
+                    <td style="font-weight: 600;">$${costoFinalArs.toFixed(2)} ARS</td>
+                    <td>
+                        <button class="btn-edit" onclick="editarGasto('${d.id}')">Editar</button>
+                        <button class="btn-delete" onclick="borrarRegistro('gastos', '${d.id}')">Borrar</button>
+                    </td>
                 `;
                 tabla.appendChild(tr);
             });
@@ -468,7 +560,70 @@
             document.getElementById('res-gastos-fijos').innerText = `$${totalGastosGlobal.toFixed(2)}`;
         }
 
-        // --- INGRESOS ---
+        window.editarGasto = function(id) {
+            const data = window.gastosDataList[id];
+            if(!data) return;
+
+            document.getElementById('gasto-id').value = id;
+            document.getElementById('gasto-nombre').value = data.nombre;
+            document.getElementById('gasto-monto').value = data.monto;
+            document.getElementById('gasto-moneda').value = data.moneda;
+            document.getElementById('gasto-tipo').value = data.tipo;
+
+            const camposTarjeta = document.getElementById('campos-tarjeta');
+            if (data.tipo === 'Tarjeta') {
+                camposTarjeta.style.display = 'flex';
+                document.getElementById('gasto-tarjeta').value = data.tarjeta || 'VISA';
+                document.getElementById('gasto-cuotas-totales').value = data.cuotas_totales || 1;
+                document.getElementById('gasto-cuotas-pagadas').value = data.cuotas_pagadas || 1;
+                document.getElementById('gasto-divisor').value = data.divisor || 1;
+            } else {
+                camposTarjeta.style.display = 'none';
+            }
+
+            document.getElementById('btn-submit-gasto').innerText = "Guardar";
+            document.getElementById('btn-cancelar-edicion').style.display = "inline-block";
+        };
+
+        window.copiarMesAnterior = async function() {
+            if(!confirm("¿Copiar gastos del mes anterior? Las cuotas de tarjetas sumarán +1 automáticamente.")) return;
+
+            let mesActualNum = parseInt(mesSelector.value);
+            let anioActualNum = parseInt(anioSelector.value);
+            
+            let mesPrevNum = mesActualNum - 1;
+            let anioPrevNum = anioActualNum;
+            if (mesPrevNum === 0) {
+                mesPrevNum = 12;
+                anioPrevNum -= 1;
+            }
+
+            const mesPrevStr = `${anioPrevNum}-${mesPrevNum.toString().padStart(2, '0')}`;
+            const mesActualStr = obtenerMesId();
+
+            const snapshotAnterior = await getDocs(collection(db, "finanzas", mesPrevStr, "gastos"));
+            if (snapshotAnterior.empty) {
+                alert("No hay gastos registrados en el mes anterior.");
+                return;
+            }
+
+            for (const d of snapshotAnterior.docs) {
+                const data = d.data();
+                
+                if (data.tipo === 'Tarjeta') {
+                    if (data.cuotas_pagadas >= data.cuotas_totales) {
+                        continue; // Si ya se completaron las cuotas, no se copia.
+                    }
+                    data.cuotas_pagadas += 1;
+                }
+                
+                await addDoc(collection(db, "finanzas", mesActualStr, "gastos"), data);
+            }
+            
+            actualizarDashboard();
+        };
+
+        // --- LÓGICA DE INGRESOS ---
         document.getElementById('btn-guardar-distribucion').addEventListener('click', async () => {
             const docRef = doc(db, "finanzas", obtenerMesId());
             await setDoc(docRef, {
@@ -519,7 +674,7 @@
                 tr.innerHTML = `
                     <td>${data.nombre}</td>
                     <td>$${data.monto.toFixed(2)}</td>
-                    <td><button class="btn-delete" onclick="borrarRegistro('ingresos', '${d.id}')">Eliminar</button></td>
+                    <td><button class="btn-delete" onclick="borrarRegistro('ingresos', '${d.id}')">Borrar</button></td>
                 `;
                 tabla.appendChild(tr);
             });
