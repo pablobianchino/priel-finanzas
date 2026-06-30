@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Finanzas Priel</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --bg-color: #f8f9fa;
@@ -134,7 +135,7 @@
         td { padding: 12px 0; border-bottom: 1px solid #f1f3f4; }
         
         /* Formularios y Botones */
-        input {
+        input, select {
             padding: 10px;
             border: 1px solid var(--card-border);
             border-radius: 8px;
@@ -153,32 +154,18 @@
             transition: 0.2s;
         }
 
-        .btn-black:hover {
-            background-color: #333333;
+        .btn-black:hover { background-color: #333333; }
+
+        .btn-icon {
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px;
+            transition: transform 0.1s;
         }
 
-        .btn-delete {
-            background-color: #fce8e6;
-            color: #d93025;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            cursor: pointer;
-            font-weight: 600;
-        }
-
-        .btn-edit {
-            background-color: #e8eaed;
-            color: #202124;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            cursor: pointer;
-            font-weight: 600;
-            margin-right: 5px;
-        }
+        .btn-icon:hover { transform: scale(1.1); }
 
         .filter-bar {
             display: flex;
@@ -188,6 +175,37 @@
             padding: 10px 15px;
             border-radius: 8px;
             margin-bottom: 15px;
+        }
+
+        /* Modales */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-close {
+            background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted);
         }
     </style>
 </head>
@@ -262,7 +280,7 @@
                         <div class="value" id="res-ingresos-dist" style="font-size: 16px;">$0.00</div>
                     </div>
                     <div class="card">
-                        <h3>Gastos Fijos y TC (ARS)</h3>
+                        <h3>Gastos Totales (ARS)</h3>
                         <div class="value" id="res-gastos-fijos">$0.00</div>
                     </div>
                     <div class="card">
@@ -313,6 +331,20 @@
 
             <!-- Vista 3: Gastos -->
             <div id="gastos" class="view">
+                
+                <!-- Tarjeta de Sumarizado Superior -->
+                <div class="card" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; background-color: #f1f3f4; border:none;">
+                    <div>
+                        <h3 style="margin:0; color:var(--text-muted); font-size: 14px;">Resumen del Mes</h3>
+                        <div style="font-size: 16px; font-weight: 600; margin-top: 8px; color: var(--text-main);">
+                            Total: <span id="sum-gastos-total">$0.00</span> &nbsp;|&nbsp; 
+                            Fijos: <span id="sum-gastos-fijos">$0.00</span> &nbsp;|&nbsp; 
+                            Tarjeta: <span id="sum-gastos-tarjeta">$0.00</span>
+                        </div>
+                    </div>
+                    <button class="btn-black" onclick="abrirModalGrafico()">📊 Ver Gráfico</button>
+                </div>
+
                 <div class="card" style="margin-bottom: 20px;">
                     <h2>Configuración de Dólar</h2>
                     <label>Dólar Débito: <input type="number" id="usd-debito" value="0" style="width: 100px;" step="0.01"></label>
@@ -323,33 +355,30 @@
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h2 style="margin: 0;">Gestión de Gastos</h2>
-                        <button onclick="copiarMesAnterior()" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">Importar Mes Anterior</button>
+                        <button onclick="copiarMesAnterior()" class="btn-black" style="background-color: #e8eaed; color: #202124;">Importar Mes Anterior</button>
                     </div>
                     
-                    <form id="form-gastos" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
-                        <input type="hidden" id="gasto-id">
-                        
+                    <form id="form-gastos-agregar" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                            <input type="text" id="gasto-nombre" placeholder="Nombre (ej. Zoom)" required>
-                            <input type="number" id="gasto-monto" placeholder="Monto Cuota/Total" required step="0.01" style="width: 130px;">
-                            <select id="gasto-moneda" style="padding: 10px; border-radius: 8px; border: 1px solid var(--card-border);">
+                            <input type="text" id="add-gasto-nombre" placeholder="Nombre (ej. Zoom)" required>
+                            <input type="number" id="add-gasto-monto" placeholder="Monto Cuota/Total" required step="0.01" style="width: 130px;">
+                            <select id="add-gasto-moneda">
                                 <option value="ARS">ARS</option>
                                 <option value="USD">USD</option>
                             </select>
-                            <select id="gasto-tipo" style="padding: 10px; border-radius: 8px; border: 1px solid var(--card-border);">
+                            <select id="add-gasto-tipo" onchange="toggleCamposTarjeta('add')">
                                 <option value="Fijo">Fijo</option>
                                 <option value="Tarjeta">Tarjeta de Crédito</option>
                             </select>
-                            <button type="submit" id="btn-submit-gasto" class="btn-black">Agregar</button>
-                            <button type="button" id="btn-cancelar-edicion" class="btn-delete" style="display: none;">Cancelar</button>
+                            <button type="submit" class="btn-black">Agregar</button>
                         </div>
 
-                        <!-- Configuración de Compartir (Para cualquier tipo de gasto) -->
+                        <!-- Configuración de Compartir -->
                         <div style="display: flex; align-items: center; gap: 10px;">
-                            <input type="checkbox" id="gasto-compartir" style="width: 16px; height: 16px; cursor: pointer;">
-                            <label for="gasto-compartir" style="font-size: 14px; cursor: pointer;">Compartir gasto</label>
+                            <input type="checkbox" id="add-gasto-compartir" style="width: 16px; height: 16px; cursor: pointer;" onchange="toggleDivisor('add')">
+                            <label for="add-gasto-compartir" style="font-size: 14px; cursor: pointer;">Compartir gasto</label>
                             
-                            <select id="gasto-divisor" style="padding: 8px; border-radius: 8px; border: 1px solid var(--card-border); display: none;">
+                            <select id="add-gasto-divisor" style="display: none;">
                                 <option value="2">Dividir en 2</option>
                                 <option value="3">Dividir en 3</option>
                                 <option value="4">Dividir en 4</option>
@@ -359,14 +388,14 @@
                         </div>
 
                         <!-- Campos extras para tarjeta -->
-                        <div id="campos-tarjeta" style="display: none; gap: 10px; align-items: center; flex-wrap: wrap;">
-                            <select id="gasto-tarjeta" style="padding: 10px; border-radius: 8px; border: 1px solid var(--card-border);">
+                        <div id="add-campos-tarjeta" style="display: none; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <select id="add-gasto-tarjeta">
                                 <option value="VISA">VISA</option>
                                 <option value="MASTERCARD">MASTERCARD</option>
                                 <option value="MP">MP</option>
                             </select>
-                            <input type="number" id="gasto-cuotas-totales" placeholder="Cuotas Totales" min="1" style="width: 120px;">
-                            <input type="number" id="gasto-cuotas-pagadas" placeholder="Cuotas Pagadas" min="1" style="width: 120px;">
+                            <input type="number" id="add-gasto-cuotas-totales" placeholder="Cuotas Totales" min="1" style="width: 120px;">
+                            <input type="number" id="add-gasto-cuotas-pagadas" placeholder="Cuotas Pagadas" min="1" style="width: 120px;">
                         </div>
                     </form>
 
@@ -397,12 +426,75 @@
         </main>
     </div>
 
+    <!-- Modal Editar Gasto -->
+    <div id="modal-editar" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 style="margin: 0; font-size: 18px;">Editar Gasto</h2>
+                <button class="modal-close" onclick="cerrarModal('modal-editar')">✖</button>
+            </div>
+            
+            <form id="form-gastos-editar" style="display: flex; flex-direction: column; gap: 15px;">
+                <input type="hidden" id="edit-gasto-id">
+                
+                <input type="text" id="edit-gasto-nombre" placeholder="Nombre" required style="width: 100%; box-sizing: border-box;">
+                
+                <div style="display: flex; gap: 10px;">
+                    <input type="number" id="edit-gasto-monto" placeholder="Monto" required step="0.01" style="flex: 1;">
+                    <select id="edit-gasto-moneda">
+                        <option value="ARS">ARS</option>
+                        <option value="USD">USD</option>
+                    </select>
+                </div>
+
+                <select id="edit-gasto-tipo" onchange="toggleCamposTarjeta('edit')" style="width: 100%; box-sizing: border-box;">
+                    <option value="Fijo">Fijo</option>
+                    <option value="Tarjeta">Tarjeta de Crédito</option>
+                </select>
+
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" id="edit-gasto-compartir" style="width: 16px; height: 16px; cursor: pointer;" onchange="toggleDivisor('edit')">
+                    <label for="edit-gasto-compartir" style="font-size: 14px; cursor: pointer;">Compartir gasto</label>
+                    <select id="edit-gasto-divisor" style="display: none;">
+                        <option value="2">Dividir en 2</option>
+                        <option value="3">Dividir en 3</option>
+                        <option value="4">Dividir en 4</option>
+                        <option value="5">Dividir en 5</option>
+                        <option value="6">Dividir en 6</option>
+                    </select>
+                </div>
+
+                <div id="edit-campos-tarjeta" style="display: none; gap: 10px; flex-wrap: wrap;">
+                    <select id="edit-gasto-tarjeta" style="flex: 1;">
+                        <option value="VISA">VISA</option>
+                        <option value="MASTERCARD">MASTERCARD</option>
+                        <option value="MP">MP</option>
+                    </select>
+                    <input type="number" id="edit-gasto-cuotas-totales" placeholder="Cuotas Tot" min="1" style="width: 100px;">
+                    <input type="number" id="edit-gasto-cuotas-pagadas" placeholder="Cuotas Pag" min="1" style="width: 100px;">
+                </div>
+
+                <button type="submit" class="btn-black" style="margin-top: 10px;">Guardar Cambios</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Gráfico -->
+    <div id="modal-grafico" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 style="margin: 0; font-size: 18px;">Comparativa de Gastos</h2>
+                <button class="modal-close" onclick="cerrarModal('modal-grafico')">✖</button>
+            </div>
+            <canvas id="grafico-gastos" width="400" height="400"></canvas>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-        // Configuración de Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyC8S5y_TJJFiL6Sqqwp6f2uidh4OiHDbnM",
             authDomain: "priel-finanzas.firebaseapp.com",
@@ -425,13 +517,14 @@
         const anioSelector = document.getElementById('anio-selector');
         
         let totalGastosGlobal = 0;
+        let subtotalFijos = 0;
+        let subtotalTarjetas = 0;
         let totalIngresosGlobal = 0;
         
-        // Arrays en memoria para aplicar filtros de búsqueda sin llamar a BD
         let listaGastos = [];
         let listaIngresos = [];
+        let graficoInstance = null;
 
-        // Navegación
         window.switchView = function(viewId, element) {
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -440,7 +533,6 @@
             document.getElementById('view-title').innerText = element.innerText.replace(/[^\w\s]/gi, '').trim();
         };
 
-        // Autenticación
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 loginScreen.style.display = 'none';
@@ -463,16 +555,23 @@
         mesSelector.addEventListener('change', actualizarDashboard);
         anioSelector.addEventListener('change', actualizarDashboard);
 
-        // Filtros (Event Listeners)
         document.getElementById('filtro-texto-gastos').addEventListener('input', renderTablaGastos);
         document.getElementById('filtro-fijo').addEventListener('change', renderTablaGastos);
         document.getElementById('filtro-tarjeta').addEventListener('change', renderTablaGastos);
         document.getElementById('filtro-texto-ingresos').addEventListener('input', renderTablaIngresos);
 
-        // UI Compartir Gasto
-        document.getElementById('gasto-compartir').addEventListener('change', (e) => {
-            document.getElementById('gasto-divisor').style.display = e.target.checked ? 'inline-block' : 'none';
-        });
+        // Funciones UI Generales
+        window.toggleCamposTarjeta = function(prefix) {
+            const tipo = document.getElementById(`${prefix}-gasto-tipo`).value;
+            document.getElementById(`${prefix}-campos-tarjeta`).style.display = tipo === 'Tarjeta' ? 'flex' : 'none';
+        }
+        window.toggleDivisor = function(prefix) {
+            const checked = document.getElementById(`${prefix}-gasto-compartir`).checked;
+            document.getElementById(`${prefix}-gasto-divisor`).style.display = checked ? 'inline-block' : 'none';
+        }
+        window.cerrarModal = function(id) {
+            document.getElementById(id).style.display = 'none';
+        }
 
         function obtenerMesId() {
             return `${anioSelector.value}-${mesSelector.value}`;
@@ -485,7 +584,6 @@
             document.getElementById('res-balance').innerText = "$0.00";
             document.getElementById('tabla-gastos').innerHTML = "";
             document.getElementById('tabla-ingresos').innerHTML = "";
-            resetFormGasto();
         }
 
         async function actualizarDashboard() {
@@ -496,10 +594,6 @@
         }
 
         // --- LÓGICA DE GASTOS ---
-        document.getElementById('gasto-tipo').addEventListener('change', (e) => {
-            document.getElementById('campos-tarjeta').style.display = e.target.value === 'Tarjeta' ? 'flex' : 'none';
-        });
-
         document.getElementById('btn-guardar-dolar').addEventListener('click', async () => {
             const docRef = doc(db, "finanzas", obtenerMesId());
             await setDoc(docRef, {
@@ -511,24 +605,39 @@
             actualizarDashboard();
         });
 
-        document.getElementById('form-gastos').addEventListener('submit', async (e) => {
+        // Formulario de Agregar
+        document.getElementById('form-gastos-agregar').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const idGasto = document.getElementById('gasto-id').value;
-            const tipo = document.getElementById('gasto-tipo').value;
-            const checkboxCompartir = document.getElementById('gasto-compartir').checked;
+            await procesarGuardadoGasto('add', null);
+            document.getElementById('form-gastos-agregar').reset();
+            toggleCamposTarjeta('add');
+            toggleDivisor('add');
+        });
+
+        // Formulario de Edición (Modal)
+        document.getElementById('form-gastos-editar').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const idGasto = document.getElementById('edit-gasto-id').value;
+            await procesarGuardadoGasto('edit', idGasto);
+            cerrarModal('modal-editar');
+        });
+
+        async function procesarGuardadoGasto(prefix, idGasto) {
+            const tipo = document.getElementById(`${prefix}-gasto-tipo`).value;
+            const checkboxCompartir = document.getElementById(`${prefix}-gasto-compartir`).checked;
             
             let datosGasto = {
-                nombre: document.getElementById('gasto-nombre').value,
-                monto: parseFloat(document.getElementById('gasto-monto').value),
-                moneda: document.getElementById('gasto-moneda').value,
+                nombre: document.getElementById(`${prefix}-gasto-nombre`).value,
+                monto: parseFloat(document.getElementById(`${prefix}-gasto-monto`).value),
+                moneda: document.getElementById(`${prefix}-gasto-moneda`).value,
                 tipo: tipo,
-                divisor: checkboxCompartir ? parseInt(document.getElementById('gasto-divisor').value) || 1 : 1
+                divisor: checkboxCompartir ? parseInt(document.getElementById(`${prefix}-gasto-divisor`).value) || 1 : 1
             };
 
             if (tipo === 'Tarjeta') {
-                datosGasto.tarjeta = document.getElementById('gasto-tarjeta').value;
-                datosGasto.cuotas_totales = parseInt(document.getElementById('gasto-cuotas-totales').value) || 1;
-                datosGasto.cuotas_pagadas = parseInt(document.getElementById('gasto-cuotas-pagadas').value) || 1;
+                datosGasto.tarjeta = document.getElementById(`${prefix}-gasto-tarjeta`).value;
+                datosGasto.cuotas_totales = parseInt(document.getElementById(`${prefix}-gasto-cuotas-totales`).value) || 1;
+                datosGasto.cuotas_pagadas = parseInt(document.getElementById(`${prefix}-gasto-cuotas-pagadas`).value) || 1;
             }
 
             if (idGasto) {
@@ -537,20 +646,7 @@
             } else {
                 await addDoc(collection(db, "finanzas", obtenerMesId(), "gastos"), datosGasto);
             }
-            
-            resetFormGasto();
             actualizarDashboard();
-        });
-
-        document.getElementById('btn-cancelar-edicion').addEventListener('click', resetFormGasto);
-
-        function resetFormGasto() {
-            document.getElementById('form-gastos').reset();
-            document.getElementById('gasto-id').value = ""; // Clave para evitar sobreescritura accidental
-            document.getElementById('btn-submit-gasto').innerText = "Agregar";
-            document.getElementById('btn-cancelar-edicion').style.display = "none";
-            document.getElementById('campos-tarjeta').style.display = "none";
-            document.getElementById('gasto-divisor').style.display = "none";
         }
 
         async function cargarGastos() {
@@ -578,7 +674,10 @@
         function renderTablaGastos() {
             const tabla = document.getElementById('tabla-gastos');
             tabla.innerHTML = '';
+            
             totalGastosGlobal = 0;
+            subtotalFijos = 0;
+            subtotalTarjetas = 0;
 
             const dDebito = parseFloat(document.getElementById('usd-debito').value) || 0;
             const dImpuesto = parseFloat(document.getElementById('usd-impuesto').value) || 0;
@@ -588,7 +687,7 @@
             const verTarjeta = document.getElementById('filtro-tarjeta').checked;
 
             listaGastos.forEach((data) => {
-                // Filtros
+                // Filtros visuales (no afectan el total real de la tarjeta, pero aplicamos los filtros para la vista)
                 if (data.tipo === 'Fijo' && !verFijo) return;
                 if (data.tipo === 'Tarjeta' && !verTarjeta) return;
                 if (textoBuscar && !data.nombre.toLowerCase().includes(textoBuscar)) return;
@@ -604,7 +703,10 @@
 
                 let divisor = data.divisor || 1;
                 let costoFinalArs = costoArsBase / divisor;
+                
                 totalGastosGlobal += costoFinalArs;
+                if (data.tipo === 'Fijo') subtotalFijos += costoFinalArs;
+                if (data.tipo === 'Tarjeta') subtotalTarjetas += costoFinalArs;
 
                 // Formateo de texto de detalle
                 let detalleTexto = data.tipo;
@@ -615,7 +717,7 @@
                     detalleTexto += ` [Dividido en ${divisor}]`;
                 }
 
-                // Construcción segura de la fila
+                // Construcción de la fila
                 const tr = document.createElement('tr');
                 
                 const tdNombre = document.createElement('td');
@@ -629,18 +731,20 @@
 
                 const tdCosto = document.createElement('td');
                 tdCosto.style.fontWeight = '600';
-                tdCosto.textContent = `$${costoFinalArs.toFixed(2)} ARS`;
+                tdCosto.textContent = `$${costoFinalArs.toFixed(2)}`;
 
                 const tdAcciones = document.createElement('td');
                 
                 const btnEdit = document.createElement('button');
-                btnEdit.className = 'btn-edit';
-                btnEdit.textContent = 'Editar';
-                btnEdit.addEventListener('click', () => editarGasto(data));
+                btnEdit.className = 'btn-icon';
+                btnEdit.textContent = '✏️';
+                btnEdit.title = 'Editar';
+                btnEdit.addEventListener('click', () => abrirModalEdicion(data));
 
                 const btnBorrar = document.createElement('button');
-                btnBorrar.className = 'btn-delete';
-                btnBorrar.textContent = 'Borrar';
+                btnBorrar.className = 'btn-icon';
+                btnBorrar.textContent = '🗑️';
+                btnBorrar.title = 'Borrar';
                 btnBorrar.addEventListener('click', async () => {
                     await deleteDoc(doc(db, "finanzas", obtenerMesId(), "gastos", data.id));
                     actualizarDashboard();
@@ -657,39 +761,67 @@
                 tabla.appendChild(tr);
             });
 
+            // Actualizar tarjetas de resumen
             document.getElementById('res-gastos-fijos').innerText = `$${totalGastosGlobal.toFixed(2)}`;
-            calcularBalance(); // Asegura sincronía al filtrar
+            document.getElementById('sum-gastos-total').innerText = `$${totalGastosGlobal.toFixed(2)}`;
+            document.getElementById('sum-gastos-fijos').innerText = `$${subtotalFijos.toFixed(2)}`;
+            document.getElementById('sum-gastos-tarjeta').innerText = `$${subtotalTarjetas.toFixed(2)}`;
+            
+            calcularBalance(); 
         }
 
-        window.editarGasto = function(data) {
-            document.getElementById('gasto-id').value = data.id;
-            document.getElementById('gasto-nombre').value = data.nombre;
-            document.getElementById('gasto-monto').value = data.monto;
-            document.getElementById('gasto-moneda').value = data.moneda;
-            document.getElementById('gasto-tipo').value = data.tipo;
+        window.abrirModalEdicion = function(data) {
+            document.getElementById('edit-gasto-id').value = data.id;
+            document.getElementById('edit-gasto-nombre').value = data.nombre;
+            document.getElementById('edit-gasto-monto').value = data.monto;
+            document.getElementById('edit-gasto-moneda').value = data.moneda;
+            document.getElementById('edit-gasto-tipo').value = data.tipo;
 
             if (data.divisor && data.divisor > 1) {
-                document.getElementById('gasto-compartir').checked = true;
-                document.getElementById('gasto-divisor').style.display = 'inline-block';
-                document.getElementById('gasto-divisor').value = data.divisor;
+                document.getElementById('edit-gasto-compartir').checked = true;
+                document.getElementById('edit-gasto-divisor').style.display = 'inline-block';
+                document.getElementById('edit-gasto-divisor').value = data.divisor;
             } else {
-                document.getElementById('gasto-compartir').checked = false;
-                document.getElementById('gasto-divisor').style.display = 'none';
-                document.getElementById('gasto-divisor').value = 1;
+                document.getElementById('edit-gasto-compartir').checked = false;
+                document.getElementById('edit-gasto-divisor').style.display = 'none';
+                document.getElementById('edit-gasto-divisor').value = 2;
             }
 
-            const camposTarjeta = document.getElementById('campos-tarjeta');
+            toggleCamposTarjeta('edit');
             if (data.tipo === 'Tarjeta') {
-                camposTarjeta.style.display = 'flex';
-                document.getElementById('gasto-tarjeta').value = data.tarjeta || 'VISA';
-                document.getElementById('gasto-cuotas-totales').value = data.cuotas_totales || 1;
-                document.getElementById('gasto-cuotas-pagadas').value = data.cuotas_pagadas || 1;
-            } else {
-                camposTarjeta.style.display = 'none';
+                document.getElementById('edit-gasto-tarjeta').value = data.tarjeta || 'VISA';
+                document.getElementById('edit-gasto-cuotas-totales').value = data.cuotas_totales || 1;
+                document.getElementById('edit-gasto-cuotas-pagadas').value = data.cuotas_pagadas || 1;
             }
 
-            document.getElementById('btn-submit-gasto').innerText = "Guardar";
-            document.getElementById('btn-cancelar-edicion').style.display = "inline-block";
+            document.getElementById('modal-editar').style.display = 'flex';
+        };
+
+        window.abrirModalGrafico = function() {
+            document.getElementById('modal-grafico').style.display = 'flex';
+            const ctx = document.getElementById('grafico-gastos').getContext('2d');
+            
+            if (graficoInstance) {
+                graficoInstance.destroy();
+            }
+
+            graficoInstance = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['Gastos Fijos', 'Tarjeta de Crédito'],
+                    datasets: [{
+                        data: [subtotalFijos, subtotalTarjetas],
+                        backgroundColor: ['#4285F4', '#EA4335'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
         };
 
         window.copiarMesAnterior = async function() {
@@ -794,8 +926,9 @@
 
                 const tdAcciones = document.createElement('td');
                 const btnBorrar = document.createElement('button');
-                btnBorrar.className = 'btn-delete';
-                btnBorrar.textContent = 'Borrar';
+                btnBorrar.className = 'btn-icon';
+                btnBorrar.textContent = '🗑️';
+                btnBorrar.title = 'Borrar';
                 btnBorrar.addEventListener('click', async () => {
                     await deleteDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", data.id));
                     actualizarDashboard();
@@ -808,7 +941,6 @@
                 tabla.appendChild(tr);
             });
 
-            // Actualizar tarjetas de resumen
             const pRes = parseFloat(document.getElementById('porcentaje-reserva').value) || 0;
             const pEq = parseFloat(document.getElementById('porcentaje-equipamiento').value) || 0;
             const pOp = parseFloat(document.getElementById('porcentaje-operativo').value) || 0;
