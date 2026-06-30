@@ -152,6 +152,10 @@
             font-weight: 600;
             cursor: pointer;
             transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
 
         .btn-black:hover { background-color: #333333; }
@@ -211,7 +215,6 @@
 </head>
 <body>
 
-    <!-- Pantalla de Login -->
     <div id="login-screen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; width: 100vw; background-color: #ffffff; position: absolute; top: 0; left: 0; z-index: 1000;">
         <div style="background: #f4f6f9; padding: 40px; border-radius: 16px; text-align: center; width: 280px;">
             <h1 style="color: var(--text-main); margin-top: 0; font-size: 22px; font-weight: 600;">Finanzas Priel</h1>
@@ -229,7 +232,6 @@
         </div>
     </div>
 
-    <!-- Contenedor Principal -->
     <div id="app-container" style="display: none; width: 100%; height: 100%;">
         
         <nav class="sidebar">
@@ -272,7 +274,6 @@
                 </div>
             </div>
 
-            <!-- Vista 1: Resumen -->
             <div id="resumen" class="view active">
                 <div class="cards-grid">
                     <div class="card" style="border-top: 4px solid #f29900;">
@@ -301,7 +302,6 @@
                 </div>
             </div>
 
-            <!-- Vista 2: Ingresos -->
             <div id="ingresos" class="view">
                 <div class="card" style="margin-bottom: 20px;">
                     <h2>Distribución de Objetivos (%)</h2>
@@ -336,7 +336,6 @@
                 </div>
             </div>
 
-            <!-- Vista 3: Gastos -->
             <div id="gastos" class="view">
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -369,47 +368,12 @@
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h2 style="margin: 0;">Gestión de Gastos</h2>
-                        <button onclick="copiarMesAnterior()" class="btn-black" style="background-color: #e8eaed; color: #202124;">Importar Mes Anterior</button>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="abrirModalNuevoGasto()" class="btn-black">➕ Nuevo Gasto</button>
+                            <button onclick="abrirModalCargaMasiva()" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">Carga Masiva</button>
+                            <button onclick="copiarMesAnterior()" class="btn-black" style="background-color: #e8eaed; color: #202124; border: 1px solid var(--card-border);">Importar Mes Anterior</button>
+                        </div>
                     </div>
-                    
-                    <form id="form-gastos-agregar" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
-                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                            <input type="text" id="add-gasto-nombre" placeholder="Nombre (ej. Zoom)" required>
-                            <input type="number" id="add-gasto-monto" placeholder="Monto Cuota/Total" required step="0.01" style="width: 130px;">
-                            <select id="add-gasto-moneda">
-                                <option value="ARS">ARS</option>
-                                <option value="USD">USD</option>
-                            </select>
-                            <select id="add-gasto-tipo" onchange="toggleCamposTarjeta('add')">
-                                <option value="Fijo">Fijo</option>
-                                <option value="Tarjeta">Tarjeta de Crédito</option>
-                            </select>
-                            <button type="submit" class="btn-black">Agregar</button>
-                        </div>
-
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <input type="checkbox" id="add-gasto-compartir" style="width: 16px; height: 16px; cursor: pointer;" onchange="toggleDivisor('add')">
-                            <label for="add-gasto-compartir" style="font-size: 14px; cursor: pointer;">Compartir gasto</label>
-                            
-                            <select id="add-gasto-divisor" style="display: none;">
-                                <option value="2">Dividir en 2</option>
-                                <option value="3">Dividir en 3</option>
-                                <option value="4">Dividir en 4</option>
-                                <option value="5">Dividir en 5</option>
-                                <option value="6">Dividir en 6</option>
-                            </select>
-                        </div>
-
-                        <div id="add-campos-tarjeta" style="display: none; gap: 10px; align-items: center; flex-wrap: wrap;">
-                            <select id="add-gasto-tarjeta">
-                                <option value="VISA">VISA</option>
-                                <option value="MASTERCARD">MASTERCARD</option>
-                                <option value="MP">MP</option>
-                            </select>
-                            <input type="number" id="add-gasto-cuotas-totales" placeholder="Cuotas Totales" min="1" style="width: 120px;">
-                            <input type="number" id="add-gasto-cuotas-pagadas" placeholder="Cuotas Pagadas" min="1" style="width: 120px;">
-                        </div>
-                    </form>
 
                     <div class="filter-bar">
                         <input type="text" id="filtro-texto-gastos" placeholder="Buscar gasto..." style="flex: 1;">
@@ -438,7 +402,56 @@
         </main>
     </div>
 
-    <!-- Modal Editar Gasto -->
+    <div id="modal-nuevo-gasto" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 style="margin: 0; font-size: 18px;">Nuevo Gasto</h2>
+                <button class="modal-close" onclick="cerrarModal('modal-nuevo-gasto')">✖</button>
+            </div>
+            
+            <form id="form-gastos-agregar" style="display: flex; flex-direction: column; gap: 15px;">
+                <input type="text" id="add-gasto-nombre" placeholder="Nombre (ej. Zoom)" required style="width: 100%; box-sizing: border-box;">
+                
+                <div style="display: flex; gap: 10px;">
+                    <input type="number" id="add-gasto-monto" placeholder="Monto" required step="0.01" style="flex: 1;">
+                    <select id="add-gasto-moneda">
+                        <option value="ARS">ARS</option>
+                        <option value="USD">USD</option>
+                    </select>
+                </div>
+
+                <select id="add-gasto-tipo" onchange="toggleCamposTarjeta('add')" style="width: 100%; box-sizing: border-box;">
+                    <option value="Fijo">Fijo</option>
+                    <option value="Tarjeta">Tarjeta de Crédito</option>
+                </select>
+
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" id="add-gasto-compartir" style="width: 16px; height: 16px; cursor: pointer;" onchange="toggleDivisor('add')">
+                    <label for="add-gasto-compartir" style="font-size: 14px; cursor: pointer;">Compartir gasto</label>
+                    <select id="add-gasto-divisor" style="display: none;">
+                        <option value="2">Dividir en 2</option>
+                        <option value="3">Dividir en 3</option>
+                        <option value="4">Dividir en 4</option>
+                        <option value="5">Dividir en 5</option>
+                        <option value="6">Dividir en 6</option>
+                    </select>
+                </div>
+
+                <div id="add-campos-tarjeta" style="display: none; gap: 10px; flex-wrap: wrap;">
+                    <select id="add-gasto-tarjeta" style="flex: 1;">
+                        <option value="VISA">VISA</option>
+                        <option value="MASTERCARD">MASTERCARD</option>
+                        <option value="MP">MP</option>
+                    </select>
+                    <input type="number" id="add-gasto-cuotas-totales" placeholder="Cuotas Tot" min="1" style="width: 100px;">
+                    <input type="number" id="add-gasto-cuotas-pagadas" placeholder="Cuotas Pag" min="1" style="width: 100px;">
+                </div>
+
+                <button type="submit" class="btn-black" style="margin-top: 10px;">Guardar Gasto</button>
+            </form>
+        </div>
+    </div>
+
     <div id="modal-editar" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
@@ -491,7 +504,23 @@
         </div>
     </div>
 
-    <!-- Modal Gráfico -->
+    <div id="modal-carga-masiva" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 style="margin: 0; font-size: 18px;">Carga Masiva (CSV)</h2>
+                <button class="modal-close" onclick="cerrarModal('modal-carga-masiva')">✖</button>
+            </div>
+            <div style="margin-bottom: 15px; font-size: 13px; color: var(--text-muted); line-height: 1.5;">
+                El archivo debe tener formato separado por comas con las siguientes 4 columnas (incluir encabezados): <br><br>
+                <strong>Nombre, Monto, Moneda, Tipo</strong> <br>
+                <em>Ej: Zoom, 15.99, USD, Fijo</em><br>
+                <em>Ej: Netflix, 15000, ARS, Tarjeta</em>
+            </div>
+            <input type="file" id="archivo-csv" accept=".csv" style="width: 100%; box-sizing: border-box; margin-bottom: 15px;">
+            <button class="btn-black" onclick="procesarCSV()" style="width: 100%;">Importar Gastos</button>
+        </div>
+    </div>
+
     <div id="modal-grafico" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
@@ -505,7 +534,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, addDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyC8S5y_TJJFiL6Sqqwp6f2uidh4OiHDbnM",
@@ -584,6 +613,18 @@
             document.getElementById(id).style.display = 'none';
         }
 
+        window.abrirModalNuevoGasto = function() {
+            document.getElementById('form-gastos-agregar').reset();
+            toggleCamposTarjeta('add');
+            toggleDivisor('add');
+            document.getElementById('modal-nuevo-gasto').style.display = 'flex';
+        }
+
+        window.abrirModalCargaMasiva = function() {
+            document.getElementById('archivo-csv').value = "";
+            document.getElementById('modal-carga-masiva').style.display = 'flex';
+        }
+
         function obtenerMesId() {
             return `${anioSelector.value}-${mesSelector.value}`;
         }
@@ -624,9 +665,7 @@
         document.getElementById('form-gastos-agregar').addEventListener('submit', async (e) => {
             e.preventDefault();
             await procesarGuardadoGasto('add', null);
-            document.getElementById('form-gastos-agregar').reset();
-            toggleCamposTarjeta('add');
-            toggleDivisor('add');
+            cerrarModal('modal-nuevo-gasto');
         });
 
         document.getElementById('form-gastos-editar').addEventListener('submit', async (e) => {
@@ -661,6 +700,76 @@
                 await addDoc(collection(db, "finanzas", obtenerMesId(), "gastos"), datosGasto);
             }
             actualizarDashboard();
+        }
+
+        window.procesarCSV = async function() {
+            const input = document.getElementById('archivo-csv');
+            if (!input.files || input.files.length === 0) {
+                alert("Por favor selecciona un archivo CSV.");
+                return;
+            }
+
+            const file = input.files[0];
+            const reader = new FileReader();
+
+            reader.onload = async function(e) {
+                const text = e.target.result;
+                const rows = text.split('\n').filter(row => row.trim() !== '');
+                
+                if (rows.length <= 1) {
+                    alert("El archivo parece estar vacío o solo tiene encabezados.");
+                    return;
+                }
+
+                try {
+                    const batch = writeBatch(db);
+                    const gastosRef = collection(db, "finanzas", obtenerMesId(), "gastos");
+                    let count = 0;
+
+                    for (let i = 1; i < rows.length; i++) {
+                        // Split handles standard comma separated values
+                        const columns = rows[i].split(',').map(col => col.trim().replace(/^"|"$/g, ''));
+                        
+                        if (columns.length >= 4) {
+                            const nombre = columns[0];
+                            const monto = parseFloat(columns[1].replace(',', '.')); 
+                            const moneda = columns[2].toUpperCase(); 
+                            let tipo = columns[3]; 
+
+                            if (!nombre || isNaN(monto)) continue;
+
+                            if (tipo.toLowerCase().includes('tarjeta')) tipo = 'Tarjeta';
+                            else tipo = 'Fijo';
+
+                            const nuevoDocRef = doc(gastosRef);
+                            batch.set(nuevoDocRef, {
+                                nombre: nombre,
+                                monto: monto,
+                                moneda: moneda === 'USD' ? 'USD' : 'ARS',
+                                tipo: tipo,
+                                divisor: 1,
+                                tarjeta: tipo === 'Tarjeta' ? 'VISA' : null,
+                                cuotas_totales: tipo === 'Tarjeta' ? 1 : null,
+                                cuotas_pagadas: tipo === 'Tarjeta' ? 1 : null
+                            });
+                            count++;
+                        }
+                    }
+
+                    if (count > 0) {
+                        await batch.commit();
+                        alert(`Se cargaron ${count} gastos exitosamente.`);
+                        cerrarModal('modal-carga-masiva');
+                        actualizarDashboard();
+                    } else {
+                        alert("No se pudo procesar ningún gasto. Verifica el formato del CSV.");
+                    }
+                } catch (error) {
+                    console.error("Error al procesar CSV:", error);
+                    alert("Ocurrió un error al procesar el archivo.");
+                }
+            };
+            reader.readAsText(file);
         }
 
         async function cargarGastos() {
