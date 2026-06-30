@@ -339,16 +339,24 @@
             <!-- Vista 3: Gastos -->
             <div id="gastos" class="view">
                 
-                <div class="card" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; background-color: #f1f3f4; border:none;">
-                    <div>
-                        <h3 style="margin:0; color:var(--text-muted); font-size: 14px;">Resumen del Mes</h3>
-                        <div style="font-size: 16px; font-weight: 600; margin-top: 8px; color: var(--text-main);">
-                            Total: <span id="sum-gastos-total">$0.00</span> &nbsp;|&nbsp; 
-                            Fijos: <span id="sum-gastos-fijos">$0.00</span> &nbsp;|&nbsp; 
-                            Tarjeta: <span id="sum-gastos-tarjeta">$0.00</span>
-                        </div>
-                    </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="margin: 0;">Resumen del Mes</h2>
                     <button class="btn-black" onclick="abrirModalGrafico()">📊 Ver Gráfico</button>
+                </div>
+
+                <div class="cards-grid" style="margin-bottom: 20px;">
+                    <div class="card" style="border-top: 4px solid #174ea6;">
+                        <h3>Gastos Totales</h3>
+                        <div class="value" id="sum-gastos-total">$0.00</div>
+                    </div>
+                    <div class="card" style="border-top: 4px solid #f29900;">
+                        <h3>Gastos Fijos</h3>
+                        <div class="value" id="sum-gastos-fijos">$0.00</div>
+                    </div>
+                    <div class="card" style="border-top: 4px solid #EA4335;">
+                        <h3>Gastos de Tarjeta</h3>
+                        <div class="value" id="sum-gastos-tarjeta">$0.00</div>
+                    </div>
                 </div>
 
                 <div class="card" style="margin-bottom: 20px;">
