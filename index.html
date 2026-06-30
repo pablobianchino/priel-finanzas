@@ -295,8 +295,8 @@
             <div id="gastos" class="view">
                 <div class="card" style="margin-bottom: 20px;">
                     <h2>Configuración de Dólar</h2>
-                    <label>Dólar Débito: <input type="number" id="usd-debito" value="0" style="width: 100px;"></label>
-                    <label style="margin-left: 20px;">Dólar Impuesto: <input type="number" id="usd-impuesto" value="0" style="width: 100px;"></label>
+                    <label>Dólar Débito: <input type="number" id="usd-debito" value="0" style="width: 100px;" step="0.01"></label>
+                    <label style="margin-left: 20px;">Dólar Impuesto: <input type="number" id="usd-impuesto" value="0" style="width: 100px;" step="0.01"></label>
                     <button id="btn-guardar-dolar" class="btn-black" style="margin-left: 20px;">Guardar Valores</button>
                 </div>
 
@@ -484,11 +484,9 @@
             }
 
             if (idGasto) {
-                // Actualizar existente
                 const docRef = doc(db, "finanzas", obtenerMesId(), "gastos", idGasto);
                 await updateDoc(docRef, datosGasto);
             } else {
-                // Crear nuevo
                 await addDoc(collection(db, "finanzas", obtenerMesId(), "gastos"), datosGasto);
             }
             
@@ -526,17 +524,22 @@
 
             querySnapshot.forEach((d) => {
                 const data = d.data();
-                window.gastosDataList[d.id] = data; // Guardar en caché para edición
+                window.gastosDataList[d.id] = data;
 
-                // Cálculo de ARS base
-                let costoArsBase = data.moneda === 'USD' ? data.monto * (dDebito + dImpuesto) : data.monto;
-                // Aplicar divisor si corresponde
+                // Cálculo de ARS con nueva fórmula para USD
+                let costoArsBase = data.monto;
+                if (data.moneda === 'USD') {
+                    let valorImpuesto = data.monto * dImpuesto;
+                    let impuestosTotal = (valorImpuesto * 0.02) + (valorImpuesto * 0.21) + (valorImpuesto * 0.30);
+                    let valorDebito = data.monto * dDebito;
+                    costoArsBase = impuestosTotal + valorDebito;
+                }
+
                 let divisor = data.divisor || 1;
                 let costoFinalArs = costoArsBase / divisor;
                 
                 totalGastosGlobal += costoFinalArs;
 
-                // Formatear detalles
                 let detalleTexto = data.tipo;
                 if (data.tipo === 'Tarjeta') {
                     detalleTexto = `${data.tarjeta} (Cuota ${data.cuotas_pagadas}/${data.cuotas_totales})`;
@@ -612,7 +615,7 @@
                 
                 if (data.tipo === 'Tarjeta') {
                     if (data.cuotas_pagadas >= data.cuotas_totales) {
-                        continue; // Si ya se completaron las cuotas, no se copia.
+                        continue;
                     }
                     data.cuotas_pagadas += 1;
                 }
