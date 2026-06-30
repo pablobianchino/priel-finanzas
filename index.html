@@ -58,10 +58,7 @@
             gap: 12px;
         }
 
-        .nav-btn:hover {
-            background-color: var(--bg-color);
-        }
-
+        .nav-btn:hover { background-color: var(--bg-color); }
         .nav-btn.active {
             font-weight: 600;
             border-left: 3px solid var(--primary-color);
@@ -92,11 +89,7 @@
             margin-bottom: 30px;
         }
 
-        .title h1 {
-            margin: 0;
-            font-size: 24px;
-            font-weight: 600;
-        }
+        .title h1 { margin: 0; font-size: 24px; font-weight: 600; }
 
         .selectors select {
             padding: 8px 12px;
@@ -107,11 +100,9 @@
             outline: none;
         }
 
-        /* Views */
         .view { display: none; }
         .view.active { display: block; }
 
-        /* Cards & Tables */
         .cards-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -126,15 +117,14 @@
             border: 1px solid var(--card-border);
         }
 
-        .card h3, .card h2 { margin-top: 0; color: var(--text-muted); font-size: 13px; font-weight: 500;}
+        .card h3 { margin-top: 0; color: var(--text-muted); font-size: 13px; font-weight: 500;}
         .card h2 { font-size: 16px; color: var(--text-main); font-weight: 600; margin-bottom: 15px;}
         .card .value { font-size: 28px; font-weight: bold; color: var(--text-main); margin-top: 10px;}
         
-        table { width: 100%; border-collapse: collapse; text-align: left; margin-top: 15px; font-size: 14px; }
-        th { padding: 12px 0; border-bottom: 2px solid var(--card-border); color: var(--text-muted); font-weight: 500; }
-        td { padding: 12px 0; border-bottom: 1px solid #f1f3f4; }
+        table { width: 100%; border-collapse: collapse; text-align: left; margin-top: 15px; font-size: 13px; }
+        th { padding: 10px 0; border-bottom: 2px solid var(--card-border); color: var(--text-muted); font-weight: 500; }
+        td { padding: 10px 0; border-bottom: 1px solid #f1f3f4; }
         
-        /* Formularios y Botones */
         input, select {
             padding: 10px;
             border: 1px solid var(--card-border);
@@ -161,56 +151,24 @@
         .btn-black:hover { background-color: #333333; }
 
         .btn-icon {
-            background: none;
-            border: none;
-            font-size: 18px;
-            cursor: pointer;
-            padding: 4px;
-            transition: transform 0.1s;
+            background: none; border: none; font-size: 16px; cursor: pointer; padding: 4px; transition: transform 0.1s;
         }
-
         .btn-icon:hover { transform: scale(1.1); }
 
         .filter-bar {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            background-color: #f1f3f4;
-            padding: 10px 15px;
-            border-radius: 8px;
-            margin-bottom: 15px;
+            display: flex; gap: 15px; align-items: center; background-color: #f1f3f4; padding: 10px 15px; border-radius: 8px; margin-bottom: 15px;
         }
 
-        /* Modales */
         .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.5);
-            z-index: 2000;
-            justify-content: center;
-            align-items: center;
+            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;
         }
 
         .modal-content {
-            background: #ffffff;
-            padding: 30px;
-            border-radius: 16px;
-            width: 90%;
-            max-width: 500px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            background: #ffffff; padding: 30px; border-radius: 16px; width: 90%; max-width: 500px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-height: 90vh; overflow-y: auto;
         }
 
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .modal-close {
-            background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted);
-        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); }
     </style>
 </head>
 <body>
@@ -218,7 +176,6 @@
     <div id="login-screen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; width: 100vw; background-color: #ffffff; position: absolute; top: 0; left: 0; z-index: 1000;">
         <div style="background: #f4f6f9; padding: 40px; border-radius: 16px; text-align: center; width: 280px;">
             <h1 style="color: var(--text-main); margin-top: 0; font-size: 22px; font-weight: 600;">Finanzas Priel</h1>
-            
             <button id="login-btn-main" style="background: #ffffff; color: var(--text-main); border: 1px solid var(--card-border); padding: 12px 20px; border-radius: 10px; font-size: 15px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; margin-top: 30px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
                 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" style="width: 18px; height: 18px;">
                     <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
@@ -233,7 +190,6 @@
     </div>
 
     <div id="app-container" style="display: none; width: 100%; height: 100%;">
-        
         <nav class="sidebar">
             <div class="logo">Finanzas Priel</div>
             <button class="nav-btn active" onclick="switchView('resumen', this)">㗊 Resumen</button>
@@ -248,9 +204,7 @@
 
         <main class="main-content">
             <div class="topbar">
-                <div class="title">
-                    <h1 id="view-title">Resumen</h1>
-                </div>
+                <div class="title"><h1 id="view-title">Resumen</h1></div>
                 <div class="selectors">
                     <select id="mes-selector">
                         <option value="01">Enero</option>
@@ -310,7 +264,6 @@
                     <label style="margin-left: 15px;">Operativo: <input type="number" id="porcentaje-operativo" value="70" min="0" max="100" style="width: 60px;"></label>
                     <button id="btn-guardar-distribucion" class="btn-black" style="margin-left: 20px;">Guardar %</button>
                 </div>
-
                 <div class="card">
                     <h2>Gestión de Ingresos</h2>
                     <form id="form-ingresos" style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center;">
@@ -318,85 +271,67 @@
                         <input type="number" id="ingreso-monto" placeholder="Monto ARS" required step="0.01">
                         <button type="submit" class="btn-black">Agregar</button>
                     </form>
-
-                    <div class="filter-bar">
-                        <input type="text" id="filtro-texto-ingresos" placeholder="Buscar ingreso..." style="flex: 1;">
-                    </div>
-
+                    <div class="filter-bar"><input type="text" id="filtro-texto-ingresos" placeholder="Buscar ingreso..." style="flex: 1;"></div>
                     <table>
-                        <thead>
-                            <tr>
-                                <th>Origen</th>
-                                <th>Monto ARS</th>
-                                <th>Acción</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th>Origen</th><th>Monto ARS</th><th>Acción</th></tr></thead>
                         <tbody id="tabla-ingresos"></tbody>
                     </table>
                 </div>
             </div>
 
             <div id="gastos" class="view">
-                
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h2 style="margin: 0;">Resumen del Mes</h2>
+                <div class="card" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; background-color: #f1f3f4; border:none;">
+                    <div>
+                        <h3 style="margin:0; color:var(--text-muted); font-size: 14px;">Resumen del Mes</h3>
+                        <div style="font-size: 16px; font-weight: 600; margin-top: 8px; color: var(--text-main);">
+                            Gastos Totales: <span id="sum-gastos-total">$0.00</span>
+                        </div>
+                    </div>
                     <button class="btn-black" onclick="abrirModalGrafico()">📊 Ver Gráfico</button>
-                </div>
-
-                <div class="cards-grid" style="margin-bottom: 20px;">
-                    <div class="card" style="border-top: 4px solid #174ea6;">
-                        <h3>Gastos Totales</h3>
-                        <div class="value" id="sum-gastos-total">$0.00</div>
-                    </div>
-                    <div class="card" style="border-top: 4px solid #f29900;">
-                        <h3>Gastos Fijos</h3>
-                        <div class="value" id="sum-gastos-fijos">$0.00</div>
-                    </div>
-                    <div class="card" style="border-top: 4px solid #EA4335;">
-                        <h3>Gastos de Tarjeta</h3>
-                        <div class="value" id="sum-gastos-tarjeta">$0.00</div>
-                    </div>
                 </div>
 
                 <div class="card" style="margin-bottom: 20px;">
                     <h2>Configuración de Dólar</h2>
                     <label>Dólar Débito: <input type="number" id="usd-debito" value="0" style="width: 100px;" step="0.01"></label>
                     <label style="margin-left: 20px;">Dólar Impuesto: <input type="number" id="usd-impuesto" value="0" style="width: 100px;" step="0.01"></label>
-                    <button id="btn-guardar-dolar" class="btn-black" style="margin-left: 20px;">Guardar Valores</button>
+                    <button id="btn-guardar-dolar" class="btn-black" style="margin-left: 20px;">Guardar</button>
                 </div>
 
-                <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h2 style="margin: 0;">Gestión de Gastos</h2>
-                        <div style="display: flex; gap: 10px;">
-                            <button onclick="abrirModalNuevoGasto()" class="btn-black">➕ Nuevo Gasto</button>
-                            <button onclick="abrirModalCargaMasiva()" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">Carga Masiva</button>
-                            <button onclick="copiarMesAnterior()" class="btn-black" style="background-color: #e8eaed; color: #202124; border: 1px solid var(--card-border);">Importar Mes Anterior</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="margin: 0;">Gestión de Gastos</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="abrirModalNuevoGasto()" class="btn-black">➕ Nuevo Gasto</button>
+                        <button onclick="abrirModalCargaMasiva()" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">Carga Masiva (CSV)</button>
+                        <button onclick="copiarMesAnterior()" class="btn-black" style="background-color: #e8eaed; color: #202124; border: 1px solid var(--card-border);">Importar Mes Anterior</button>
+                    </div>
+                </div>
+
+                <div class="filter-bar">
+                    <input type="text" id="filtro-texto-gastos" placeholder="Buscar gasto..." style="flex: 1;">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="card" style="border-top: 4px solid #f29900;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h3 style="margin: 0; font-size: 15px;">Gastos Fijos</h3>
+                            <div class="value" id="sum-gastos-fijos" style="font-size: 16px; margin: 0;">$0.00</div>
                         </div>
+                        <table>
+                            <thead><tr><th>Nombre</th><th>Ingresado</th><th>Detalle</th><th>Costo (ARS)</th><th>⚙️</th></tr></thead>
+                            <tbody id="tabla-fijos"></tbody>
+                        </table>
                     </div>
-
-                    <div class="filter-bar">
-                        <input type="text" id="filtro-texto-gastos" placeholder="Buscar gasto..." style="flex: 1;">
-                        <label style="font-size: 14px; display: flex; align-items: center; gap: 5px;">
-                            <input type="checkbox" id="filtro-fijo" checked> Fijos
-                        </label>
-                        <label style="font-size: 14px; display: flex; align-items: center; gap: 5px;">
-                            <input type="checkbox" id="filtro-tarjeta" checked> Tarjeta
-                        </label>
+                    
+                    <div class="card" style="border-top: 4px solid #EA4335;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h3 style="margin: 0; font-size: 15px;">Gastos de Tarjeta</h3>
+                            <div class="value" id="sum-gastos-tarjeta" style="font-size: 16px; margin: 0;">$0.00</div>
+                        </div>
+                        <table>
+                            <thead><tr><th>Nombre</th><th>Ingresado</th><th>Detalle</th><th>Cuota (ARS)</th><th>⚙️</th></tr></thead>
+                            <tbody id="tabla-tarjetas"></tbody>
+                        </table>
                     </div>
-
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Nombre</th>
-                                <th>Monto Ingresado</th>
-                                <th>Detalle</th>
-                                <th>Costo Final (ARS)</th>
-                                <th>Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabla-gastos"></tbody>
-                    </table>
                 </div>
             </div>
         </main>
@@ -413,7 +348,7 @@
                 <input type="text" id="add-gasto-nombre" placeholder="Nombre (ej. Zoom)" required style="width: 100%; box-sizing: border-box;">
                 
                 <div style="display: flex; gap: 10px;">
-                    <input type="number" id="add-gasto-monto" placeholder="Monto" required step="0.01" style="flex: 1;">
+                    <input type="number" id="add-gasto-monto" placeholder="Monto Total Compra" required step="0.01" style="flex: 1;">
                     <select id="add-gasto-moneda">
                         <option value="ARS">ARS</option>
                         <option value="USD">USD</option>
@@ -465,7 +400,7 @@
                 <input type="text" id="edit-gasto-nombre" placeholder="Nombre" required style="width: 100%; box-sizing: border-box;">
                 
                 <div style="display: flex; gap: 10px;">
-                    <input type="number" id="edit-gasto-monto" placeholder="Monto" required step="0.01" style="flex: 1;">
+                    <input type="number" id="edit-gasto-monto" placeholder="Monto Total Compra" required step="0.01" style="flex: 1;">
                     <select id="edit-gasto-moneda">
                         <option value="ARS">ARS</option>
                         <option value="USD">USD</option>
@@ -511,10 +446,10 @@
                 <button class="modal-close" onclick="cerrarModal('modal-carga-masiva')">✖</button>
             </div>
             <div style="margin-bottom: 15px; font-size: 13px; color: var(--text-muted); line-height: 1.5;">
-                El archivo debe tener formato separado por comas con las siguientes 4 columnas (incluir encabezados): <br><br>
-                <strong>Nombre, Monto, Moneda, Tipo</strong> <br>
-                <em>Ej: Zoom, 15.99, USD, Fijo</em><br>
-                <em>Ej: Netflix, 15000, ARS, Tarjeta</em>
+                El archivo debe tener 8 columnas separadas por comas (incluir encabezados): <br><br>
+                <strong>Nombre, Monto, Moneda, Tipo, Divisor, Tarjeta, Cuotas Tot, Cuotas Pag</strong> <br><br>
+                <em>Ej Fijo: Zoom, 15.99, USD, Fijo, 1, , , </em><br>
+                <em>Ej Tarjeta: Heladera, 150000, ARS, Tarjeta, 2, VISA, 6, 1</em>
             </div>
             <input type="file" id="archivo-csv" accept=".csv" style="width: 100%; box-sizing: border-box; margin-bottom: 15px;">
             <button class="btn-black" onclick="procesarCSV()" style="width: 100%;">Importar Gastos</button>
@@ -597,8 +532,6 @@
         anioSelector.addEventListener('change', actualizarDashboard);
 
         document.getElementById('filtro-texto-gastos').addEventListener('input', renderTablaGastos);
-        document.getElementById('filtro-fijo').addEventListener('change', renderTablaGastos);
-        document.getElementById('filtro-tarjeta').addEventListener('change', renderTablaGastos);
         document.getElementById('filtro-texto-ingresos').addEventListener('input', renderTablaIngresos);
 
         window.toggleCamposTarjeta = function(prefix) {
@@ -616,6 +549,7 @@
         window.abrirModalNuevoGasto = function() {
             document.getElementById('form-gastos-agregar').reset();
             toggleCamposTarjeta('add');
+            document.getElementById('add-gasto-compartir').checked = false;
             toggleDivisor('add');
             document.getElementById('modal-nuevo-gasto').style.display = 'flex';
         }
@@ -640,7 +574,8 @@
             document.getElementById('res-gastos-fijos').innerText = "$0.00";
             document.getElementById('res-ingresos-mes').innerText = "$0.00";
             document.getElementById('res-balance').innerText = "$0.00";
-            document.getElementById('tabla-gastos').innerHTML = "";
+            document.getElementById('tabla-fijos').innerHTML = "";
+            document.getElementById('tabla-tarjetas').innerHTML = "";
             document.getElementById('tabla-ingresos').innerHTML = "";
         }
 
@@ -727,17 +662,19 @@
                     let count = 0;
 
                     for (let i = 1; i < rows.length; i++) {
-                        // Split handles standard comma separated values
                         const columns = rows[i].split(',').map(col => col.trim().replace(/^"|"$/g, ''));
                         
                         if (columns.length >= 4) {
                             const nombre = columns[0];
                             const monto = parseFloat(columns[1].replace(',', '.')); 
                             const moneda = columns[2].toUpperCase(); 
-                            let tipo = columns[3]; 
+                            let tipo = columns[3] || 'Fijo'; 
+                            let divisor = parseInt(columns[4]) || 1;
+                            let tarjeta = columns[5] || 'VISA';
+                            let cuotas_totales = parseInt(columns[6]) || 1;
+                            let cuotas_pagadas = parseInt(columns[7]) || 1;
 
                             if (!nombre || isNaN(monto)) continue;
-
                             if (tipo.toLowerCase().includes('tarjeta')) tipo = 'Tarjeta';
                             else tipo = 'Fijo';
 
@@ -747,10 +684,10 @@
                                 monto: monto,
                                 moneda: moneda === 'USD' ? 'USD' : 'ARS',
                                 tipo: tipo,
-                                divisor: 1,
-                                tarjeta: tipo === 'Tarjeta' ? 'VISA' : null,
-                                cuotas_totales: tipo === 'Tarjeta' ? 1 : null,
-                                cuotas_pagadas: tipo === 'Tarjeta' ? 1 : null
+                                divisor: divisor,
+                                tarjeta: tipo === 'Tarjeta' ? tarjeta : null,
+                                cuotas_totales: tipo === 'Tarjeta' ? cuotas_totales : null,
+                                cuotas_pagadas: tipo === 'Tarjeta' ? cuotas_pagadas : null
                             });
                             count++;
                         }
@@ -795,8 +732,10 @@
         }
 
         function renderTablaGastos() {
-            const tabla = document.getElementById('tabla-gastos');
-            tabla.innerHTML = '';
+            const tablaFijos = document.getElementById('tabla-fijos');
+            const tablaTarjetas = document.getElementById('tabla-tarjetas');
+            tablaFijos.innerHTML = '';
+            tablaTarjetas.innerHTML = '';
             
             totalGastosGlobal = 0;
             subtotalFijos = 0;
@@ -804,16 +743,12 @@
 
             const dDebito = parseFloat(document.getElementById('usd-debito').value) || 0;
             const dImpuesto = parseFloat(document.getElementById('usd-impuesto').value) || 0;
-
             const textoBuscar = document.getElementById('filtro-texto-gastos').value.toLowerCase();
-            const verFijo = document.getElementById('filtro-fijo').checked;
-            const verTarjeta = document.getElementById('filtro-tarjeta').checked;
 
             listaGastos.forEach((data) => {
-                if (data.tipo === 'Fijo' && !verFijo) return;
-                if (data.tipo === 'Tarjeta' && !verTarjeta) return;
                 if (textoBuscar && !data.nombre.toLowerCase().includes(textoBuscar)) return;
 
+                // 1. Calculo base ARS del monto total
                 let costoArsBase = data.monto;
                 if (data.moneda === 'USD') {
                     let vImpuesto = data.monto * dImpuesto;
@@ -822,62 +757,48 @@
                     costoArsBase = impuestoFinal + vDebito;
                 }
 
+                // 2. Calculo de cuota y divisores
                 let divisor = data.divisor || 1;
-                let costoFinalArs = costoArsBase / divisor;
+                let costoFinalArs = 0;
+
+                if (data.tipo === 'Tarjeta') {
+                    let cuotasTotales = data.cuotas_totales || 1;
+                    let cuotaMensual = costoArsBase / cuotasTotales;
+                    costoFinalArs = cuotaMensual / divisor;
+                } else {
+                    costoFinalArs = costoArsBase / divisor;
+                }
                 
                 totalGastosGlobal += costoFinalArs;
                 if (data.tipo === 'Fijo') subtotalFijos += costoFinalArs;
                 if (data.tipo === 'Tarjeta') subtotalTarjetas += costoFinalArs;
 
+                // 3. Render
                 let detalleTexto = data.tipo;
                 if (data.tipo === 'Tarjeta') {
-                    detalleTexto = `${data.tarjeta} (Cuota ${data.cuotas_pagadas}/${data.cuotas_totales})`;
+                    detalleTexto = `${data.tarjeta} (${data.cuotas_pagadas}/${data.cuotas_totales})`;
                 }
                 if (divisor > 1) {
-                    detalleTexto += ` [Dividido en ${divisor}]`;
+                    detalleTexto += ` [Div ${divisor}]`;
                 }
 
                 const tr = document.createElement('tr');
-                
-                const tdNombre = document.createElement('td');
-                tdNombre.textContent = data.nombre;
-                
-                const tdMonto = document.createElement('td');
-                tdMonto.textContent = `$${data.monto.toFixed(2)} ${data.moneda}`;
-                
-                const tdDetalle = document.createElement('td');
-                tdDetalle.textContent = detalleTexto;
+                tr.innerHTML = `
+                    <td>${data.nombre}</td>
+                    <td>$${data.monto.toFixed(2)} ${data.moneda}</td>
+                    <td>${detalleTexto}</td>
+                    <td style="font-weight: 600;">$${costoFinalArs.toFixed(2)}</td>
+                    <td style="white-space: nowrap;">
+                        <button class="btn-icon" onclick='abrirModalEdicion(${JSON.stringify(data)})'>✏️</button>
+                        <button class="btn-icon" onclick="borrarRegistroGasto('${data.id}')">🗑️</button>
+                    </td>
+                `;
 
-                const tdCosto = document.createElement('td');
-                tdCosto.style.fontWeight = '600';
-                tdCosto.textContent = `$${costoFinalArs.toFixed(2)}`;
-
-                const tdAcciones = document.createElement('td');
-                
-                const btnEdit = document.createElement('button');
-                btnEdit.className = 'btn-icon';
-                btnEdit.textContent = '✏️';
-                btnEdit.title = 'Editar';
-                btnEdit.addEventListener('click', () => abrirModalEdicion(data));
-
-                const btnBorrar = document.createElement('button');
-                btnBorrar.className = 'btn-icon';
-                btnBorrar.textContent = '🗑️';
-                btnBorrar.title = 'Borrar';
-                btnBorrar.addEventListener('click', async () => {
-                    await deleteDoc(doc(db, "finanzas", obtenerMesId(), "gastos", data.id));
-                    actualizarDashboard();
-                });
-
-                tdAcciones.appendChild(btnEdit);
-                tdAcciones.appendChild(btnBorrar);
-
-                tr.appendChild(tdNombre);
-                tr.appendChild(tdMonto);
-                tr.appendChild(tdDetalle);
-                tr.appendChild(tdCosto);
-                tr.appendChild(tdAcciones);
-                tabla.appendChild(tr);
+                if (data.tipo === 'Fijo') {
+                    tablaFijos.appendChild(tr);
+                } else {
+                    tablaTarjetas.appendChild(tr);
+                }
             });
 
             document.getElementById('res-gastos-fijos').innerText = `$${totalGastosGlobal.toFixed(2)}`;
@@ -886,6 +807,11 @@
             document.getElementById('sum-gastos-tarjeta').innerText = `$${subtotalTarjetas.toFixed(2)}`;
             
             calcularBalance(); 
+        }
+
+        window.borrarRegistroGasto = async function(id) {
+            await deleteDoc(doc(db, "finanzas", obtenerMesId(), "gastos", id));
+            actualizarDashboard();
         }
 
         window.abrirModalEdicion = function(data) {
@@ -919,9 +845,7 @@
             document.getElementById('modal-grafico').style.display = 'flex';
             const ctx = document.getElementById('grafico-gastos').getContext('2d');
             
-            if (graficoInstance) {
-                graficoInstance.destroy();
-            }
+            if (graficoInstance) graficoInstance.destroy();
 
             graficoInstance = new Chart(ctx, {
                 type: 'pie',
@@ -929,16 +853,11 @@
                     labels: ['Gastos Fijos', 'Tarjeta de Crédito'],
                     datasets: [{
                         data: [subtotalFijos, subtotalTarjetas],
-                        backgroundColor: ['#4285F4', '#EA4335'],
+                        backgroundColor: ['#f29900', '#EA4335'],
                         borderWidth: 1
                     }]
                 },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { position: 'bottom' }
-                    }
-                }
+                options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
             });
         };
 
@@ -950,19 +869,13 @@
             
             let mesPrevNum = mesActualNum - 1;
             let anioPrevNum = anioActualNum;
-            if (mesPrevNum === 0) {
-                mesPrevNum = 12;
-                anioPrevNum -= 1;
-            }
+            if (mesPrevNum === 0) { mesPrevNum = 12; anioPrevNum -= 1; }
 
             const mesPrevStr = `${anioPrevNum}-${mesPrevNum.toString().padStart(2, '0')}`;
             const mesActualStr = obtenerMesId();
 
             const snapshotAnterior = await getDocs(collection(db, "finanzas", mesPrevStr, "gastos"));
-            if (snapshotAnterior.empty) {
-                alert("No hay gastos registrados en el mes anterior.");
-                return;
-            }
+            if (snapshotAnterior.empty) { alert("No hay gastos registrados en el mes anterior."); return; }
 
             for (const d of snapshotAnterior.docs) {
                 const data = d.data();
@@ -1015,10 +928,7 @@
 
             const querySnapshot = await getDocs(collection(db, "finanzas", mesId, "ingresos"));
             listaIngresos = [];
-            querySnapshot.forEach((d) => {
-                listaIngresos.push({ id: d.id, ...d.data() });
-            });
-
+            querySnapshot.forEach((d) => { listaIngresos.push({ id: d.id, ...d.data() }); });
             renderTablaIngresos();
         }
 
@@ -1031,31 +941,14 @@
 
             listaIngresos.forEach((data) => {
                 if (textoBuscar && !data.nombre.toLowerCase().includes(textoBuscar)) return;
-
                 totalIngresosGlobal += data.monto;
 
                 const tr = document.createElement('tr');
-                
-                const tdNombre = document.createElement('td');
-                tdNombre.textContent = data.nombre;
-
-                const tdMonto = document.createElement('td');
-                tdMonto.textContent = `$${data.monto.toFixed(2)}`;
-
-                const tdAcciones = document.createElement('td');
-                const btnBorrar = document.createElement('button');
-                btnBorrar.className = 'btn-icon';
-                btnBorrar.textContent = '🗑️';
-                btnBorrar.title = 'Borrar';
-                btnBorrar.addEventListener('click', async () => {
-                    await deleteDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", data.id));
-                    actualizarDashboard();
-                });
-                
-                tdAcciones.appendChild(btnBorrar);
-                tr.appendChild(tdNombre);
-                tr.appendChild(tdMonto);
-                tr.appendChild(tdAcciones);
+                tr.innerHTML = `
+                    <td>${data.nombre}</td>
+                    <td>$${data.monto.toFixed(2)}</td>
+                    <td><button class="btn-icon" onclick="borrarRegistroIngreso('${data.id}')">🗑️</button></td>
+                `;
                 tabla.appendChild(tr);
             });
 
@@ -1068,7 +961,6 @@
             const vOp = totalIngresosGlobal * (pOp / 100);
 
             document.getElementById('res-ingresos-mes').innerText = `$${totalIngresosGlobal.toFixed(2)}`;
-            
             document.getElementById('res-ingresos-dist').innerHTML = `
                 <div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: var(--text-main);">Total: $${totalIngresosGlobal.toFixed(2)}</div>
                 <div style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
@@ -1078,6 +970,11 @@
                 </div>
             `;
             calcularBalance();
+        }
+
+        window.borrarRegistroIngreso = async function(id) {
+            await deleteDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", id));
+            actualizarDashboard();
         }
 
         function calcularBalance() {
