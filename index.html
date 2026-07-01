@@ -16,35 +16,33 @@
         }
 
         body {
-            margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
+            margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color); color: var(--text-main); display: flex; height: 100vh; overflow: hidden;
+        }
+
+        /* Loading Spinner */
+        .loader {
+            border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%;
+            width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        #loading-screen {
+            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(255,255,255,0.9); z-index: 4000; justify-content: center; align-items: center; flex-direction: column;
         }
 
         /* Sidebar */
         .sidebar {
-            width: 250px;
-            background-color: var(--sidebar-bg);
-            border-right: 1px solid var(--card-border);
-            display: flex;
-            flex-direction: column;
-            padding: 20px 0;
-            transition: transform 0.3s ease;
+            width: 250px; background-color: var(--sidebar-bg); border-right: 1px solid var(--card-border);
+            display: flex; flex-direction: column; padding: 20px 0; transition: transform 0.3s ease;
         }
 
-        .logo {
-            text-align: center; font-size: 22px; font-weight: 600;
-            color: var(--text-main); margin-bottom: 30px;
-        }
+        .logo { text-align: center; font-size: 22px; font-weight: 600; color: var(--text-main); margin-bottom: 30px; }
 
         .nav-btn {
-            background: none; border: none; padding: 15px 20px; text-align: left;
-            font-size: 15px; color: var(--text-main); cursor: pointer; transition: 0.2s;
-            border-left: 3px solid transparent; display: flex; align-items: center; gap: 12px;
+            background: none; border: none; padding: 15px 20px; text-align: left; font-size: 15px;
+            color: var(--text-main); cursor: pointer; transition: 0.2s; border-left: 3px solid transparent; display: flex; align-items: center; gap: 12px;
         }
         .nav-btn:hover { background-color: var(--bg-color); }
         .nav-btn.active { font-weight: 600; border-left: 3px solid var(--primary-color); background-color: #f1f3f4; }
@@ -67,6 +65,7 @@
 
         .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
 
         .card { background-color: #ffffff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); border: 1px solid var(--card-border); }
         .card h3 { margin-top: 0; color: var(--text-muted); font-size: 13px; font-weight: 500;}
@@ -104,12 +103,17 @@
             .sidebar.open { transform: translateX(0); }
             .mobile-menu-btn { display: block; }
             .main-content { padding: 15px; }
-            .cards-grid, .grid-2 { grid-template-columns: 1fr; }
+            .cards-grid, .grid-2, .grid-3 { grid-template-columns: 1fr; }
             .filter-bar { flex-direction: column; align-items: stretch; }
         }
     </style>
 </head>
 <body>
+
+    <div id="loading-screen">
+        <div class="loader"></div>
+        <div style="color: var(--text-main); font-weight: 600;">Cargando datos...</div>
+    </div>
 
     <div id="login-screen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; width: 100vw; background-color: #ffffff; position: absolute; top: 0; left: 0; z-index: 3000;">
         <div style="background: #f4f6f9; padding: 40px; border-radius: 16px; text-align: center; width: 280px;">
@@ -162,11 +166,11 @@
             <div id="resumen" class="view active">
                 <div class="cards-grid">
                     <div class="card" style="border-top: 4px solid #f29900;">
-                        <h3>Ingresos y Distribución</h3>
+                        <h3>Distribución de Objetivos</h3>
                         <div id="res-ingresos-dist"></div>
                     </div>
                     <div class="card" style="border-top: 4px solid #174ea6;">
-                        <h3>Gastos Totales (ARS)</h3>
+                        <h3>Gastos Totales (Propios)</h3>
                         <div class="value" id="res-gastos-fijos">$0,0</div>
                     </div>
                     <div class="card" style="border-top: 4px solid #34A853;">
@@ -214,16 +218,29 @@
 
             <!-- Gastos -->
             <div id="gastos" class="view">
-                <div class="card" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; background-color: #f1f3f4; border:none; flex-wrap: wrap; gap:10px;">
-                    <div>
-                        <h3 style="margin:0; color:var(--text-muted); font-size: 14px;">Resumen del Mes</h3>
-                        <div style="font-size: 16px; font-weight: 600; margin-top: 8px; color: var(--text-main);">
-                            Total: <span id="sum-gastos-total">$0,0</span> &nbsp;|&nbsp; 
-                            Fijos: <span id="sum-gastos-fijos">$0,0</span> &nbsp;|&nbsp; 
-                            Tarjeta: <span id="sum-gastos-tarjeta">$0,0</span>
-                        </div>
-                    </div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="margin: 0;">Resumen del Mes</h2>
                     <button class="btn-black" onclick="abrirModalGrafico()">📊 Ver Gráfico</button>
+                </div>
+
+                <div class="cards-grid" style="margin-bottom: 20px;">
+                    <div class="card" style="border-top: 4px solid var(--text-main);">
+                        <h3>Gastos Totales (Propios)</h3>
+                        <div class="value" id="sum-gastos-total">$0,0</div>
+                    </div>
+                    <div class="card" style="border-top: 4px solid #f29900;">
+                        <h3>Fijos (Propios)</h3>
+                        <div class="value" id="sum-gastos-fijos">$0,0</div>
+                    </div>
+                    <div class="card" style="border-top: 4px solid #EA4335;">
+                        <h3>Tarjeta (Propios)</h3>
+                        <div class="value" id="sum-gastos-tarjeta">$0,0</div>
+                    </div>
+                    <div class="card" style="border-top: 4px solid #5f6368;">
+                        <h3>De Terceros</h3>
+                        <div class="value" id="sum-gastos-terceros">$0,0</div>
+                    </div>
                 </div>
 
                 <div class="card" style="margin-bottom: 20px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
@@ -237,7 +254,7 @@
                     <h2 style="margin: 0;">Gestión de Gastos</h2>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                         <button onclick="abrirModalNuevoGasto()" class="btn-black">➕ Nuevo Gasto</button>
-                        <button onclick="abrirModalCargaMasiva()" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">Carga Masiva</button>
+                        <button onclick="abrirModalCargaMasiva()" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">Carga Masiva (CSV)</button>
                         <button onclick="copiarMesAnterior()" class="btn-black" style="background-color: #e8eaed; color: #202124; border: 1px solid var(--card-border);">Importar Anterior</button>
                     </div>
                 </div>
@@ -246,7 +263,7 @@
                     <input type="text" id="filtro-texto-gastos" placeholder="Buscar gasto..." style="flex: 1;">
                 </div>
 
-                <div class="grid-2">
+                <div class="grid-3">
                     <div class="card" style="border-top: 4px solid #f29900;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                             <h3 style="margin: 0; font-size: 15px;">Gastos Fijos</h3>
@@ -266,6 +283,16 @@
                             <tbody id="tabla-tarjetas"></tbody>
                         </table>
                     </div>
+
+                    <div class="card" style="border-top: 4px solid #5f6368;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h3 style="margin: 0; font-size: 15px;">Gastos Terceros</h3>
+                        </div>
+                        <table>
+                            <thead><tr><th>Nombre</th><th>Ingresado</th><th>Detalle</th><th>Costo (ARS)</th><th>⚙️</th></tr></thead>
+                            <tbody id="tabla-terceros"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </main>
@@ -280,6 +307,15 @@
             </div>
             <form id="form-gasto" style="display: flex; flex-direction: column; gap: 15px;">
                 <input type="hidden" id="gasto-id">
+                
+                <div style="display: flex; gap: 10px;">
+                    <select id="gasto-propietario" style="flex:1;" onchange="toggleTercero()">
+                        <option value="Propio">Gasto Propio</option>
+                        <option value="Tercero">Gasto de Tercero</option>
+                    </select>
+                    <input type="text" id="gasto-tercero-nombre" placeholder="Nombre Tercero" style="display:none; flex:1;">
+                </div>
+
                 <input type="text" id="gasto-nombre" placeholder="Nombre (ej. Zoom)" required>
                 <div style="display: flex; gap: 10px;">
                     <input type="number" id="gasto-monto" placeholder="Monto Total Compra" required step="0.01" style="flex: 1;">
@@ -288,13 +324,12 @@
                 <select id="gasto-tipo" onchange="toggleCamposTarjeta()">
                     <option value="Fijo">Fijo</option><option value="Tarjeta">Tarjeta de Crédito</option>
                 </select>
-                <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px;" id="box-compartir">
                     <input type="checkbox" id="gasto-compartir" style="width: 16px; height: 16px;" onchange="toggleDivisor()">
                     <label for="gasto-compartir" style="font-size: 14px; cursor: pointer;">Compartir gasto</label>
                     <select id="gasto-divisor" style="display: none;">
                         <option value="2">Dividir en 2</option><option value="3">Dividir en 3</option>
-                        <option value="4">Dividir en 4</option><option value="5">Dividir en 5</option>
-                        <option value="6">Dividir en 6</option>
+                        <option value="4">Dividir en 4</option><option value="5">Dividir en 5</option><option value="6">Dividir en 6</option>
                     </select>
                 </div>
                 <div id="campos-tarjeta" style="display: none; gap: 10px; flex-wrap: wrap;">
@@ -368,7 +403,7 @@
     <div id="modal-grafico" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 style="margin: 0; font-size: 18px;">Comparativa de Gastos</h2>
+                <h2 style="margin: 0; font-size: 18px;">Comparativa de Gastos Propios</h2>
                 <button class="modal-close" onclick="cerrarModal('modal-grafico')">✖</button>
             </div>
             <canvas id="grafico-gastos" width="400" height="400"></canvas>
@@ -398,13 +433,12 @@
         const mesSelector = document.getElementById('mes-selector');
         const anioSelector = document.getElementById('anio-selector');
         
-        let totalGastosGlobal = 0, subtotalFijos = 0, subtotalTarjetas = 0, totalIngresosGlobal = 0;
+        let totalGastosGlobal = 0, subtotalFijos = 0, subtotalTarjetas = 0, subtotalTerceros = 0, totalIngresosGlobal = 0;
         let listaGastos = [], listaIngresos = [];
         let graficoInstance = null;
         
         let gruposDistribucion = { 'General': [ {nombre: 'Reserva', porc: 10}, {nombre: 'Equipamiento', porc: 20}, {nombre: 'Operativo', porc: 70} ] };
 
-        // Utilidad: Formato de Dinero ($x.xxx,x - Redondeado hacia arriba a 1 decimal)
         window.formatearDinero = function(num) {
             if (isNaN(num)) num = 0;
             let rounded = Math.ceil(num * 10) / 10;
@@ -413,6 +447,10 @@
             let decimal = parts[1] ? parts[1] : '0';
             return "$" + enteros + "," + decimal;
         };
+
+        window.mostrarCargando = function(show) {
+            document.getElementById('loading-screen').style.display = show ? 'flex' : 'none';
+        }
 
         window.toggleSidebar = function() { document.getElementById('sidebar').classList.toggle('open'); };
         
@@ -443,6 +481,7 @@
             } else {
                 document.getElementById('login-screen').style.display = 'flex';
                 document.getElementById('app-container').style.display = 'none';
+                mostrarCargando(false);
             }
         });
 
@@ -461,10 +500,12 @@
 
         async function actualizarDashboard() {
             if (!auth.currentUser) return;
+            mostrarCargando(true);
             await cargarConfiguracion();
             await cargarGastos();
             await cargarIngresos();
             calcularBalance();
+            mostrarCargando(false);
         }
 
         async function cargarConfiguracion() {
@@ -490,33 +531,47 @@
             const checked = document.getElementById(`gasto-compartir`).checked;
             document.getElementById(`gasto-divisor`).style.display = checked ? 'inline-block' : 'none';
         }
+        window.toggleTercero = function() {
+            const prop = document.getElementById('gasto-propietario').value;
+            const isTercero = prop === 'Tercero';
+            document.getElementById('gasto-tercero-nombre').style.display = isTercero ? 'inline-block' : 'none';
+            document.getElementById('gasto-tercero-nombre').required = isTercero;
+            document.getElementById('box-compartir').style.display = isTercero ? 'none' : 'flex';
+            if(isTercero) { document.getElementById('gasto-compartir').checked = false; toggleDivisor(); }
+        }
 
         window.abrirModalNuevoGasto = function() {
             document.getElementById('form-gasto').reset();
             document.getElementById('gasto-id').value = "";
             document.getElementById('titulo-modal-gasto').innerText = "Nuevo Gasto";
+            toggleTercero();
             toggleCamposTarjeta();
-            document.getElementById('gasto-compartir').checked = false;
             toggleDivisor();
             document.getElementById('modal-gasto').style.display = 'flex';
         }
 
         window.abrirModalEditarGasto = function(data) {
             document.getElementById('gasto-id').value = data.id;
+            document.getElementById('gasto-propietario').value = data.propietario || 'Propio';
+            document.getElementById('gasto-tercero-nombre').value = data.tercero_nombre || '';
             document.getElementById('gasto-nombre').value = data.nombre;
             document.getElementById('gasto-monto').value = data.monto;
             document.getElementById('gasto-moneda').value = data.moneda;
             document.getElementById('gasto-tipo').value = data.tipo;
             document.getElementById('titulo-modal-gasto').innerText = "Editar Gasto";
 
-            if (data.divisor && data.divisor > 1) {
-                document.getElementById('gasto-compartir').checked = true;
-                document.getElementById('gasto-divisor').style.display = 'inline-block';
-                document.getElementById('gasto-divisor').value = data.divisor;
-            } else {
-                document.getElementById('gasto-compartir').checked = false;
-                document.getElementById('gasto-divisor').style.display = 'none';
-                document.getElementById('gasto-divisor').value = 2;
+            toggleTercero();
+
+            if (data.propietario !== 'Tercero') {
+                if (data.divisor && data.divisor > 1) {
+                    document.getElementById('gasto-compartir').checked = true;
+                    document.getElementById('gasto-divisor').style.display = 'inline-block';
+                    document.getElementById('gasto-divisor').value = data.divisor;
+                } else {
+                    document.getElementById('gasto-compartir').checked = false;
+                    document.getElementById('gasto-divisor').style.display = 'none';
+                    document.getElementById('gasto-divisor').value = 2;
+                }
             }
 
             toggleCamposTarjeta();
@@ -530,6 +585,7 @@
         }
 
         document.getElementById('btn-guardar-dolar').addEventListener('click', async () => {
+            mostrarCargando(true);
             await setDoc(doc(db, "finanzas", obtenerMesId()), {
                 configuracion: {
                     dolar_debito: parseFloat(document.getElementById('usd-debito').value) || 0,
@@ -537,21 +593,25 @@
                     grupos_distribucion: gruposDistribucion
                 }
             }, { merge: true });
-            actualizarDashboard();
+            await actualizarDashboard();
         });
 
         document.getElementById('form-gasto').addEventListener('submit', async (e) => {
             e.preventDefault();
+            mostrarCargando(true);
             const idGasto = document.getElementById('gasto-id').value;
+            const prop = document.getElementById('gasto-propietario').value;
             const tipo = document.getElementById('gasto-tipo').value;
             const checkboxCompartir = document.getElementById('gasto-compartir').checked;
             
             let datosGasto = {
+                propietario: prop,
+                tercero_nombre: prop === 'Tercero' ? document.getElementById('gasto-tercero-nombre').value : '',
                 nombre: document.getElementById('gasto-nombre').value,
                 monto: parseFloat(document.getElementById('gasto-monto').value),
                 moneda: document.getElementById('gasto-moneda').value,
                 tipo: tipo,
-                divisor: checkboxCompartir ? parseInt(document.getElementById('gasto-divisor').value) || 1 : 1
+                divisor: (prop === 'Propio' && checkboxCompartir) ? parseInt(document.getElementById('gasto-divisor').value) || 1 : 1
             };
 
             if (tipo === 'Tarjeta') {
@@ -564,7 +624,7 @@
             else await addDoc(collection(db, "finanzas", obtenerMesId(), "gastos"), datosGasto);
             
             cerrarModal('modal-gasto');
-            actualizarDashboard();
+            await actualizarDashboard();
         });
 
         window.toggleRow = function(id) {
@@ -582,9 +642,10 @@
         function renderTablaGastos() {
             const tablaFijos = document.getElementById('tabla-fijos');
             const tablaTarjetas = document.getElementById('tabla-tarjetas');
-            tablaFijos.innerHTML = ''; tablaTarjetas.innerHTML = '';
+            const tablaTerceros = document.getElementById('tabla-terceros');
+            tablaFijos.innerHTML = ''; tablaTarjetas.innerHTML = ''; tablaTerceros.innerHTML = '';
             
-            totalGastosGlobal = 0; subtotalFijos = 0; subtotalTarjetas = 0;
+            totalGastosGlobal = 0; subtotalFijos = 0; subtotalTarjetas = 0; subtotalTerceros = 0;
 
             const dDebito = parseFloat(document.getElementById('usd-debito').value) || 0;
             const dImpuesto = parseFloat(document.getElementById('usd-impuesto').value) || 0;
@@ -595,12 +656,13 @@
 
                 let costoArsBase = data.monto;
                 let usdDetailsHTML = "";
+                let sumImp = 0; let vDeb = 0;
 
                 if (data.moneda === 'USD') {
                     let vImp = data.monto * dImpuesto;
                     let i2 = vImp * 0.02, i21 = vImp * 0.21, i30 = vImp * 0.30;
-                    let sumImp = i2 + i21 + i30;
-                    let vDeb = data.monto * dDebito;
+                    sumImp = i2 + i21 + i30;
+                    vDeb = data.monto * dDebito;
                     costoArsBase = sumImp + vDeb;
 
                     usdDetailsHTML = `
@@ -616,14 +678,13 @@
                                 <span style="color:#ddd;">---------------------------</span><br>
                                 Monto (dólar débito): ${formatearDinero(vDeb)}<br>
                                 <span style="color:#ddd;">---------------------------</span><br>
-                                <strong>Costo Total ARS: ${formatearDinero(costoArsBase)}</strong>
-                            </div>
-                        </td>
+                                <strong>Total final a pagar: ${formatearDinero(costoArsBase)}</strong>
                     `;
                 }
 
                 let divisor = data.divisor || 1;
                 let costoFinalArs = 0;
+                let isTercero = data.propietario === 'Tercero';
 
                 if (data.tipo === 'Tarjeta') {
                     let cuotasTotales = data.cuotas_totales || 1;
@@ -632,13 +693,23 @@
                     costoFinalArs = costoArsBase / divisor;
                 }
                 
-                totalGastosGlobal += costoFinalArs;
-                if (data.tipo === 'Fijo') subtotalFijos += costoFinalArs;
-                if (data.tipo === 'Tarjeta') subtotalTarjetas += costoFinalArs;
+                if (isTercero) {
+                    subtotalTerceros += costoFinalArs;
+                } else {
+                    totalGastosGlobal += costoFinalArs;
+                    if (data.tipo === 'Fijo') subtotalFijos += costoFinalArs;
+                    if (data.tipo === 'Tarjeta') subtotalTarjetas += costoFinalArs;
+                }
+
+                if (data.moneda === 'USD') {
+                    if (divisor > 1) usdDetailsHTML += `<br><span style="color:#ddd;">---------------------------</span><br><strong>Total final compartido: ${formatearDinero(costoFinalArs)}</strong>`;
+                    usdDetailsHTML += `</div></td>`;
+                }
 
                 let detalleTexto = data.tipo;
                 if (data.tipo === 'Tarjeta') detalleTexto = `${data.tarjeta} (${data.cuotas_pagadas}/${data.cuotas_totales})`;
-                if (divisor > 1) detalleTexto += ` [Div ${divisor}]`;
+                if (isTercero) detalleTexto = `${data.tercero_nombre} - ${detalleTexto}`;
+                else if (divisor > 1) detalleTexto += ` [Div ${divisor}]`;
 
                 const tr = document.createElement('tr');
                 tr.className = data.moneda === 'USD' ? 'tr-clickable' : '';
@@ -655,7 +726,7 @@
                     </td>
                 `;
 
-                const tablaDestino = data.tipo === 'Fijo' ? tablaFijos : tablaTarjetas;
+                const tablaDestino = isTercero ? tablaTerceros : (data.tipo === 'Fijo' ? tablaFijos : tablaTarjetas);
                 tablaDestino.appendChild(tr);
 
                 if(data.moneda === 'USD') {
@@ -672,16 +743,21 @@
             document.getElementById('sum-gastos-total').innerText = formatearDinero(totalGastosGlobal);
             document.getElementById('sum-gastos-fijos').innerText = formatearDinero(subtotalFijos);
             document.getElementById('sum-gastos-tarjeta').innerText = formatearDinero(subtotalTarjetas);
+            document.getElementById('sum-gastos-terceros').innerText = formatearDinero(subtotalTerceros);
         }
 
-        window.borrarGasto = async function(id) { await deleteDoc(doc(db, "finanzas", obtenerMesId(), "gastos", id)); actualizarDashboard(); }
+        window.borrarGasto = async function(id) { 
+            mostrarCargando(true);
+            await deleteDoc(doc(db, "finanzas", obtenerMesId(), "gastos", id)); 
+            await actualizarDashboard(); 
+        }
 
         window.abrirModalGrafico = function() {
             document.getElementById('modal-grafico').style.display = 'flex';
             if (graficoInstance) graficoInstance.destroy();
             graficoInstance = new Chart(document.getElementById('grafico-gastos').getContext('2d'), {
                 type: 'pie',
-                data: { labels: ['Fijos', 'Tarjeta'], datasets: [{ data: [subtotalFijos, subtotalTarjetas], backgroundColor: ['#f29900', '#EA4335'] }] }
+                data: { labels: ['Fijos Propios', 'Tarjeta Propios'], datasets: [{ data: [subtotalFijos, subtotalTarjetas], backgroundColor: ['#f29900', '#EA4335'] }] }
             });
         };
 
@@ -690,10 +766,11 @@
         window.procesarCSV = async function() {
             const input = document.getElementById('archivo-csv');
             if (!input.files || input.files.length === 0) return alert("Selecciona un CSV.");
+            mostrarCargando(true);
             const reader = new FileReader();
             reader.onload = async function(e) {
                 const rows = e.target.result.split('\n').filter(row => row.trim() !== '');
-                if (rows.length <= 1) return alert("El archivo está vacío.");
+                if (rows.length <= 1) { mostrarCargando(false); return alert("El archivo está vacío."); }
                 try {
                     const batch = writeBatch(db);
                     const ref = collection(db, "finanzas", obtenerMesId(), "gastos");
@@ -705,6 +782,8 @@
                             if (!col[0] || isNaN(monto)) continue;
                             let tipo = (col[3]||'').toLowerCase().includes('tarjeta') ? 'Tarjeta' : 'Fijo';
                             batch.set(doc(ref), {
+                                propietario: 'Propio',
+                                tercero_nombre: '',
                                 nombre: col[0], monto: monto, moneda: col[2].toUpperCase() === 'USD' ? 'USD' : 'ARS',
                                 tipo: tipo, divisor: parseInt(col[4]) || 1, tarjeta: tipo === 'Tarjeta' ? (col[5]||'VISA') : null,
                                 cuotas_totales: tipo === 'Tarjeta' ? (parseInt(col[6])||1) : null,
@@ -713,25 +792,27 @@
                             count++;
                         }
                     }
-                    if(count>0){ await batch.commit(); cerrarModal('modal-carga-masiva'); actualizarDashboard(); }
-                } catch(e){ alert("Error CSV."); }
+                    if(count>0){ await batch.commit(); cerrarModal('modal-carga-masiva'); await actualizarDashboard(); }
+                    else { mostrarCargando(false); }
+                } catch(e){ mostrarCargando(false); alert("Error CSV."); }
             };
             reader.readAsText(input.files[0]);
         }
 
         window.copiarMesAnterior = async function() {
             if(!confirm("¿Copiar gastos del mes anterior? (+1 cuota en tarjetas)")) return;
+            mostrarCargando(true);
             let m = parseInt(mesSelector.value)-1, a = parseInt(anioSelector.value);
             if(m===0){ m=12; a--; }
             const prev = `${a}-${m.toString().padStart(2, '0')}`;
             const snap = await getDocs(collection(db, "finanzas", prev, "gastos"));
-            if(snap.empty) return alert("Sin gastos previos.");
+            if(snap.empty) { mostrarCargando(false); return alert("Sin gastos previos."); }
             for(const d of snap.docs){
                 let data = d.data();
                 if(data.tipo==='Tarjeta'){ if(data.cuotas_pagadas>=data.cuotas_totales) continue; data.cuotas_pagadas++; }
                 await addDoc(collection(db, "finanzas", obtenerMesId(), "gastos"), data);
             }
-            actualizarDashboard();
+            await actualizarDashboard();
         };
 
         // --- INGRESOS E INLINE DISTRIBUCION ---
@@ -763,6 +844,7 @@
 
         document.getElementById('form-ingreso').addEventListener('submit', async (e) => {
             e.preventDefault();
+            mostrarCargando(true);
             const id = document.getElementById('ingreso-id').value;
             const data = {
                 nombre: document.getElementById('ingreso-nombre').value,
@@ -772,7 +854,7 @@
             if(id) await updateDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", id), data);
             else await addDoc(collection(db, "finanzas", obtenerMesId(), "ingresos"), data);
             cerrarModal('modal-ingreso');
-            actualizarDashboard();
+            await actualizarDashboard();
         });
 
         async function cargarIngresos() {
@@ -819,13 +901,13 @@
             const resDist = document.getElementById('res-ingresos-dist');
             divDist.innerHTML = '';
             
-            let resHtml = `<div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: var(--text-main);">Total: ${formatearDinero(totalIngresosGlobal)}</div>`;
-            if(Object.keys(sumPorGrupo).length === 0) divDist.innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No hay ingresos para distribuir.</p>';
+            let resHtml = '';
+            if(Object.keys(gruposDistribucion).length === 0) divDist.innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No hay grupos de distribución.</p>';
 
             let gIndex = 0;
-            for(let grupoName in sumPorGrupo) {
-                let totalGrupo = sumPorGrupo[grupoName];
-                let cfgItems = gruposDistribucion[grupoName] || [];
+            for(let grupoName in gruposDistribucion) {
+                let totalGrupo = sumPorGrupo[grupoName] || 0;
+                let cfgItems = gruposDistribucion[grupoName];
                 let gId = `grp_${gIndex++}`;
                 
                 let htmlBlock = `
@@ -862,7 +944,7 @@
                 divDist.innerHTML += htmlBlock;
             }
 
-            resDist.innerHTML = resHtml;
+            resDist.innerHTML = `<div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: var(--text-main);">Total Distribuido: ${formatearDinero(totalIngresosGlobal)}</div>` + resHtml;
             calcularBalance();
         }
 
@@ -890,13 +972,14 @@
             }
             if (sum !== 100) return alert("La suma de los porcentajes debe ser exactamente 100%.");
             
+            mostrarCargando(true);
             gruposDistribucion[grupoName] = newItems;
             await setDoc(doc(db, "finanzas", obtenerMesId()), { configuracion: { grupos_distribucion: gruposDistribucion } }, { merge: true });
             alert("Distribución actualizada correctamente.");
-            actualizarDashboard();
+            await actualizarDashboard();
         }
 
-        window.borrarIngreso = async function(id) { await deleteDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", id)); actualizarDashboard(); }
+        window.borrarIngreso = async function(id) { mostrarCargando(true); await deleteDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", id)); await actualizarDashboard(); }
 
         window.abrirModalGruposDistribucion = function() {
             document.getElementById('modal-grupos-dist').style.display = 'flex';
@@ -974,13 +1057,14 @@
 
             if(items.length === 0) return alert("Agrega al menos un objetivo.");
 
+            mostrarCargando(true);
             gruposDistribucion[nombreGrupo] = items;
             await setDoc(doc(db, "finanzas", obtenerMesId()), { configuracion: { grupos_distribucion: gruposDistribucion } }, { merge: true });
 
             alert("Grupo guardado correctamente.");
             actualizarSelectGrupos();
             document.getElementById('select-grupo-editar').value = nombreGrupo;
-            actualizarDashboard();
+            await actualizarDashboard();
         }
 
         function calcularBalance() {
