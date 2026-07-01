@@ -37,11 +37,8 @@
         }
 
         .logo {
-            text-align: center;
-            font-size: 22px;
-            font-weight: 600;
-            color: var(--text-main);
-            margin-bottom: 30px;
+            text-align: center; font-size: 22px; font-weight: 600;
+            color: var(--text-main); margin-bottom: 30px;
         }
 
         .nav-btn {
@@ -102,7 +99,6 @@
         .tr-clickable:hover { background-color: #fcfcfc; cursor: pointer; }
         .details-row td { background-color: #f8f9fa; border-radius: 8px; border: 1px solid #eee;}
 
-        /* Mobile Adjustments */
         @media (max-width: 768px) {
             .sidebar { position: fixed; height: 100vh; transform: translateX(-100%); z-index: 2001; box-shadow: 2px 0 10px rgba(0,0,0,0.1); }
             .sidebar.open { transform: translateX(0); }
@@ -170,7 +166,7 @@
                         <div id="res-ingresos-dist"></div>
                     </div>
                     <div class="card" style="border-top: 4px solid #174ea6;">
-                        <h3>Gastos Totales</h3>
+                        <h3>Gastos Totales (ARS)</h3>
                         <div class="value" id="res-gastos-fijos">$0,0</div>
                     </div>
                     <div class="card" style="border-top: 4px solid #34A853;">
@@ -186,7 +182,7 @@
 
             <!-- Ingresos -->
             <div id="ingresos" class="view">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
                     <h2 style="margin: 0;">Gestión de Ingresos</h2>
                     <div style="display: flex; gap: 10px;">
                         <button onclick="abrirModalNuevoIngreso()" class="btn-black">➕ Nuevo Ingreso</button>
@@ -203,7 +199,7 @@
                             <div class="value" id="sum-ingresos-mes" style="font-size: 16px; margin: 0;">$0,0</div>
                         </div>
                         <table>
-                            <thead><tr><th>Origen</th><th>Grupo</th><th>Monto</th><th>⚙️</th></tr></thead>
+                            <thead><tr><th>Origen</th><th>Grupo Vinculado</th><th>Monto</th><th>⚙️</th></tr></thead>
                             <tbody id="tabla-ingresos"></tbody>
                         </table>
                     </div>
@@ -322,8 +318,10 @@
                 <input type="hidden" id="ingreso-id">
                 <input type="text" id="ingreso-nombre" placeholder="Origen (ej. Cuotas, Show)" required>
                 <input type="number" id="ingreso-monto" placeholder="Monto Total ARS" required step="0.01">
-                <label style="font-size: 13px; color: var(--text-muted); margin-bottom:-10px;">Grupo de Distribución:</label>
-                <select id="ingreso-grupo" required></select>
+                <div>
+                    <label style="font-size: 13px; color: var(--text-muted);">Vincular a Grupo de Distribución:</label>
+                    <select id="ingreso-grupo" style="width:100%; margin-top:5px;" required></select>
+                </div>
                 <button type="submit" class="btn-black" style="margin-top: 10px;">Guardar</button>
             </form>
         </div>
@@ -345,7 +343,7 @@
                 <button class="btn-icon" style="background:#e8eaed; border-radius:4px; font-size:14px; padding:5px 10px;" onclick="agregarItemGrupo()">➕ Agregar Ítem</button>
                 <div style="margin-top:15px; text-align:right;">
                     <span id="editor-grupo-suma" style="font-weight:bold; font-size:14px; margin-right:10px;">Total: 0%</span>
-                    <button class="btn-black" onclick="guardarGrupoDistribucion()">Guardar Grupo</button>
+                    <button class="btn-black" onclick="guardarGrupoDistribucionModal()">Guardar Grupo</button>
                 </div>
             </div>
         </div>
@@ -404,10 +402,7 @@
         let listaGastos = [], listaIngresos = [];
         let graficoInstance = null;
         
-        // Estructura por defecto para distribución
-        let gruposDistribucion = {
-            'General': [ {nombre: 'Reserva', porc: 10}, {nombre: 'Equipamiento', porc: 20}, {nombre: 'Operativo', porc: 70} ]
-        };
+        let gruposDistribucion = { 'General': [ {nombre: 'Reserva', porc: 10}, {nombre: 'Equipamiento', porc: 20}, {nombre: 'Operativo', porc: 70} ] };
 
         // Utilidad: Formato de Dinero ($x.xxx,x - Redondeado hacia arriba a 1 decimal)
         window.formatearDinero = function(num) {
@@ -415,13 +410,12 @@
             let rounded = Math.ceil(num * 10) / 10;
             let parts = rounded.toFixed(1).split('.');
             let enteros = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-            return "$" + enteros + "," + parts[1];
+            let decimal = parts[1] ? parts[1] : '0';
+            return "$" + enteros + "," + decimal;
         };
 
-        window.toggleSidebar = function() {
-            document.getElementById('sidebar').classList.toggle('open');
-        };
-        // Cerrar sidebar al hacer click fuera en movil
+        window.toggleSidebar = function() { document.getElementById('sidebar').classList.toggle('open'); };
+        
         document.addEventListener('click', (e) => {
             const sidebar = document.getElementById('sidebar');
             const btn = document.querySelector('.mobile-menu-btn');
@@ -740,15 +734,13 @@
             actualizarDashboard();
         };
 
-        // --- INGRESOS ---
+        // --- INGRESOS E INLINE DISTRIBUCION ---
         function actualizarSelectGrupos() {
             const selectIngreso = document.getElementById('ingreso-grupo');
             const selectEditor = document.getElementById('select-grupo-editar');
             selectIngreso.innerHTML = ''; selectEditor.innerHTML = '';
-            
             for(let key in gruposDistribucion) {
-                selectIngreso.add(new Option(key, key));
-                selectEditor.add(new Option(key, key));
+                selectIngreso.add(new Option(key, key)); selectEditor.add(new Option(key, key));
             }
         }
 
@@ -828,37 +820,43 @@
             divDist.innerHTML = '';
             
             let resHtml = `<div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: var(--text-main);">Total: ${formatearDinero(totalIngresosGlobal)}</div>`;
+            if(Object.keys(sumPorGrupo).length === 0) divDist.innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No hay ingresos para distribuir.</p>';
 
-            if(Object.keys(sumPorGrupo).length === 0) {
-                divDist.innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No hay ingresos para distribuir.</p>';
-            }
-
+            let gIndex = 0;
             for(let grupoName in sumPorGrupo) {
                 let totalGrupo = sumPorGrupo[grupoName];
                 let cfgItems = gruposDistribucion[grupoName] || [];
+                let gId = `grp_${gIndex++}`;
                 
                 let htmlBlock = `
                     <div style="background:#f8f9fa; border-radius:8px; padding:15px; margin-bottom:15px; border:1px solid var(--card-border);">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px; align-items:center; flex-wrap:wrap; gap:5px;">
                             <strong style="font-size:14px;">${grupoName}</strong>
-                            <span style="font-weight:600;">${formatearDinero(totalGrupo)}</span>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <span id="sum-porc-${gId}" style="font-size:12px; font-weight:bold; color:var(--text-muted);">Total: 100%</span>
+                                <span style="font-weight:600;">${formatearDinero(totalGrupo)}</span>
+                                <button class="btn-icon" onclick="guardarInline('${grupoName}', '${gId}')" title="Guardar Cambios">💾</button>
+                            </div>
                         </div>
                         <table style="margin-top:0;">
                 `;
 
                 resHtml += `<strong style="font-size:13px; display:block; margin-top:10px;">${grupoName}:</strong><div style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">`;
 
-                cfgItems.forEach(it => {
+                cfgItems.forEach((it, idx) => {
                     let val = totalGrupo * (it.porc / 100);
                     htmlBlock += `
                         <tr>
-                            <td style="color:var(--text-muted); border-bottom:none; padding:6px 0;">${it.nombre} (${it.porc}%)</td>
-                            <td style="text-align:right; font-weight:500; border-bottom:none; padding:6px 0;">${formatearDinero(val)}</td>
+                            <td style="color:var(--text-muted); border-bottom:none; padding:6px 0;">
+                                ${it.nombre} (<input type="number" id="inp-${gId}-${idx}" value="${it.porc}" min="0" max="100" style="width:50px; padding:4px; font-size:12px; text-align:center;" onchange="recalcularInline('${gId}', ${totalGrupo}, ${cfgItems.length})">%)
+                            </td>
+                            <td id="val-${gId}-${idx}" style="text-align:right; font-weight:500; border-bottom:none; padding:6px 0;">
+                                ${formatearDinero(val)}
+                            </td>
                         </tr>
                     `;
                     resHtml += `<span style="color: var(--text-main);">${it.nombre} (${it.porc}%):</span> ${formatearDinero(val)}<br>`;
                 });
-                
                 htmlBlock += `</table></div>`;
                 resHtml += `</div>`;
                 divDist.innerHTML += htmlBlock;
@@ -868,9 +866,38 @@
             calcularBalance();
         }
 
+        window.recalcularInline = function(gId, totalGrupo, count) {
+            let sum = 0;
+            for (let i = 0; i < count; i++) {
+                let p = parseFloat(document.getElementById(`inp-${gId}-${i}`).value) || 0;
+                sum += p;
+                let val = totalGrupo * (p / 100);
+                document.getElementById(`val-${gId}-${i}`).innerText = formatearDinero(val);
+            }
+            let sumEl = document.getElementById(`sum-porc-${gId}`);
+            sumEl.innerText = `Total: ${sum}%`;
+            sumEl.style.color = sum === 100 ? 'var(--text-muted)' : '#d93025';
+        }
+
+        window.guardarInline = async function(grupoName, gId) {
+            let items = gruposDistribucion[grupoName];
+            let sum = 0;
+            let newItems = [];
+            for (let i = 0; i < items.length; i++) {
+                let p = parseFloat(document.getElementById(`inp-${gId}-${i}`).value) || 0;
+                sum += p;
+                newItems.push({ nombre: items[i].nombre, porc: p });
+            }
+            if (sum !== 100) return alert("La suma de los porcentajes debe ser exactamente 100%.");
+            
+            gruposDistribucion[grupoName] = newItems;
+            await setDoc(doc(db, "finanzas", obtenerMesId()), { configuracion: { grupos_distribucion: gruposDistribucion } }, { merge: true });
+            alert("Distribución actualizada correctamente.");
+            actualizarDashboard();
+        }
+
         window.borrarIngreso = async function(id) { await deleteDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", id)); actualizarDashboard(); }
 
-        // --- DISTRIBUCION LOGIC ---
         window.abrirModalGruposDistribucion = function() {
             document.getElementById('modal-grupos-dist').style.display = 'flex';
             document.getElementById('editor-grupo-box').style.display = 'none';
@@ -883,7 +910,7 @@
             if(!select.value) return;
             const grupo = gruposDistribucion[select.value];
             document.getElementById('editor-grupo-nombre').value = select.value;
-            document.getElementById('editor-grupo-nombre').disabled = true; // no cambiar nombre por ahora para evitar bugs de llaves
+            document.getElementById('editor-grupo-nombre').disabled = true;
             renderItemsEditor(grupo);
             document.getElementById('editor-grupo-box').style.display = 'block';
         }
@@ -898,7 +925,7 @@
         window.renderItemsEditor = function(items) {
             const container = document.getElementById('editor-grupo-items');
             container.innerHTML = '';
-            items.forEach((it, idx) => {
+            items.forEach((it) => {
                 container.innerHTML += `
                     <div style="display:flex; gap:10px; align-items:center;" class="dist-item-row">
                         <input type="text" class="dist-nombre" value="${it.nombre}" style="flex:1;">
@@ -931,7 +958,7 @@
             return sum;
         }
 
-        window.guardarGrupoDistribucion = async function() {
+        window.guardarGrupoDistribucionModal = async function() {
             let sum = calcularSumaEditor();
             if(sum !== 100) return alert("La suma de los porcentajes debe ser exactamente 100%.");
             
@@ -948,10 +975,7 @@
             if(items.length === 0) return alert("Agrega al menos un objetivo.");
 
             gruposDistribucion[nombreGrupo] = items;
-            
-            await setDoc(doc(db, "finanzas", obtenerMesId()), {
-                configuracion: { grupos_distribucion: gruposDistribucion }
-            }, { merge: true });
+            await setDoc(doc(db, "finanzas", obtenerMesId()), { configuracion: { grupos_distribucion: gruposDistribucion } }, { merge: true });
 
             alert("Grupo guardado correctamente.");
             actualizarSelectGrupos();
