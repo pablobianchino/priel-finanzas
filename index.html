@@ -141,6 +141,7 @@
             <button class="nav-btn active" onclick="switchView('resumen', this)">㗊 Resumen</button>
             <button class="nav-btn" onclick="switchView('ingresos', this)">💲 Ingresos</button>
             <button class="nav-btn" onclick="switchView('gastos', this)">🧾 Gastos</button>
+            <button class="nav-btn" onclick="switchView('estadisticas', this)">📊 Estadísticas</button>
             
             <div class="user-info">
                 <span id="user-email">No autenticado</span><br>
@@ -169,6 +170,10 @@
 
             <!-- Resumen -->
             <div id="resumen" class="view active">
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
+                    <button onclick="copiarMesAnterior()" class="btn-black" style="background-color: #e8eaed; color: #202124; border: 1px solid var(--card-border);">Importar Mes Anterior</button>
+                </div>
+
                 <div class="cards-grid">
                     <div class="card" style="border-top: 4px solid #f29900;">
                         <div class="card-header-toggle" onclick="toggleCard(this)">
@@ -236,7 +241,6 @@
 
             <!-- Gastos -->
             <div id="gastos" class="view">
-                
                 <div class="cards-grid">
                     <div class="card" style="border-top: 4px solid var(--text-main);">
                         <h3>Gastos Totales (Propios)</h3>
@@ -273,7 +277,6 @@
                         <button onclick="abrirModalGrafico('Gastos Propios', ['Fijos', 'Tarjetas'], [subtotalFijos, subtotalTarjetas], ['#f29900', '#EA4335'])" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">📊 Gráfico</button>
                         <button onclick="abrirModalNuevoGasto()" class="btn-black">➕ Nuevo Gasto</button>
                         <button onclick="abrirModalCargaMasiva()" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">Carga CSV</button>
-                        <button onclick="copiarMesAnterior()" class="btn-black" style="background-color: #e8eaed; color: #202124; border: 1px solid var(--card-border);">Importar Anterior</button>
                     </div>
                 </div>
 
@@ -319,6 +322,22 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Estadísticas Anuales -->
+            <div id="estadisticas" class="view">
+                <div class="card" style="border-top: 4px solid var(--text-main);">
+                    <div class="card-header-toggle" onclick="toggleCard(this)">
+                        <h3 style="font-size: 16px;">Estadísticas Anual de Ingresos vs Gastos</h3>
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="card-content">
+                        <div class="chart-container" style="height: 400px; margin-top: 20px;">
+                            <canvas id="chart-estadisticas"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
 
@@ -467,7 +486,7 @@
 
         let totalGastosGlobal = 0, subtotalFijos = 0, subtotalTarjetas = 0, subtotalTerceros = 0, totalIngresosGlobal = 0;
         let listaGastos = [], listaIngresos = [];
-        let chartDinamico = null, chartResumen = null, chartIngresos = null;
+        let chartDinamico = null, chartResumen = null, chartIngresos = null, chartEstadisticas = null;
         let gruposDistribucion = {};
 
         window.formatearDinero = function(num) {
@@ -501,13 +520,17 @@
             if(window.innerWidth <= 768 && !sidebar.contains(e.target) && !btn.contains(e.target)) sidebar.classList.remove('open');
         });
 
-        window.switchView = function(viewId, element) {
+        window.switchView = async function(viewId, element) {
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(viewId).classList.add('active');
             element.classList.add('active');
             document.getElementById('view-title').innerText = element.innerText.replace(/[^\w\s]/gi, '').trim();
             if(window.innerWidth <= 768) toggleSidebar();
+
+            if (viewId === 'estadisticas') {
+                await cargarEstadisticasAnuales();
+            }
         };
 
         onAuthStateChanged(auth, (user) => {
@@ -528,7 +551,12 @@
         document.getElementById('logout-btn').addEventListener('click', (e) => { e.preventDefault(); signOut(auth); });
         
         mesSelector.addEventListener('change', actualizarDashboard);
-        anioSelector.addEventListener('change', actualizarDashboard);
+        anioSelector.addEventListener('change', () => {
+            actualizarDashboard();
+            if (document.getElementById('estadisticas').classList.contains('active')) {
+                cargarEstadisticasAnuales();
+            }
+        });
 
         document.getElementById('filtro-texto-gastos').addEventListener('input', renderTablaGastos);
         document.getElementById('filtro-texto-ingresos').addEventListener('input', renderTablaIngresos);
@@ -542,6 +570,9 @@
             await cargarGastos();
             await cargarIngresos();
             calcularBalance();
+            if (document.getElementById('estadisticas').classList.contains('active')) {
+                await cargarEstadisticasAnuales();
+            }
             mostrarCargando(false);
         }
 
@@ -846,19 +877,39 @@
         }
 
         window.copiarMesAnterior = async function() {
-            if(!confirm("¿Copiar gastos del mes anterior? (+1 cuota en tarjetas)")) return;
+            if(!confirm("¿Estás seguro de importar todos los datos del mes anterior? Esta acción copiará la configuración, ingresos y gastos. Si ya tienes datos en este mes, podrían duplicarse.")) return;
             mostrarCargando(true);
             let m = parseInt(mesSelector.value)-1, a = parseInt(anioSelector.value);
             if(m===0){ m=12; a--; }
             const prev = `${a}-${m.toString().padStart(2, '0')}`;
-            const snap = await getDocs(collection(db, "finanzas", prev, "gastos"));
-            if(snap.empty) { mostrarCargando(false); return alert("Sin gastos previos."); }
-            for(const d of snap.docs){
-                let data = d.data();
-                if(data.tipo==='Tarjeta'){ if(data.cuotas_pagadas>=data.cuotas_totales) continue; data.cuotas_pagadas++; }
-                await addDoc(collection(db, "finanzas", obtenerMesId(), "gastos"), data);
+            const actual = obtenerMesId();
+
+            try {
+                const prevDocSnap = await getDoc(doc(db, "finanzas", prev));
+                if(prevDocSnap.exists()) {
+                    await setDoc(doc(db, "finanzas", actual), prevDocSnap.data(), { merge: true });
+                }
+
+                const snapG = await getDocs(collection(db, "finanzas", prev, "gastos"));
+                for(const d of snapG.docs){
+                    let data = d.data();
+                    if(data.tipo==='Tarjeta'){ 
+                        if(data.cuotas_pagadas>=data.cuotas_totales) continue; 
+                        data.cuotas_pagadas++; 
+                    }
+                    await addDoc(collection(db, "finanzas", actual, "gastos"), data);
+                }
+
+                const snapI = await getDocs(collection(db, "finanzas", prev, "ingresos"));
+                for(const d of snapI.docs){
+                    await addDoc(collection(db, "finanzas", actual, "ingresos"), d.data());
+                }
+
+                await actualizarDashboard();
+            } catch (e) {
+                mostrarCargando(false);
+                alert("Hubo un error al copiar los datos.");
             }
-            await actualizarDashboard();
         };
 
         // --- INGRESOS E INLINE DISTRIBUCION ---
@@ -1001,6 +1052,7 @@
                 resHtml += `</div>`;
                 divDist.innerHTML += htmlBlock;
             }
+
             resDist.innerHTML = `<div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: var(--text-main);">Total Distribuido: ${formatearDinero(totalIngresosGlobal)}</div>` + resHtml;
         }
 
@@ -1093,6 +1145,85 @@
                 type: 'pie', data: { labels: ['Gastos Totales', 'Ingresos Totales'], datasets: [{ data: [totalGastosGlobal, totalIngresosGlobal], backgroundColor: ['#EA4335', '#34A853'] }] },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: {boxWidth: 10, font: {size: 10}} } } }
             });
+        }
+
+        // --- ESTADISTICAS ANUALES ---
+        async function cargarEstadisticasAnuales() {
+            const anio = anioSelector.value;
+            const meses = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
+            const nombresMeses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+            
+            let ingresosData = new Array(12).fill(0);
+            let gastosData = new Array(12).fill(0);
+
+            mostrarCargando(true);
+
+            const promesas = meses.map(async (mes, index) => {
+                const mesId = `${anio}-${mes}`;
+                
+                const docSnap = await getDoc(doc(db, "finanzas", mesId));
+                let dDebito = 0, dImpuesto = 0;
+                if (docSnap.exists() && docSnap.data().configuracion) {
+                    dDebito = docSnap.data().configuracion.dolar_debito || 0;
+                    dImpuesto = docSnap.data().configuracion.dolar_impuesto || 0;
+                }
+
+                const ingSnap = await getDocs(collection(db, "finanzas", mesId, "ingresos"));
+                let totalIng = 0;
+                ingSnap.forEach(d => { totalIng += d.data().monto; });
+                ingresosData[index] = totalIng;
+
+                const gasSnap = await getDocs(collection(db, "finanzas", mesId, "gastos"));
+                let totalGas = 0;
+                gasSnap.forEach(d => {
+                    let data = d.data();
+                    if (data.propietario === 'Tercero') return;
+
+                    let costoArsBase = data.monto;
+                    if (data.moneda === 'USD') {
+                        let vImp = data.monto * dImpuesto;
+                        let sumImp = (vImp * 0.02) + (vImp * 0.21) + (vImp * 0.30);
+                        let vDeb = data.monto * dDebito;
+                        costoArsBase = sumImp + vDeb;
+                    }
+
+                    let divisor = data.divisor || 1;
+                    let costoFinalArs = 0;
+                    if (data.compartir_tipo === 'fijo') {
+                        costoFinalArs = data.monto_fijo;
+                    } else {
+                        if (data.tipo === 'Tarjeta') {
+                            costoFinalArs = (costoArsBase / (data.cuotas_totales || 1)) / divisor;
+                        } else {
+                            costoFinalArs = costoArsBase / divisor;
+                        }
+                    }
+                    totalGas += costoFinalArs;
+                });
+                gastosData[index] = totalGas;
+            });
+
+            await Promise.all(promesas);
+
+            if (chartEstadisticas) chartEstadisticas.destroy();
+            chartEstadisticas = new Chart(document.getElementById('chart-estadisticas').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: nombresMeses,
+                    datasets: [
+                        { label: 'Ingresos', data: ingresosData, backgroundColor: '#34A853' },
+                        { label: 'Gastos Propios', data: gastosData, backgroundColor: '#EA4335' }
+                    ]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+            
+            mostrarCargando(false);
         }
     </script>
 </body>
