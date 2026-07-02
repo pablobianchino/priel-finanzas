@@ -101,7 +101,7 @@
         .tr-clickable:hover { background-color: #fcfcfc; cursor: pointer; }
         .details-row td { background-color: #f8f9fa; border-radius: 8px; border: 1px solid #eee;}
 
-        .chart-container { position: relative; width: 100%; height: 200px; margin-top: 15px; }
+        .chart-container { position: relative; width: 100%; }
 
         @media (max-width: 768px) {
             .sidebar { position: fixed; height: 100vh; transform: translateX(-100%); z-index: 2001; box-shadow: 2px 0 10px rgba(0,0,0,0.1); }
@@ -187,9 +187,9 @@
                             <div class="value" id="res-gastos-fijos">$0,0</div>
                         </div>
                         <div class="card" style="border-top: 4px solid #EA4335;">
-                            <h3>Total Gastos vs Ingresos</h3>
+                            <h3>Saldo a favor</h3>
                             <div class="value" id="res-balance">$0,0</div>
-                            <div class="chart-container"><canvas id="chart-resumen"></canvas></div>
+                            <div class="chart-container" style="height: 150px; margin-top: 15px;"><canvas id="chart-resumen"></canvas></div>
                         </div>
                     </div>
                 </div>
@@ -218,10 +218,10 @@
                         </div>
                         <div class="card-content">
                             <table>
-                                <thead><tr><th>Origen</th><th>Grupo</th><th>Monto</th><th>⚙️</th></tr></thead>
+                                <thead><tr><th>Origen</th><th>Grupo Vinculado</th><th>Monto</th><th>⚙️</th></tr></thead>
                                 <tbody id="tabla-ingresos"></tbody>
                             </table>
-                            <div class="chart-container" style="margin-top:20px;"><canvas id="chart-ingresos-mes"></canvas></div>
+                            <div class="chart-container" style="height: 250px; margin-top:20px;"><canvas id="chart-ingresos-mes"></canvas></div>
                         </div>
                     </div>
 
@@ -437,7 +437,7 @@
                 <h2 style="margin: 0; font-size: 18px;" id="titulo-modal-grafico">Gráfico</h2>
                 <button class="modal-close" onclick="cerrarModal('modal-grafico')">✖</button>
             </div>
-            <canvas id="grafico-dinamico" width="400" height="400"></canvas>
+            <div class="chart-container" style="height: 300px;"><canvas id="grafico-dinamico"></canvas></div>
         </div>
     </div>
 
@@ -463,12 +463,13 @@
         const mesSelector = document.getElementById('mes-selector');
         const anioSelector = document.getElementById('anio-selector');
         
+        const colorPalette = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#9C27B0', '#00BCD4', '#FF9800', '#795548', '#8BC34A', '#E91E63', '#3F51B5'];
+
         let totalGastosGlobal = 0, subtotalFijos = 0, subtotalTarjetas = 0, subtotalTerceros = 0, totalIngresosGlobal = 0;
         let listaGastos = [], listaIngresos = [];
         let chartDinamico = null, chartResumen = null, chartIngresos = null;
         let gruposDistribucion = {};
 
-        // Utilidades UI
         window.formatearDinero = function(num) {
             if (isNaN(num)) num = 0;
             let rounded = Math.ceil(num * 10) / 10;
@@ -793,7 +794,11 @@
             document.getElementById('sum-gastos-terceros').innerText = formatearDinero(subtotalTerceros);
         }
 
-        window.borrarGasto = async function(id) { mostrarCargando(true); await deleteDoc(doc(db, "finanzas", obtenerMesId(), "gastos", id)); await actualizarDashboard(); }
+        window.borrarGasto = async function(id) { 
+            mostrarCargando(true);
+            await deleteDoc(doc(db, "finanzas", obtenerMesId(), "gastos", id)); 
+            await actualizarDashboard(); 
+        }
 
         window.abrirModalGrafico = function(titulo, labels, datos, colores) {
             document.getElementById('titulo-modal-grafico').innerText = titulo;
@@ -802,7 +807,7 @@
             chartDinamico = new Chart(document.getElementById('grafico-dinamico').getContext('2d'), {
                 type: 'pie',
                 data: { labels: labels, datasets: [{ data: datos, backgroundColor: colores }] },
-                options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
             });
         };
 
@@ -899,15 +904,19 @@
             const tabla = document.getElementById('tabla-ingresos');
             tabla.innerHTML = ''; totalIngresosGlobal = 0;
             let sumPorGrupo = {};
-            let chartLabels = []; let chartData = [];
+            let chartLabels = []; let chartData = []; let chartColors = [];
 
             const filter = document.getElementById('filtro-texto-ingresos').value.toLowerCase();
 
-            listaIngresos.forEach(data => {
+            listaIngresos.forEach((data, index) => {
                 if (filter && !data.nombre.toLowerCase().includes(filter)) return;
                 
+                let assignedColor = colorPalette[index % colorPalette.length];
                 totalIngresosGlobal += data.monto;
-                chartLabels.push(data.nombre); chartData.push(data.monto);
+                
+                chartLabels.push(data.nombre); 
+                chartData.push(data.monto); 
+                chartColors.push(assignedColor);
                 
                 if (data.grupo) {
                     if(!sumPorGrupo[data.grupo]) sumPorGrupo[data.grupo] = 0;
@@ -916,7 +925,12 @@
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${data.nombre}</td>
+                    <td>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${assignedColor};"></span>
+                            ${data.nombre}
+                        </div>
+                    </td>
                     <td><span style="background:#e8eaed; padding:2px 6px; border-radius:4px; font-size:11px;">${data.grupo || 'Ninguno'}</span></td>
                     <td style="font-weight:600;">${formatearDinero(data.monto)}</td>
                     <td style="white-space: nowrap;">
@@ -930,13 +944,12 @@
             document.getElementById('sum-ingresos-mes').innerText = formatearDinero(totalIngresosGlobal);
             document.getElementById('res-ingresos-mes').innerText = formatearDinero(totalIngresosGlobal);
 
-            // Gráfico Ingresos del mes
             if (chartIngresos) chartIngresos.destroy();
             chartIngresos = new Chart(document.getElementById('chart-ingresos-mes').getContext('2d'), {
-                type: 'pie', data: { labels: chartLabels, datasets: [{ data: chartData }] }, options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+                type: 'pie', data: { labels: chartLabels, datasets: [{ data: chartData, backgroundColor: chartColors }] }, 
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
             });
 
-            // Renderizar Distribución
             const divDist = document.getElementById('tabla-distribucion');
             const resDist = document.getElementById('res-ingresos-dist');
             divDist.innerHTML = '';
@@ -953,7 +966,7 @@
                 let distLabels = []; let distData = [];
                 cfgItems.forEach(it => { distLabels.push(it.nombre); distData.push(totalGrupo * (it.porc / 100)); });
                 
-                let btnGraficoHTML = `<button class="btn-icon" onclick='abrirModalGrafico("Distribución: ${grupoName}", ${JSON.stringify(distLabels)}, ${JSON.stringify(distData)}, [])' title="Ver Gráfico">📊</button>`;
+                let btnGraficoHTML = `<button class="btn-icon" onclick='abrirModalGrafico("Distribución: ${grupoName}", ${JSON.stringify(distLabels)}, ${JSON.stringify(distData)}, ${JSON.stringify(colorPalette)})' title="Ver Gráfico">📊</button>`;
 
                 let htmlBlock = `
                     <div style="background:#f8f9fa; border-radius:8px; padding:15px; margin-bottom:15px; border:1px solid var(--card-border);">
@@ -988,7 +1001,7 @@
                 resHtml += `</div>`;
                 divDist.innerHTML += htmlBlock;
             }
-            resDist.innerHTML = resHtml;
+            resDist.innerHTML = `<div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: var(--text-main);">Total Distribuido: ${formatearDinero(totalIngresosGlobal)}</div>` + resHtml;
         }
 
         window.recalcularInline = function(gId, totalGrupo, count) {
@@ -1078,7 +1091,7 @@
             if (chartResumen) chartResumen.destroy();
             chartResumen = new Chart(document.getElementById('chart-resumen').getContext('2d'), {
                 type: 'pie', data: { labels: ['Gastos Totales', 'Ingresos Totales'], datasets: [{ data: [totalGastosGlobal, totalIngresosGlobal], backgroundColor: ['#EA4335', '#34A853'] }] },
-                options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: {boxWidth: 10, font: {size: 10}} } } }
             });
         }
     </script>
