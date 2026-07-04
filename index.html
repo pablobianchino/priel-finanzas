@@ -570,26 +570,12 @@
             }
         }
 
-        function getCostoCalculado(g, dDebito, dImpuesto) {
-            let costoArsBase = g.monto;
-            if (g.moneda === 'USD') {
-                let vImp = g.monto * dImpuesto;
-                costoArsBase = (vImp * 0.02) + (vImp * 0.21) + (vImp * 0.30) + (g.monto * dDebito);
-            }
-            let divisor = g.divisor || 1;
-            if (g.propietario !== 'Tercero' && g.compartir_tipo === 'fijo') {
-                return g.monto_fijo || 0;
-            } else {
-                let cuotaBase = g.tipo === 'Tarjeta' ? (costoArsBase / (g.cuotas_totales || 1)) : costoArsBase;
-                return cuotaBase / divisor;
-            }
-        }
-
         window.crearNuevoTipoGastoPanel = function() {
             const nombre = prompt("Ingresa el nombre para el nuevo tipo de gasto (Nuevo Panel):");
             if (!nombre || nombre.trim() === "") return;
             const limpio = nombre.trim();
             if (tiposGastoAsociaciones[limpio] !== undefined) return alert("Este tipo de panel ya existe.");
+            
             tiposGastoAsociaciones[limpio] = "";
             guardarConfiguracionGlobalGlobal();
         };
@@ -597,15 +583,19 @@
         window.editarNombreTipoGastoPanel = async function(oldCategoria) {
             const nuevoNombre = prompt("Ingresa el nuevo nombre para este panel de gasto:", oldCategoria);
             if (!nuevoNombre || nuevoNombre.trim() === "" || nuevoNombre.trim() === oldCategoria) return;
+            
             const limpio = nuevoNombre.trim();
             if (tiposGastoAsociaciones[limpio] !== undefined) return alert("Este tipo de panel ya existe.");
             
             mostrarCargando(true);
+            
             const origenVinculado = tiposGastoAsociaciones[oldCategoria];
             tiposGastoAsociaciones[limpio] = origenVinculado;
             delete tiposGastoAsociaciones[oldCategoria];
             
-            await actualizarConfiguracionDB({"configuracion.tipos_gasto": tiposGastoAsociaciones});
+            await actualizarConfiguracionDB({
+                "configuracion.tipos_gasto": tiposGastoAsociaciones
+            });
             
             const batch = writeBatch(db);
             let updatedCount = 0;
@@ -617,12 +607,16 @@
                     updatedCount++;
                 }
             });
-            if (updatedCount > 0) await batch.commit();
+            
+            if (updatedCount > 0) {
+                await batch.commit();
+            }
+            
             await actualizarDashboard();
         };
 
         window.eliminarTipoGastoPanel = function(categoria) {
-            if (confirm(`¿Estás seguro de eliminar el panel '${categoria}'?`)) {
+            if (confirm(`¿Estás seguro de eliminar el panel '${categoria}'? No se borrarán los gastos asignados pero quedarán en el panel 'Sin Panel'.`)) {
                 delete tiposGastoAsociaciones[categoria];
                 guardarConfiguracionGlobalGlobal();
             }
@@ -654,20 +648,42 @@
             const dImpuesto = parseFloat(document.getElementById('usd-impuesto').value) || 0;
             const buscador = document.getElementById('filtro-texto-gastos').value.toLowerCase();
 
-            let gastosProcesados = listaGastos.map(g => ({ ...g, costoCalculado: getCostoCalculado(g, dDebito, dImpuesto) }));
-            let sumatoriaGastosPorOrigen = {};
+            let gastosProcesados = listaGastos.map(g => {
+                let costoArsBase = g.monto;
+                if (g.moneda === 'USD') {
+                    let vImp = g.monto * dImpuesto;
+                    costoArsBase = (vImp * 0.02) + (vImp * 0.21) + (vImp * 0.30) + (g.monto * dDebito);
+                }
+                let costoFinalArs = 0;
+                let cuotaBase = g.tipo === 'Tarjeta' ? (costoArsBase / (g.cuotas_totales || 1)) : costoArsBase;
 
+                if (g.propietario !== 'Tercero' && g.compartir_tipo === 'fijo') {
+                    costoFinalArs = g.monto_fijo || 0;
+                } else {
+                    costoFinalArs = cuotaBase / (g.divisor || 1);
+                }
+                return { ...g, costoCalculado: costoFinalArs };
+            });
+
+            let sumatoriaGastosPorOrigen = {};
             gastosProcesados.forEach(g => {
-                if (g.propietario === 'Tercero') { subtotalTerceros += g.costoCalculado; return; }
+                if (g.propietario === 'Tercero') {
+                    subtotalTerceros += g.costoCalculado;
+                    return;
+                }
                 totalGastosGlobal += g.costoCalculado;
+                
                 let catAsociada = g.categoria || "Fijos";
                 let origenId = tiposGastoAsociaciones[catAsociada] || "";
-                if (origenId) sumatoriaGastosPorOrigen[origenId] = (sumatoriaGastosPorOrigen[origenId] || 0) + g.costoCalculado;
+                if (origenId) {
+                    sumatoriaGastosPorOrigen[origenId] = (sumatoriaGastosPorOrigen[origenId] || 0) + g.costoCalculado;
+                }
             });
 
             for (let categoria in tiposGastoAsociaciones) {
                 let origenAsignadoId = tiposGastoAsociaciones[categoria] || "";
                 let origenDoc = listaIngresos.find(i => i.id === origenAsignadoId);
+                
                 let saldoTexto = "Sin origen vinculado";
                 let saldoClass = "saldo-ok";
                 if (origenDoc) {
@@ -677,48 +693,348 @@
                     saldoClass = restante < 0 ? "saldo-danger" : "saldo-ok";
                 }
 
-                let itemsPanel = gastosProcesados.filter(g => (g.categoria || "Fijos") === categoria && (!buscador || g.nombre.toLowerCase().includes(buscador)));
-                let totalPanel = itemsPanel.reduce((sum, g) => sum + g.costoCalculado, 0);
+                let itemsPanel = gastosProcesados.filter(g => {
+                    let c = g.categoria || "Fijos";
+                    if (buscador) return c === categoria && g.nombre.toLowerCase().includes(buscador);
+                    return c === categoria;
+                });
 
-                contenedor.innerHTML += `
-                    <div class="card" style="border-top: 4px solid var(--primary-color);">
+                let totalPanel = itemsPanel.reduce((sum, current) => sum + current.costoCalculado, 0);
+
+                let tarjetaHtml = `
+                    <div class="card" style="border-top: 4px solid var(--primary-color); display: flex; flex-direction: column;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <h2 style="margin:0; font-size:15px;">${categoria} <span style="font-weight:normal;">| Total: <b>${formatearDinero(totalPanel)}</b></span></h2>
+                            <h2 style="margin:0; font-size:15px;">
+                                ${categoria} 
+                                <span style="font-weight:normal; font-size:13px; color:var(--text-muted);">
+                                    | Total: <b style="color:var(--text-main);">${formatearDinero(totalPanel)}</b>
+                                </span>
+                            </h2>
                             <div style="display: flex; gap: 5px;">
-                                <button class="btn-icon" onclick="window.editarNombreTipoGastoPanel('${categoria}')">✏️</button>
-                                <button class="btn-icon" onclick="window.eliminarTipoGastoPanel('${categoria}')">🗑️</button>
+                                <button class="btn-icon" onclick="window.editarNombreTipoGastoPanel('${categoria}')" title="Editar nombre de este panel">✏️</button>
+                                <button class="btn-icon" onclick="window.eliminarTipoGastoPanel('${categoria}')" title="Eliminar este panel">🗑️</button>
                             </div>
                         </div>
-                        <div style="margin-top:10px;"><select style="padding:4px; font-size:12px; width:100%;" onchange="window.asociarPanelAOrigenIngreso('${categoria}', this.value)"><option value="">-- Sin Vincular --</option>${listaIngresos.map(ing => `<option value="${ing.id}" ${origenAsignadoId === ing.id ? 'selected' : ''}>${ing.nombre} (${formatearDinero(ing.monto)})</option>`).join('')}</select></div>
+                        
+                        <div style="margin-top:10px; display:flex; flex-direction:column; gap:5px;">
+                            <label style="font-size:11px; color:var(--text-muted);">Asociar Origen de Ingreso:</label>
+                            <select style="padding:4px; font-size:12px; width:100%;" onchange="window.asociarPanelAOrigenIngreso('${categoria}', this.value)">
+                                <option value="">-- Sin Vincular --</option>
+                                ${listaIngresos.map(ing => `<option value="${ing.id}" ${origenAsignadoId === ing.id ? 'selected' : ''}>${ing.nombre} (${formatearDinero(ing.monto)})</option>`).join('')}
+                            </select>
+                        </div>
+
                         <div class="saldo-restante-container ${saldoClass}">${saldoTexto}</div>
-                        <table><thead><tr><th>Gasto</th><th>Costo Mes</th><th>⚙️</th></tr></thead>
-                        <tbody>${itemsPanel.map(g => `<tr><td><strong>${g.nombre}</strong></td><td style="font-weight:600;">${formatearDinero(g.costoCalculado)}</td><td><button class="btn-icon" onclick='abrirModalEditarGasto(${JSON.stringify(g)})'>✏️</button><button class="btn-icon" onclick="borrarGasto('${g.id}')">🗑️</button></td></tr>`).join('')}</tbody></table>
+
+                        <table style="width:100%; margin-top:10px;">
+                            <thead>
+                                <tr><th>Gasto</th><th>Monto original</th><th>Costo Mes</th><th>⚙️</th></tr>
+                            </thead>
+                            <tbody>
+                                ${itemsPanel.map(g => {
+                                    let det = g.tipo === 'Tarjeta' ? ` (${g.cuotas_pagadas}/${g.cuotas_totales})` : '';
+                                    return `
+                                        <tr>
+                                            <td><strong>${g.nombre}</strong><br><small style="color:var(--text-muted);">${g.propietario}${det}</small></td>
+                                            <td>${formatearDinero(g.monto)} ${g.moneda}</td>
+                                            <td style="font-weight:600;">${formatearDinero(g.costoCalculado)}</td>
+                                            <td>
+                                                <button class="btn-icon" onclick='abrirModalEditarGasto(${JSON.stringify(g)})'>✏️</button>
+                                                <button class="btn-icon" onclick="borrarGasto('${g.id}')">🗑️</button>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                                ${itemsPanel.length === 0 ? '<tr><td colspan="4" style="color:var(--text-muted); text-align:center;">No hay gastos</td></tr>' : ''}
+                            </tbody>
+                        </table>
                     </div>
                 `;
+                contenedor.innerHTML += tarjetaHtml;
             }
+
+            let huerfanos = gastosProcesados.filter(g => {
+                let c = g.categoria || "Fijos";
+                return !tiposGastoAsociaciones.hasOwnProperty(c);
+            });
+
+            if (huerfanos.length > 0) {
+                let hTotal = huerfanos.reduce((sum, g) => sum + g.costoCalculado, 0);
+                let tarjetaHuerfanos = `
+                    <div class="card" style="border-top: 4px solid #dc3545; display: flex; flex-direction: column;">
+                        <h2 style="margin:0; font-size:15px; color: #dc3545;">
+                            Gastos Sin Panel (Recuperados)
+                            <span style="font-weight:normal; font-size:13px; color:var(--text-muted);">| Total: <b style="color:var(--text-main);">${formatearDinero(hTotal)}</b></span>
+                        </h2>
+                        <p style="font-size: 11px; color: var(--text-muted); margin-top: 5px;">Estos gastos perdieron su categoría. Edítalos para asignarlos a un panel válido.</p>
+                        <table style="width:100%; margin-top:10px;">
+                            <thead>
+                                <tr><th>Gasto</th><th>Categoría anterior</th><th>Costo Mes</th><th>⚙️</th></tr>
+                            </thead>
+                            <tbody>
+                                ${huerfanos.map(g => {
+                                    return `
+                                        <tr>
+                                            <td><strong>${g.nombre}</strong></td>
+                                            <td style="color:#dc3545;">${g.categoria || "Fijos"}</td>
+                                            <td style="font-weight:600;">${formatearDinero(g.costoCalculado)}</td>
+                                            <td>
+                                                <button class="btn-icon" onclick='abrirModalEditarGasto(${JSON.stringify(g)})'>✏️</button>
+                                                <button class="btn-icon" onclick="borrarGasto('${g.id}')">🗑️</button>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                contenedor.innerHTML += tarjetaHuerfanos;
+            }
+
             document.getElementById('res-gastos-fijos').innerText = formatearDinero(totalGastosGlobal);
             document.getElementById('sum-gastos-total').innerText = formatearDinero(totalGastosGlobal);
             document.getElementById('sum-gastos-terceros').innerText = formatearDinero(subtotalTerceros);
         }
 
-        window.renderDistribucionDirecta = function() {
+        window.abrirModalNuevoGasto = function() {
+            document.getElementById('form-gasto').reset();
+            document.getElementById('gasto-id').value = "";
+            document.getElementById('titulo-modal-gasto').innerText = "Nuevo Gasto";
+            toggleTercero('gasto');
+            toggleCamposTarjeta('gasto');
+            document.getElementById('gasto-compartir').checked = false;
+            toggleDivisor('gasto');
+            document.getElementById('modal-gasto').style.display = 'flex';
+        }
+
+        window.abrirModalEditarGasto = function(data) {
+            document.getElementById('gasto-id').value = data.id;
+            document.getElementById('gasto-propietario').value = data.propietario || 'Propio';
+            document.getElementById('gasto-tercero-nombre').value = data.tercero_nombre || '';
+            document.getElementById('gasto-nombre').value = data.nombre;
+            document.getElementById('gasto-monto').value = data.monto;
+            document.getElementById('gasto-moneda').value = data.moneda;
+            
+            const catSelect = document.getElementById('gasto-categoria-select');
+            let catValue = data.categoria || "Fijos";
+            if(!tiposGastoAsociaciones.hasOwnProperty(catValue)) catValue = Object.keys(tiposGastoAsociaciones)[0];
+            catSelect.value = catValue;
+            
+            document.getElementById('gasto-tipo').value = data.tipo;
+            document.getElementById('titulo-modal-gasto').innerText = "Editar Gasto";
+
+            toggleTercero('gasto');
+            if (data.propietario !== 'Tercero') {
+                if ((data.divisor && data.divisor > 1) || (data.compartir_tipo === 'fijo' && data.monto_fijo)) {
+                    document.getElementById('gasto-compartir').checked = true;
+                    document.getElementById('gasto-compartir-tipo').value = data.compartir_tipo || 'divisor';
+                    document.getElementById('gasto-divisor').value = data.divisor || 2;
+                    document.getElementById('gasto-monto-fijo').value = data.monto_fijo || '';
+                } else {
+                    document.getElementById('gasto-compartir').checked = false;
+                }
+                toggleDivisor('gasto');
+            }
+            toggleCamposTarjeta('gasto');
+            if (data.tipo === 'Tarjeta') {
+                document.getElementById('gasto-tarjeta').value = data.tarjeta || 'VISA';
+                document.getElementById('gasto-cuotas-totales').value = data.cuotas_totales || 1;
+                document.getElementById('gasto-cuotas-pagadas').value = data.cuotas_pagadas || 1;
+            }
+            document.getElementById('modal-gasto').style.display = 'flex';
+        }
+
+        document.getElementById('form-gasto').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            mostrarCargando(true);
+            const idGasto = document.getElementById('gasto-id').value;
+            const prop = document.getElementById('gasto-propietario').value;
+            const tipo = document.getElementById('gasto-tipo').value;
+            const checkboxCompartir = document.getElementById('gasto-compartir').checked;
+            const compTipo = document.getElementById('gasto-compartir-tipo').value;
+            
+            let datosGasto = {
+                propietario: prop, tercero_nombre: prop === 'Tercero' ? document.getElementById('gasto-tercero-nombre').value : '',
+                nombre: document.getElementById('gasto-nombre').value, monto: parseFloat(document.getElementById('gasto-monto').value),
+                moneda: document.getElementById('gasto-moneda').value, tipo: tipo,
+                categoria: document.getElementById('gasto-categoria-select').value,
+                compartir_tipo: (prop === 'Propio' && checkboxCompartir) ? compTipo : 'divisor',
+                divisor: (prop === 'Propio' && checkboxCompartir && compTipo === 'divisor') ? parseInt(document.getElementById('gasto-divisor').value) || 1 : 1,
+                monto_fijo: (prop === 'Propio' && checkboxCompartir && compTipo === 'fijo') ? parseFloat(document.getElementById('gasto-monto-fijo').value) || 0 : null
+            };
+
+            if (tipo === 'Tarjeta') {
+                datosGasto.tarjeta = document.getElementById('gasto-tarjeta').value;
+                datosGasto.cuotas_totales = parseInt(document.getElementById('gasto-cuotas-totales').value) || 1;
+                datosGasto.cuotas_pagadas = parseInt(document.getElementById('gasto-cuotas-pagadas').value) || 1;
+            }
+
+            if (idGasto) await updateDoc(doc(db, "finanzas", obtenerMesId(), "gastos", idGasto), datosGasto);
+            else await addDoc(collection(db, "finanzas", obtenerMesId(), "gastos"), datosGasto);
+            
+            cerrarModal('modal-gasto');
+            await actualizarDashboard();
+        });
+
+        window.borrarGasto = async function(id) { 
+            mostrarCargando(true);
+            await deleteDoc(doc(db, "finanzas", obtenerMesId(), "gastos", id)); 
+            await actualizarDashboard(); 
+        };
+
+        window.toggleCamposTarjeta = function(prefix) {
+            prefix = prefix || 'gasto';
+            const tipo = document.getElementById(`${prefix}-tipo`).value;
+            document.getElementById(`campos-tarjeta`).style.display = tipo === 'Tarjeta' ? 'flex' : 'none';
+        };
+        
+        window.toggleDivisor = function(prefix) {
+            prefix = prefix || 'gasto';
+            const checked = document.getElementById(`${prefix}-compartir`).checked;
+            const tComp = document.getElementById(`${prefix}-compartir-tipo`).value;
+            document.getElementById(`${prefix}-compartir-tipo`).style.display = checked ? 'inline-block' : 'none';
+            if (checked) {
+                if (tComp === 'divisor') {
+                    document.getElementById(`${prefix}-divisor`).style.display = 'inline-block';
+                    document.getElementById(`${prefix}-monto-fijo`).style.display = 'none';
+                } else {
+                    document.getElementById(`${prefix}-divisor`).style.display = 'none';
+                    document.getElementById(`${prefix}-monto-fijo`).style.display = 'inline-block';
+                }
+            } else {
+                document.getElementById(`${prefix}-divisor`).style.display = 'none';
+                document.getElementById(`${prefix}-monto-fijo`).style.display = 'none';
+            }
+        };
+
+        window.toggleTercero = function(prefix) {
+            prefix = prefix || 'gasto';
+            const prop = document.getElementById(`${prefix}-propietario`).value;
+            const isTercero = prop === 'Tercero';
+            document.getElementById(`${prefix}-tercero-nombre`).style.display = isTercero ? 'inline-block' : 'none';
+            document.getElementById(`${prefix}-tercero-nombre`).required = isTercero;
+            document.getElementById('box-compartir').style.display = isTercero ? 'none' : 'flex';
+            if(isTercero) { document.getElementById(`${prefix}-compartir`).checked = false; toggleDivisor(prefix); }
+        };
+
+        window.crearNuevoGrupoDistribucion = function() {
+            const nombre = prompt("Nombre del nuevo Grupo de Distribución:");
+            if (!nombre || nombre.trim() === "") return;
+            const gNombre = nombre.trim();
+            if (gruposDistribucion[gNombre]) return alert("Este grupo ya existe.");
+            gruposDistribucion[gNombre] = [{ nombre: "Objetivo Inicial", porc: 100 }];
+            autoGuardarDistribucionEstructura();
+        };
+
+        window.eliminarGrupoDistribucion = function(grupoName) {
+            if (confirm(`¿Estás seguro de borrar por completo el grupo '${grupoName}' y todos sus objetivos asignados?`)) {
+                delete gruposDistribucion[grupoName];
+                autoGuardarDistribucionEstructura();
+            }
+        };
+
+        window.agregarObjetivoLinea = function(grupoName) {
+            gruposDistribucion[grupoName].push({ nombre: "Nuevo Objetivo", porc: 0 });
+            renderDistribucionDirecta();
+        };
+
+        window.eliminarObjetivoLinea = function(grupoName, index) {
+            if (confirm("¿Seguro que deseas eliminar este objetivo?")) {
+                gruposDistribucion[grupoName].splice(index, 1);
+                autoGuardarDistribucionEstructura();
+            }
+        };
+
+        window.actualizarDatoObjetivoMemory = function(grupoName, index, campo, valor) {
+            gruposDistribucion[grupoName][index][campo] = campo === 'porc' ? (parseFloat(valor) || 0) : valor;
+            dispararDebounceAutoguardado();
+        };
+
+        window.calcularBidireccionalLinea = function(grupoName, index, disparadoPor) {
+            const totalDineroGrupo = sumPorGrupo[grupoName] || 0;
+            const inpPct = document.getElementById(`pct-${grupoName}-${index}`);
+            const inpPesos = document.getElementById(`pesos-${grupoName}-${index}`);
+
+            if (disparadoPor === 'pct') {
+                let pct = parseFloat(inpPct.value) || 0;
+                let pesosCalculados = (totalDineroGrupo * (pct / 100)).toFixed(2);
+                inpPesos.value = pesosCalculados;
+                gruposDistribucion[grupoName][index].porc = pct;
+            } else {
+                let pesos = parseFloat(inpPesos.value) || 0;
+                let pctCalculado = totalDineroGrupo > 0 ? ((pesos / totalDineroGrupo) * 100).toFixed(2) : 0;
+                inpPct.value = pctCalculado;
+                gruposDistribucion[grupoName][index].porc = parseFloat(pctCalculado);
+            }
+            
+            let sumTotalPctCard = 0;
+            gruposDistribucion[grupoName].forEach((_, idx) => {
+                sumTotalPctCard += parseFloat(document.getElementById(`pct-${grupoName}-${idx}`).value) || 0;
+            });
+            const lblSum = document.getElementById(`sum-card-pct-${grupoName}`);
+            if (lblSum) {
+                lblSum.innerText = `Total: ${sumTotalPctCard.toFixed(1)}%`;
+                lblSum.style.color = Math.abs(sumTotalPctCard - 100) < 0.1 ? 'green' : 'red';
+            }
+
+            dispararDebounceAutoguardado();
+        };
+
+        function dispararDebounceAutoguardado() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                autoGuardarDistribucionEstructura();
+            }, 800);
+        }
+
+        async function autoGuardarDistribucionEstructura() {
+            try {
+                await actualizarConfiguracionDB({
+                    "configuracion.grupos_distribucion": gruposDistribucion
+                });
+                await actualizarDashboard();
+            } catch(e) { console.error("Error autoguardando distribución:", e); }
+        }
+
+        function renderDistribucionDirecta() {
             const divDist = document.getElementById('tabla-distribucion');
             const resDist = document.getElementById('res-ingresos-dist');
             divDist.innerHTML = '';
             
             const dDebito = parseFloat(document.getElementById('usd-debito').value) || 0;
             const dImpuesto = parseFloat(document.getElementById('usd-impuesto').value) || 0;
-            
             let sumatoriaGastosPorOrigen = {};
+            
             listaGastos.forEach(g => {
                 if (g.propietario === 'Tercero') return;
-                let cat = g.categoria || "Fijos";
-                let origenId = tiposGastoAsociaciones[cat] || "";
-                if (origenId) sumatoriaGastosPorOrigen[origenId] = (sumatoriaGastosPorOrigen[origenId] || 0) + getCostoCalculado(g, dDebito, dImpuesto);
+                
+                let costoArsBase = g.monto;
+                if (g.moneda === 'USD') {
+                    let vImp = g.monto * dImpuesto;
+                    costoArsBase = (vImp * 0.02) + (vImp * 0.21) + (vImp * 0.30) + (g.monto * dDebito);
+                }
+                
+                let divisor = g.divisor || 1;
+                let costoFinalArs = 0;
+                
+                if (g.compartir_tipo === 'fijo') {
+                    costoFinalArs = g.monto_fijo || 0;
+                } else {
+                    let cuotaBase = g.tipo === 'Tarjeta' ? (costoArsBase / (g.cuotas_totales || 1)) : costoArsBase;
+                    costoFinalArs = cuotaBase / divisor;
+                }
+                
+                let catAsociada = g.categoria || "Fijos";
+                let origenId = tiposGastoAsociaciones[catAsociada] || "";
+                if (origenId) {
+                    sumatoriaGastosPorOrigen[origenId] = (sumatoriaGastosPorOrigen[origenId] || 0) + costoFinalArs;
+                }
             });
 
             sumPorGrupo = {};
             let totalDistribuibleGlobal = 0;
+            
             listaIngresos.forEach(ing => {
                 if (ing.grupo) {
                     let consumido = sumatoriaGastosPorOrigen[ing.id] || 0;
@@ -728,33 +1044,327 @@
                 }
             });
 
+            let resHtml = '';
+            if(Object.keys(gruposDistribucion).length === 0) {
+                divDist.innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No hay grupos de distribución creados.</p>';
+            }
+
             for(let grupoName in gruposDistribucion) {
                 let totalGrupo = sumPorGrupo[grupoName] || 0;
                 let cfgItems = gruposDistribucion[grupoName];
-                let sumPorc = cfgItems.reduce((acc, el) => acc + (el.porc || 0), 0);
                 
-                divDist.innerHTML += `
+                let sumPorcentajesGrupo = cfgItems.reduce((acc, el) => acc + (el.porc || 0), 0);
+                let colorValidacion = Math.abs(sumPorcentajesGrupo - 100) < 0.1 ? 'green' : 'red';
+
+                let htmlBlock = `
                     <div style="background:#f8f9fa; border-radius:8px; padding:15px; margin-bottom:15px; border:1px solid var(--card-border);">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:10px; align-items:center;">
-                            <strong style="font-size:14px;">${grupoName}</strong>
-                            <div><span style="font-weight:600; font-size:13px;">Disponible: ${formatearDinero(totalGrupo)}</span></div>
-                        </div>
-                        ${cfgItems.map((it, idx) => `
-                            <div style="display:flex; gap:8px; align-items:center; margin-bottom:5px;">
-                                <input type="text" value="${it.nombre}" style="flex:1; padding:4px;" oninput="window.actualizarDatoObjetivoMemory('${grupoName}', ${idx}, 'nombre', this.value)">
-                                <input type="number" value="${it.porc}" style="width:60px; padding:4px;" oninput="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pct')">
-                                <input type="text" value="${formatearDinero(totalGrupo * (it.porc/100))}" disabled style="width:90px; padding:4px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px; align-items:center; flex-wrap:wrap; gap:5px;">
+                            <strong style="font-size:14px; color:var(--text-main);">${grupoName}</strong>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <span id="sum-card-pct-${grupoName}" style="font-size:12px; font-weight:bold; color:${colorValidacion};">Total: ${sumPorcentajesGrupo}%</span>
+                                <span style="font-weight:600; font-size:13px; background-color: yellow; padding: 2px 5px; border-radius: 4px;">Disponible: ${formatearDinero(totalGrupo)}</span>
+                                <button class="btn-icon" onclick="window.eliminarGrupoDistribucion('${grupoName}')" title="Eliminar este Grupo Completo">❌</button>
                             </div>
-                        `).join('')}
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                `;
+
+                resHtml += `<strong style="font-size:13px; display:block; margin-top:10px;">${grupoName}:</strong><div style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">`;
+
+                cfgItems.forEach((it, idx) => {
+                    let dineroCalculado = totalGrupo * ((it.porc || 0) / 100);
+                    htmlBlock += `
+                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                            <input type="text" value="${it.nombre}" style="flex:2; padding:5px; font-size:12px;" oninput="window.actualizarDatoObjetivoMemory('${grupoName}', ${idx}, 'nombre', this.value)" placeholder="Objetivo">
+                            <input type="number" id="pct-${grupoName}-${idx}" value="${it.porc}" style="width:65px; padding:5px; font-size:12px; text-align:center;" oninput="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pct')" placeholder="%" step="0.1">
+                            <span style="font-size:11px;">%</span>
+                            <input type="number" id="pesos-${grupoName}-${idx}" value="${dineroCalculado.toFixed(1)}" style="width:90px; padding:5px; font-size:12px;" oninput="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pesos')" placeholder="$">
+                            
+                            <button class="btn-black" style="padding:4px 8px; font-size:11px; background-color:#9c27b0;" onclick="window.ejecutarSeparacionAhorro('${grupoName}', ${idx}, 1)" title="Separar fondos bajo acción modelo 1">🐷 Ahorro A</button>
+                            <button class="btn-black" style="padding:4px 8px; font-size:11px; background-color:#673ab7;" onclick="window.ejecutarSeparacionAhorro('${grupoName}', ${idx}, 2)" title="Separar fondos bajo acción modelo 2">🔒 Ahorro B</button>
+                            <button class="btn-icon" onclick="window.eliminarObjetivoLinea('${grupoName}', ${idx})">🗑️</button>
+                        </div>
+                    `;
+                    resHtml += `<span style="color: var(--text-main);">${it.nombre} (${it.porc}%):</span> ${formatearDinero(dineroCalculado)}<br>`;
+                });
+
+                htmlBlock += `
+                        </div>
+                        <button class="btn-black" style="margin-top:10px; padding:4px 12px; font-size:12px; background-color:#f1f3f4; color:var(--text-main); border:1px solid #ccc;" onclick="window.agregarObjetivoLinea('${grupoName}')">➕ Añadir Ítem Objetivo</button>
                     </div>
                 `;
+                resHtml += `</div>`;
+                divDist.innerHTML += htmlBlock;
             }
-            resDist.innerHTML = `<strong>Disponible Total para Objetivos: ${formatearDinero(totalDistribuibleGlobal)}</strong>`;
+
+            resDist.innerHTML = `<div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: var(--text-main);">Disponible Total para Objetivos: ${formatearDinero(totalDistribuibleGlobal)}</div>` + resHtml;
         }
 
-        // Helper functions included for completion...
-        // [rest of logic: abrirModalEditarGasto, deleteDoc, etc. remains same as previous good state]
-        // (Truncated for brevity in response, ensure you use the full code from this logic)
+        window.ejecutarSeparacionAhorro = async function(grupoName, index, tipoAccionId) {
+            const totalDineroGrupo = sumPorGrupo[grupoName] || 0;
+            const obj = gruposDistribucion[grupoName][index];
+            const montoASeparar = totalDineroGrupo * ((obj.porc || 0) / 100);
+
+            if (montoASeparar <= 0) return alert("El monto de ahorro debe ser mayor a $0.");
+
+            const confirmado = confirm(`¿Deseas enviar ${formatearDinero(montoASeparar)} desde '${obj.nombre}' al panel de Ahorros de forma permanente?`);
+            if (!confirmado) return;
+
+            mostrarCargando(true);
+            try {
+                await addDoc(collection(db, "finanzas", obtenerMesId(), "ahorros"), {
+                    fecha: new Date().toISOString(),
+                    origenObjetivo: `${grupoName} -> ${obj.nombre}`,
+                    tipoAccion: `Acción Modelo ${tipoAccionId}`,
+                    monto: parseFloat(montoASeparar)
+                });
+                await actualizarDashboard();
+            } catch(e) { console.error(e); mostrarCargando(false); }
+        };
+
+        window.eliminarRegistroAhorro = async function(id) {
+            if(confirm("¿Estás seguro de revertir o eliminar este registro de ahorro acumulado?")) {
+                mostrarCargando(true);
+                await deleteDoc(doc(db, "finanzas", obtenerMesId(), "ahorros", id));
+                await actualizarDashboard();
+            }
+        }
+
+        function renderTablaAhorros() {
+            const tabla = document.getElementById('tabla-ahorros');
+            tabla.innerHTML = '';
+            let totalAhorrado = 0;
+
+            listaAhorros.forEach(a => {
+                totalAhorrado += a.monto;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${new Date(a.fecha).toLocaleDateString()} ${new Date(a.fecha).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
+                    <td><strong>${a.origenObjetivo}</strong></td>
+                    <td><span style="background:#f3e5f5; color:#7b1fa2; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:600;">${a.tipoAccion}</span></td>
+                    <td style="font-weight:600; color:#7b1fa2;">+ ${formatearDinero(a.monto)}</td>
+                    <td><button class="btn-icon" onclick="window.eliminarRegistroAhorro('${a.id}')">🗑️</button></td>
+                `;
+                tabla.appendChild(tr);
+            });
+            document.getElementById('sum-ahorros-total').innerText = formatearDinero(totalAhorrado);
+        }
+
+        window.abrirModalNuevoIngreso = function() {
+            document.getElementById('form-ingreso').reset(); document.getElementById('ingreso-id').value = "";
+            document.getElementById('titulo-modal-ingreso').innerText = "Nuevo Ingreso";
+            document.getElementById('ingreso-grupo').value = "";
+            document.getElementById('modal-ingreso').style.display = 'flex';
+        }
+
+        window.abrirModalEditarIngreso = function(data) {
+            document.getElementById('ingreso-id').value = data.id; document.getElementById('ingreso-nombre').value = data.nombre;
+            document.getElementById('ingreso-monto').value = data.monto; document.getElementById('ingreso-grupo').value = data.grupo || "";
+            document.getElementById('titulo-modal-ingreso').innerText = "Editar Ingreso";
+            document.getElementById('modal-ingreso').style.display = 'flex';
+        }
+
+        document.getElementById('form-ingreso').addEventListener('submit', async (e) => {
+            e.preventDefault(); mostrarCargando(true);
+            const id = document.getElementById('ingreso-id').value;
+            const data = { nombre: document.getElementById('ingreso-nombre').value, monto: parseFloat(document.getElementById('ingreso-monto').value), grupo: document.getElementById('ingreso-grupo').value };
+            if(id) await updateDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", id), data);
+            else await addDoc(collection(db, "finanzas", obtenerMesId(), "ingresos"), data);
+            cerrarModal('modal-ingreso'); await actualizarDashboard();
+        });
+
+        window.borrarIngreso = async function(id) { 
+            mostrarCargando(true); 
+            await deleteDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", id)); 
+            await actualizarDashboard(); 
+        };
+
+        function renderTablaIngresos() {
+            const tabla = document.getElementById('tabla-ingresos');
+            tabla.innerHTML = ''; totalIngresosGlobal = 0;
+            let chartLabels = []; let chartData = []; let chartColors = [];
+
+            const filter = document.getElementById('filtro-texto-ingresos').value.toLowerCase();
+
+            listaIngresos.forEach((data, index) => {
+                if (filter && !data.nombre.toLowerCase().includes(filter)) return;
+                
+                let assignedColor = colorPalette[index % colorPalette.length];
+                totalIngresosGlobal += data.monto;
+                
+                chartLabels.push(data.nombre); 
+                chartData.push(data.monto); 
+                chartColors.push(assignedColor);
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${assignedColor};"></span>
+                            ${data.nombre}
+                        </div>
+                    </td>
+                    <td><span style="background:#e8eaed; padding:2px 6px; border-radius:4px; font-size:11px;">${data.grupo || 'Ninguno'}</span></td>
+                    <td style="font-weight:600;">${formatearDinero(data.monto)}</td>
+                    <td style="white-space: nowrap;">
+                        <button class="btn-icon" onclick='abrirModalEditarIngreso(${JSON.stringify(data)})'>✏️</button>
+                        <button class="btn-icon" onclick="borrarIngreso('${data.id}')">🗑️</button>
+                    </td>
+                `;
+                tabla.appendChild(tr);
+            });
+
+            document.getElementById('sum-ingresos-mes').innerText = formatearDinero(totalIngresosGlobal);
+            document.getElementById('res-ingresos-mes').innerText = formatearDinero(totalIngresosGlobal);
+
+            if (chartIngresos) chartIngresos.destroy();
+            chartIngresos = new Chart(document.getElementById('chart-ingresos-mes').getContext('2d'), {
+                type: 'pie', data: { labels: chartLabels, datasets: [{ data: chartData, backgroundColor: chartColors }] }, 
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+
+            renderDistribucionDirecta();
+        }
+
+        function calcularBalance() {
+            const balance = totalIngresosGlobal - totalGastosGlobal;
+            const bElement = document.getElementById('res-balance');
+            bElement.innerText = formatearDinero(balance);
+            bElement.style.color = balance >= 0 ? '#137333' : '#d93025';
+
+            if (chartResumen) chartResumen.destroy();
+            chartResumen = new Chart(document.getElementById('chart-resumen').getContext('2d'), {
+                type: 'pie', data: { labels: ['Gastos Totales', 'Ingresos Totales'], datasets: [{ data: [totalGastosGlobal, totalIngresosGlobal], backgroundColor: ['#EA4335', '#34A853'] }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: {boxWidth: 10, font: {size: 10}} } } }
+            });
+        }
+
+        async function cargarEstadisticasAnuales() {
+            const anio = anioSelector.value;
+            const meses = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
+            const nombresMeses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+            
+            let ingresosData = new Array(12).fill(0);
+            let gastosData = new Array(12).fill(0);
+
+            mostrarCargando(true);
+
+            const promesas = meses.map(async (mes, index) => {
+                const mesId = `${anio}-${mes}`;
+                const docSnap = await getDoc(doc(db, "finanzas", mesId));
+                let dDebito = 0, dImpuesto = 0;
+                if (docSnap.exists() && docSnap.data().configuracion) {
+                    dDebito = docSnap.data().configuracion.dolar_debito || 0;
+                    dImpuesto = docSnap.data().configuracion.dolar_impuesto || 0;
+                }
+
+                const ingSnap = await getDocs(collection(db, "finanzas", mesId, "ingresos"));
+                let totalIng = 0; ingSnap.forEach(d => { totalIng += d.data().monto; });
+                ingresosData[index] = totalIng;
+
+                const gasSnap = await getDocs(collection(db, "finanzas", mesId, "gastos"));
+                let totalGas = 0;
+                gasSnap.forEach(d => {
+                    let data = d.data();
+                    if (data.propietario === 'Tercero') return;
+                    let costoArsBase = data.monto;
+                    if (data.moneda === 'USD') {
+                        let vImp = data.monto * dImpuesto;
+                        costoArsBase = (vImp * 0.02) + (vImp * 0.21) + (vImp * 0.30) + (data.monto * dDebito);
+                    }
+                    let divisor = data.divisor || 1;
+                    let costoFinalArs = 0;
+                    if (data.compartir_tipo === 'fijo') {
+                        costoFinalArs = data.monto_fijo || 0;
+                    } else {
+                        costoFinalArs = data.tipo === 'Tarjeta' ? ((costoArsBase / (data.cuotas_totales || 1)) / divisor) : (costoArsBase / divisor);
+                    }
+                    totalGas += costoFinalArs;
+                });
+                gastosData[index] = totalGas;
+            });
+
+            await Promise.all(promesas);
+
+            if (chartEstadisticas) chartEstadisticas.destroy();
+            chartEstadisticas = new Chart(document.getElementById('chart-estadisticas').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: nombresMeses,
+                    datasets: [
+                        { label: 'Ingresos', data: ingresosData, backgroundColor: '#34A853' },
+                        { label: 'Gastos Propios', data: gastosData, backgroundColor: '#EA4335' }
+                    ]
+                },
+                options: { 
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+            mostrarCargando(false);
+        }
+
+        window.abrirModalCargaMasiva = function() { document.getElementById('archivo-csv').value = ""; document.getElementById('modal-carga-masiva').style.display = 'flex'; }
+        window.procesarCSV = async function() {
+            const input = document.getElementById('archivo-csv');
+            if (!input.files || input.files.length === 0) return alert("Selecciona un CSV.");
+            mostrarCargando(true);
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const rows = e.target.result.split('\n').filter(row => row.trim() !== '');
+                if (rows.length <= 1) { mostrarCargando(false); return alert("El archivo está vacío."); }
+                try {
+                    const batch = writeBatch(db); const ref = collection(db, "finanzas", obtenerMesId(), "gastos");
+                    let count = 0;
+                    for (let i = 1; i < rows.length; i++) {
+                        const col = rows[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+                        if (col.length >= 4) {
+                            let monto = parseFloat(col[1].replace(',', '.'));
+                            if (!col[0] || isNaN(monto)) continue;
+                            let tipo = (col[3]||'').toLowerCase().includes('tarjeta') ? 'Tarjeta' : 'Fijo';
+                            batch.set(doc(ref), {
+                                propietario: 'Propio', tercero_nombre: '', nombre: col[0], monto: monto, moneda: col[2].toUpperCase() === 'USD' ? 'USD' : 'ARS',
+                                tipo: tipo, categoria: "Fijos", compartir_tipo: 'divisor', divisor: parseInt(col[4]) || 1, tarjeta: tipo === 'Tarjeta' ? (col[5]||'VISA') : null,
+                                cuotas_totales: tipo === 'Tarjeta' ? (parseInt(col[6])||1) : null, cuotas_pagadas: tipo === 'Tarjeta' ? (parseInt(col[7])||1) : null
+                            });
+                            count++;
+                        }
+                    }
+                    if(count>0){ await batch.commit(); cerrarModal('modal-carga-masiva'); await actualizarDashboard(); }
+                    else { mostrarCargando(false); }
+                } catch(e){ mostrarCargando(false); alert("Error CSV."); }
+            };
+            reader.readAsText(input.files[0]);
+        };
+
+        window.copiarMesAnterior = async function() {
+            if(!confirm("¿Importar todos los datos del mes anterior? Puede duplicar registros si ya cargaste información.")) return;
+            mostrarCargando(true);
+            let m = parseInt(mesSelector.value)-1, a = parseInt(anioSelector.value);
+            if(m===0){ m=12; a--; }
+            const prev = `${a}-${m.toString().padStart(2, '0')}`;
+            const actual = obtenerMesId();
+
+            try {
+                const prevDocSnap = await getDoc(doc(db, "finanzas", prev));
+                if(prevDocSnap.exists()) {
+                    await setDoc(doc(db, "finanzas", actual), prevDocSnap.data(), { merge: true });
+                }
+                const snapG = await getDocs(collection(db, "finanzas", prev, "gastos"));
+                for(const d of snapG.docs){
+                    let data = d.data();
+                    if(data.tipo==='Tarjeta'){ 
+                        if(data.cuotas_pagadas>=data.cuotas_totales) continue; 
+                        data.cuotas_pagadas++; 
+                    }
+                    await addDoc(collection(db, "finanzas", actual, "gastos"), data);
+                }
+                const snapI = await getDocs(collection(db, "finanzas", prev, "ingresos"));
+                for(const d of snapI.docs){ await addDoc(collection(db, "finanzas", actual, "ingresos"), d.data()); }
+                await actualizarDashboard();
+            } catch (e) { mostrarCargando(false); alert("Error al copiar datos."); }
+        };
     </script>
 </body>
 </html>
