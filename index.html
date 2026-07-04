@@ -61,7 +61,20 @@
 
         .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px;}
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;}
-        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 20px;}
+        
+        /* Nuevo diseño tipo Tetris (Masonry) para los paneles */
+        .masonry-layout {
+            column-width: 320px;
+            column-gap: 20px;
+            width: 100%;
+        }
+        .masonry-layout > .card {
+            break-inside: avoid;
+            margin-bottom: 20px;
+            display: inline-block;
+            width: 100%;
+            box-sizing: border-box;
+        }
 
         .card { background-color: #ffffff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); border: 1px solid var(--card-border); }
         
@@ -99,7 +112,7 @@
         .details-row td { background-color: #f8f9fa; border-radius: 8px; border: 1px solid #eee;}
         .chart-container { position: relative; width: 100%; }
 
-        .saldo-restante-container { margin-top: 10px; font-size: 13px; font-weight: 600; padding: 8px 12px; border-radius: 6px; display: inline-block; }
+        .saldo-restante-container { margin-top: 10px; font-size: 13px; font-weight: 600; padding: 8px 12px; border-radius: 6px; display: inline-block; width: 100%; box-sizing: border-box;}
         .saldo-ok { background-color: #e6f4ea; color: #137333; }
         .saldo-danger { background-color: #fce8e6; color: #c5221f; }
 
@@ -108,7 +121,7 @@
             .sidebar.open { transform: translateX(0); }
             .mobile-menu-btn { display: block; }
             .main-content { padding: 15px; }
-            .cards-grid, .grid-2, .grid-3 { grid-template-columns: 1fr; }
+            .cards-grid, .grid-2 { grid-template-columns: 1fr; }
             .filter-bar { flex-direction: column; align-items: stretch; }
         }
     </style>
@@ -286,7 +299,7 @@
                 </div>
 
                 <div class="filter-bar"><input type="text" id="filtro-texto-gastos" placeholder="Buscar gasto por nombre..." style="flex: 1;"></div>
-                <div id="contenedor-dinamico-gastos" class="grid-3"></div>
+                <div id="contenedor-dinamico-gastos" class="masonry-layout"></div>
             </div>
 
             <!-- Estadísticas Anuales -->
@@ -542,7 +555,6 @@
             guardarConfiguracionGlobalGlobal();
         };
 
-        // NUEVA FUNCIÓN PARA EDITAR EL NOMBRE DEL PANEL
         window.editarNombreTipoGastoPanel = async function(oldCategoria) {
             const nuevoNombre = prompt("Ingresa el nuevo nombre para este panel de gasto:", oldCategoria);
             if (!nuevoNombre || nuevoNombre.trim() === "" || nuevoNombre.trim() === oldCategoria) return;
@@ -552,21 +564,19 @@
             
             mostrarCargando(true);
             
-            // 1. Conservar el origen vinculado, crear nueva clave y eliminar la vieja
             const origenVinculado = tiposGastoAsociaciones[oldCategoria];
             tiposGastoAsociaciones[limpio] = origenVinculado;
             delete tiposGastoAsociaciones[oldCategoria];
             
-            // 2. Actualizar la configuración en Firebase
             await actualizarConfiguracionDB({
                 "configuracion.tipos_gasto": tiposGastoAsociaciones
             });
             
-            // 3. Actualizar todos los gastos que tenían esta categoría vieja para que no queden huérfanos
             const batch = writeBatch(db);
             let updatedCount = 0;
             listaGastos.forEach(g => {
-                if (g.categoria === oldCategoria) {
+                let catAsociada = g.categoria || "Fijos"; 
+                if (catAsociada === oldCategoria) {
                     const docRef = doc(db, "finanzas", obtenerMesId(), "gastos", g.id);
                     batch.update(docRef, { categoria: limpio });
                     updatedCount++;
@@ -664,10 +674,17 @@
                     return c === categoria;
                 });
 
+                let totalPanel = itemsPanel.reduce((sum, current) => sum + current.costoCalculado, 0);
+
                 let tarjetaHtml = `
                     <div class="card" style="border-top: 4px solid var(--primary-color); display: flex; flex-direction: column;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <h2 style="margin:0; font-size:15px;">${categoria}</h2>
+                            <h2 style="margin:0; font-size:15px;">
+                                ${categoria} 
+                                <span style="font-weight:normal; font-size:13px; color:var(--text-muted);">
+                                    | Total: <b style="color:var(--text-main);">${formatearDinero(totalPanel)}</b>
+                                </span>
+                            </h2>
                             <div style="display: flex; gap: 5px;">
                                 <button class="btn-icon" onclick="window.editarNombreTipoGastoPanel('${categoria}')" title="Editar nombre de este panel">✏️</button>
                                 <button class="btn-icon" onclick="window.eliminarTipoGastoPanel('${categoria}')" title="Eliminar este panel">🗑️</button>
@@ -711,6 +728,46 @@
                 contenedor.innerHTML += tarjetaHtml;
             }
 
+            // Panel de Rescate para Gastos Huérfanos
+            let huerfanos = gastosProcesados.filter(g => {
+                let c = g.categoria || "Fijos";
+                return !tiposGastoAsociaciones.hasOwnProperty(c);
+            });
+
+            if (huerfanos.length > 0) {
+                let hTotal = huerfanos.reduce((sum, g) => sum + g.costoCalculado, 0);
+                let tarjetaHuerfanos = `
+                    <div class="card" style="border-top: 4px solid #dc3545; display: flex; flex-direction: column;">
+                        <h2 style="margin:0; font-size:15px; color: #dc3545;">
+                            Gastos Sin Panel (Recuperados)
+                            <span style="font-weight:normal; font-size:13px; color:var(--text-muted);">| Total: <b style="color:var(--text-main);">${formatearDinero(hTotal)}</b></span>
+                        </h2>
+                        <p style="font-size: 11px; color: var(--text-muted); margin-top: 5px;">Estos gastos perdieron su categoría. Edítalos para asignarlos a un panel válido.</p>
+                        <table style="width:100%; margin-top:10px;">
+                            <thead>
+                                <tr><th>Gasto</th><th>Categoría anterior</th><th>Costo Mes</th><th>⚙️</th></tr>
+                            </thead>
+                            <tbody>
+                                ${huerfanos.map(g => {
+                                    return `
+                                        <tr>
+                                            <td><strong>${g.nombre}</strong></td>
+                                            <td style="color:#dc3545;">${g.categoria || "Fijos"}</td>
+                                            <td style="font-weight:600;">${formatearDinero(g.costoCalculado)}</td>
+                                            <td>
+                                                <button class="btn-icon" onclick='abrirModalEditarGasto(${JSON.stringify(g)})'>✏️</button>
+                                                <button class="btn-icon" onclick="borrarGasto('${g.id}')">🗑️</button>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                contenedor.innerHTML += tarjetaHuerfanos;
+            }
+
             document.getElementById('res-gastos-fijos').innerText = formatearDinero(totalGastosGlobal);
             document.getElementById('sum-gastos-total').innerText = formatearDinero(totalGastosGlobal);
             document.getElementById('sum-gastos-terceros').innerText = formatearDinero(subtotalTerceros);
@@ -734,7 +791,13 @@
             document.getElementById('gasto-nombre').value = data.nombre;
             document.getElementById('gasto-monto').value = data.monto;
             document.getElementById('gasto-moneda').value = data.moneda;
-            document.getElementById('gasto-categoria-select').value = data.categoria || Object.keys(tiposGastoAsociaciones)[0];
+            
+            // Asegurar que si la categoria original no existe, se ponga vacio o la primera para forzar asignacion
+            const catSelect = document.getElementById('gasto-categoria-select');
+            let catValue = data.categoria || "Fijos";
+            if(!tiposGastoAsociaciones.hasOwnProperty(catValue)) catValue = Object.keys(tiposGastoAsociaciones)[0];
+            catSelect.value = catValue;
+            
             document.getElementById('gasto-tipo').value = data.tipo;
             document.getElementById('titulo-modal-gasto').innerText = "Editar Gasto";
 
