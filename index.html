@@ -515,6 +515,23 @@
             for(let cat in tiposGastoAsociaciones) { selectGastoModal.add(new Option(cat, cat)); }
         }
 
+        async function actualizarConfiguracionDB(camposUpdate) {
+            const docRef = doc(db, "finanzas", obtenerMesId());
+            try {
+                await updateDoc(docRef, camposUpdate);
+            } catch(e) {
+                const fullConfig = {
+                    configuracion: {
+                        dolar_debito: parseFloat(document.getElementById('usd-debito').value) || 0,
+                        dolar_impuesto: parseFloat(document.getElementById('usd-impuesto').value) || 0,
+                        grupos_distribucion: gruposDistribucion,
+                        tipos_gasto: tiposGastoAsociaciones
+                    }
+                };
+                await setDoc(docRef, fullConfig);
+            }
+        }
+
         window.crearNuevoTipoGastoPanel = function() {
             const nombre = prompt("Ingresa el nombre para el nuevo tipo de gasto (Nuevo Panel):");
             if (!nombre || nombre.trim() === "") return;
@@ -523,6 +540,44 @@
             
             tiposGastoAsociaciones[limpio] = "";
             guardarConfiguracionGlobalGlobal();
+        };
+
+        // NUEVA FUNCIÓN PARA EDITAR EL NOMBRE DEL PANEL
+        window.editarNombreTipoGastoPanel = async function(oldCategoria) {
+            const nuevoNombre = prompt("Ingresa el nuevo nombre para este panel de gasto:", oldCategoria);
+            if (!nuevoNombre || nuevoNombre.trim() === "" || nuevoNombre.trim() === oldCategoria) return;
+            
+            const limpio = nuevoNombre.trim();
+            if (tiposGastoAsociaciones[limpio] !== undefined) return alert("Este tipo de panel ya existe.");
+            
+            mostrarCargando(true);
+            
+            // 1. Conservar el origen vinculado, crear nueva clave y eliminar la vieja
+            const origenVinculado = tiposGastoAsociaciones[oldCategoria];
+            tiposGastoAsociaciones[limpio] = origenVinculado;
+            delete tiposGastoAsociaciones[oldCategoria];
+            
+            // 2. Actualizar la configuración en Firebase
+            await actualizarConfiguracionDB({
+                "configuracion.tipos_gasto": tiposGastoAsociaciones
+            });
+            
+            // 3. Actualizar todos los gastos que tenían esta categoría vieja para que no queden huérfanos
+            const batch = writeBatch(db);
+            let updatedCount = 0;
+            listaGastos.forEach(g => {
+                if (g.categoria === oldCategoria) {
+                    const docRef = doc(db, "finanzas", obtenerMesId(), "gastos", g.id);
+                    batch.update(docRef, { categoria: limpio });
+                    updatedCount++;
+                }
+            });
+            
+            if (updatedCount > 0) {
+                await batch.commit();
+            }
+            
+            await actualizarDashboard();
         };
 
         window.eliminarTipoGastoPanel = function(categoria) {
@@ -539,14 +594,11 @@
 
         async function guardarConfiguracionGlobalGlobal() {
             mostrarCargando(true);
-            await setDoc(doc(db, "finanzas", obtenerMesId()), {
-                configuracion: {
-                    dolar_debito: parseFloat(document.getElementById('usd-debito').value) || 0,
-                    dolar_impuesto: parseFloat(document.getElementById('usd-impuesto').value) || 0,
-                    grupos_distribucion: gruposDistribucion,
-                    tipos_gasto: tiposGastoAsociaciones
-                }
-            }, { merge: true });
+            await actualizarConfiguracionDB({
+                "configuracion.dolar_debito": parseFloat(document.getElementById('usd-debito').value) || 0,
+                "configuracion.dolar_impuesto": parseFloat(document.getElementById('usd-impuesto').value) || 0,
+                "configuracion.tipos_gasto": tiposGastoAsociaciones
+            });
             await actualizarDashboard();
         }
 
@@ -616,7 +668,10 @@
                     <div class="card" style="border-top: 4px solid var(--primary-color); display: flex; flex-direction: column;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <h2 style="margin:0; font-size:15px;">${categoria}</h2>
-                            <button class="btn-icon" onclick="window.eliminarTipoGastoPanel('${categoria}')" title="Eliminar este panel">🗑️</button>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="btn-icon" onclick="window.editarNombreTipoGastoPanel('${categoria}')" title="Editar nombre de este panel">✏️</button>
+                                <button class="btn-icon" onclick="window.eliminarTipoGastoPanel('${categoria}')" title="Eliminar este panel">🗑️</button>
+                            </div>
                         </div>
                         
                         <div style="margin-top:10px; display:flex; flex-direction:column; gap:5px;">
@@ -858,9 +913,9 @@
 
         async function autoGuardarDistribucionEstructura() {
             try {
-                await setDoc(doc(db, "finanzas", obtenerMesId()), {
-                    configuracion: { grupos_distribucion: gruposDistribucion }
-                }, { merge: true });
+                await actualizarConfiguracionDB({
+                    "configuracion.grupos_distribucion": gruposDistribucion
+                });
                 await actualizarDashboard();
             } catch(e) { console.error("Error autoguardando distribución:", e); }
         }
