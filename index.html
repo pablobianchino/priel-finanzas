@@ -410,7 +410,7 @@
         let chartResumen = null, chartIngresos = null, chartEstadisticas = null;
         
         let gruposDistribucion = {};
-        let tiposGastoAsociaciones = {}; // { Categoria: OrigenIngresoId }
+        let tiposGastoAsociaciones = {};
         let debounceTimer;
 
         window.formatearDinero = function(num) {
@@ -515,7 +515,6 @@
             for(let cat in tiposGastoAsociaciones) { selectGastoModal.add(new Option(cat, cat)); }
         }
 
-        // --- SECCIÓN DE GASTOS: PANELES DINÁMICOS Y LOGICA DE SALDOS ---
         window.crearNuevoTipoGastoPanel = function() {
             const nombre = prompt("Ingresa el nombre para el nuevo tipo de gasto (Nuevo Panel):");
             if (!nombre || nombre.trim() === "") return;
@@ -562,7 +561,6 @@
             const dImpuesto = parseFloat(document.getElementById('usd-impuesto').value) || 0;
             const buscador = document.getElementById('filtro-texto-gastos').value.toLowerCase();
 
-            // Mapeo e indexación de costos reales calculados
             let gastosProcesados = listaGastos.map(g => {
                 let costoArsBase = g.monto;
                 if (g.moneda === 'USD') {
@@ -580,7 +578,6 @@
                 return { ...g, costoCalculado: costoFinalArs };
             });
 
-            // Agrupación global de gastos consumidos por Origen de Ingreso para lógica cruzada de saldos
             let sumatoriaGastosPorOrigen = {};
             gastosProcesados.forEach(g => {
                 if (g.propietario === 'Tercero') {
@@ -589,7 +586,6 @@
                 }
                 totalGastosGlobal += g.costoCalculado;
                 
-                // Encontrar a qué canal/panel pertenece y sumar al origen vinculado
                 let catAsociada = g.categoria || "Fijos";
                 let origenId = tiposGastoAsociaciones[catAsociada] || "";
                 if (origenId) {
@@ -597,7 +593,6 @@
                 }
             });
 
-            // Renderizar cada panel dinámico
             for (let categoria in tiposGastoAsociaciones) {
                 let origenAsignadoId = tiposGastoAsociaciones[categoria] || "";
                 let origenDoc = listaIngresos.find(i => i.id === origenAsignadoId);
@@ -611,7 +606,6 @@
                     saldoClass = restante < 0 ? "saldo-danger" : "saldo-ok";
                 }
 
-                // Filtrar los ítems de este panel específico
                 let itemsPanel = gastosProcesados.filter(g => {
                     let c = g.categoria || "Fijos";
                     if (buscador) return c === categoria && g.nombre.toLowerCase().includes(buscador);
@@ -790,7 +784,6 @@
             if(isTercero) { document.getElementById(`${prefix}-compartir`).checked = false; toggleDivisor(prefix); }
         };
 
-        // --- SECCIÓN: INLINE DISTRIBUCION DE OBJETIVOS (CRUD & BIDIRECCIONAL) ---
         let sumPorGrupo = {};
 
         window.crearNuevoGrupoDistribucion = function() {
@@ -843,7 +836,6 @@
                 gruposDistribucion[grupoName][index].porc = parseFloat(pctCalculado);
             }
             
-            // Recalcular el indicador de suma total visual de la tarjeta
             let sumTotalPctCard = 0;
             gruposDistribucion[grupoName].forEach((_, idx) => {
                 sumTotalPctCard += parseFloat(document.getElementById(`pct-${grupoName}-${idx}`).value) || 0;
@@ -912,7 +904,7 @@
                             <input type="text" value="${it.nombre}" style="flex:2; padding:5px; font-size:12px;" oninput="window.actualizarDatoObjetivoMemory('${grupoName}', ${idx}, 'nombre', this.value)" placeholder="Objetivo">
                             <input type="number" id="pct-${grupoName}-${idx}" value="${it.porc}" style="width:65px; padding:5px; font-size:12px; text-align:center;" oninput="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pct')" placeholder="%" step="0.1">
                             <span style="font-size:11px;">%</span>
-                            <input type="number" id="pesos-${grupoName}-${idx}" value="${dineroCalculated.toFixed(1)}" style="width:90px; padding:5px; font-size:12px;" oninput="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pesos')" placeholder="$">
+                            <input type="number" id="pesos-${grupoName}-${idx}" value="${dineroCalculado.toFixed(1)}" style="width:90px; padding:5px; font-size:12px;" oninput="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pesos')" placeholder="$">
                             
                             <button class="btn-black" style="padding:4px 8px; font-size:11px; background-color:#9c27b0;" onclick="window.ejecutarSeparacionAhorro('${grupoName}', ${idx}, 1)" title="Separar fondos bajo acción modelo 1">🐷 Ahorro A</button>
                             <button class="btn-black" style="padding:4px 8px; font-size:11px; background-color:#673ab7;" onclick="window.ejecutarSeparacionAhorro('${grupoName}', ${idx}, 2)" title="Separar fondos bajo acción modelo 2">🔒 Ahorro B</button>
@@ -934,7 +926,6 @@
             resDist.innerHTML = `<div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: var(--text-main);">Monto Total Entrante: ${formatearDinero(totalIngresosGlobal)}</div>` + resHtml;
         }
 
-        // --- NUEVO PANEL: LOGICA DE AHORROS ---
         window.ejecutarSeparacionAhorro = async function(grupoName, index, tipoAccionId) {
             const totalDineroGrupo = sumPorGrupo[grupoName] || 0;
             const obj = gruposDistribucion[grupoName][index];
@@ -942,8 +933,8 @@
 
             if (montoASeparar <= 0) return alert("El monto de ahorro debe ser mayor a $0.");
 
-            const de acuerdo = confirm(`¿Deseas enviar ${formatearDinero(montoASeparar)} desde '${obj.nombre}' al panel de Ahorros de forma permanente?`);
-            if (!de acuerdo) return;
+            const confirmado = confirm(`¿Deseas enviar ${formatearDinero(montoASeparar)} desde '${obj.nombre}' al panel de Ahorros de forma permanente?`);
+            if (!confirmado) return;
 
             mostrarCargando(true);
             try {
@@ -992,7 +983,6 @@
             document.getElementById('sum-ahorros-total').innerText = formatearDinero(totalAhorrado);
         }
 
-        // --- SECCIÓN: GESTIÓN DE INGRESOS ---
         window.abrirModalNuevoIngreso = function() {
             document.getElementById('form-ingreso').reset(); document.getElementById('ingreso-id').value = "";
             document.getElementById('titulo-modal-ingreso').innerText = "Nuevo Ingreso";
@@ -1080,7 +1070,6 @@
             renderDistribucionDirecta();
         }
 
-        // --- CONSOLIDADO: BALANCE GENERAL Y ESTADÍSTICAS ---
         function calcularBalance() {
             const balance = totalIngresosGlobal - totalGastosGlobal;
             const bElement = document.getElementById('res-balance');
@@ -1160,7 +1149,6 @@
             mostrarCargando(false);
         }
 
-        // --- CARGA MASIVA Y COPIADO ---
         window.abrirModalCargaMasiva = function() { document.getElementById('archivo-csv').value = ""; document.getElementById('modal-carga-masiva').style.display = 'flex'; }
         window.procesarCSV = async function() {
             const input = document.getElementById('archivo-csv');
