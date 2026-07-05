@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Finanzas Priel</title>
     
-    <!-- Etiquetas PWA -->
+    <!-- Etiquetas PWA actualizadas -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffffff">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -207,7 +208,6 @@
                             <div class="value" id="res-ingresos-mes">$0,0</div>
                         </div>
                         
-                        <!-- NUEVA TARJETA: RESUMEN DE AHORROS -->
                         <div class="card" style="border-top: 4px solid #9c27b0;">
                             <div class="card-header-toggle" onclick="toggleCard(this)">
                                 <h3>Cuentas de Ahorro (Mes)</h3><span class="toggle-icon">▼</span>
@@ -456,12 +456,12 @@
         const colorPalette = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#9C27B0', '#00BCD4', '#FF9800', '#795548', '#8BC34A', '#E91E63', '#3F51B5'];
 
         let totalGastosGlobal = 0, subtotalTerceros = 0, totalIngresosGlobal = 0;
-        let listaGastos = [], listaIngresos = [];
+        let listaGastos = [], listaIngresos = [], listaAhorros = [];
         let chartResumen = null, chartIngresos = null, chartEstadisticas = null;
         
         let gruposDistribucion = {};
         let tiposGastoAsociaciones = {}; 
-        let cuentasAhorro = [];
+        let cuentasAhorro = []; 
         let sumPorGrupo = {};
         let sumatoriaGastosPorOrigen = {};
         let debounceTimer;
@@ -536,14 +536,15 @@
             
             const pGastos = cargarGastosFetch();
             const pIngresos = cargarIngresosFetch();
+            const pAhorros = cargarAhorrosFetch();
             
-            await Promise.all([pGastos, pIngresos]);
+            await Promise.all([pGastos, pIngresos, pAhorros]);
             
             calcularSaldosOrigenes();
             
             renderizacioDinamicaGastosPaneles();
             renderTablaIngresos();
-            renderCuentasAhorro(); 
+            renderCuentasAhorro();
             
             calcularBalance();
             mostrarCargando(false);
@@ -560,6 +561,12 @@
             listaIngresos = []; snap.forEach(d => listaIngresos.push({ id: d.id, ...d.data() }));
         }
 
+        async function cargarAhorrosFetch() {
+            const snap = await getDocs(collection(db, "finanzas", obtenerMesId(), "ahorros"));
+            listaAhorros = [];
+            snap.forEach(d => listaAhorros.push({ id: d.id, ...d.data() }));
+        }
+
         async function cargarConfiguracion() {
             const docSnap = await getDoc(doc(db, "finanzas", obtenerMesId()));
             if (docSnap.exists() && docSnap.data().configuracion) {
@@ -567,12 +574,22 @@
                 document.getElementById('usd-mep').value = config.dolar_mep || 0;
                 document.getElementById('usd-debito').value = config.dolar_debito || 0;
                 document.getElementById('usd-impuesto').value = config.dolar_impuesto || 0;
-                gruposDistribucion = config.grupos_distribucion || {};
                 
+                // Normalizador Array Firestore
+                gruposDistribucion = config.grupos_distribucion || {};
+                for (let g in gruposDistribucion) {
+                    if (!Array.isArray(gruposDistribucion[g])) {
+                        gruposDistribucion[g] = Object.values(gruposDistribucion[g]);
+                    }
+                    gruposDistribucion[g] = gruposDistribucion[g].filter(it => it !== null);
+                }
+
                 let oldTipos = config.tipos_gasto || { "Fijos": [], "Tarjeta": [], "Terceros": [] };
                 for(let k in oldTipos) {
                     if (typeof oldTipos[k] === 'string') {
                         oldTipos[k] = oldTipos[k] !== "" ? [oldTipos[k]] : [];
+                    } else if (!Array.isArray(oldTipos[k])) {
+                        oldTipos[k] = Object.values(oldTipos[k]);
                     }
                 }
                 tiposGastoAsociaciones = oldTipos;
@@ -653,9 +670,6 @@
                 }
             });
         }
-
-
-        // --- PANELES DINÁMICOS DE GASTOS ---
 
         window.crearNuevoTipoGastoPanel = function() {
             const nombre = prompt("Ingresa el nombre para el nuevo tipo de gasto (Nuevo Panel):");
@@ -845,8 +859,6 @@
             document.getElementById('sum-gastos-terceros').innerText = formatearDinero(subtotalTerceros);
         }
 
-        // --- MANEJO DE MODAL GASTOS ---
-
         window.abrirModalNuevoGasto = function(categoriaPredefinida = '') {
             document.getElementById('form-gasto').reset();
             document.getElementById('gasto-id').value = "";
@@ -1009,8 +1021,6 @@
             if(isTercero) { document.getElementById(`${prefix}-compartir`).checked = false; toggleDivisor(prefix); }
         };
 
-        // --- GESTIÓN DE AHORROS Y DISTRIBUCIÓN ---
-
         window.crearCuentaAhorro = function() {
             let n = prompt("Nombre de la nueva Cuenta de Ahorro:");
             if(!n || n.trim() === "") return;
@@ -1069,8 +1079,9 @@
 
             for(let grupoName in gruposDistribucion) {
                 let totalGrupo = sumPorGrupo[grupoName] || 0;
-                gruposDistribucion[grupoName].forEach(it => {
-                    if(it.ahorro_id && ahorrosSuma[it.ahorro_id] !== undefined) {
+                let arrItems = Array.isArray(gruposDistribucion[grupoName]) ? gruposDistribucion[grupoName] : [];
+                arrItems.forEach(it => {
+                    if(it && it.ahorro_id && ahorrosSuma[it.ahorro_id] !== undefined) {
                         ahorrosSuma[it.ahorro_id] += totalGrupo * (it.porc / 100);
                     }
                 });
@@ -1110,7 +1121,7 @@
             });
 
             if(cuentasAhorro.length === 0) {
-                cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro. Haz click en "Nueva Cuenta" para empezar.</p>`;
+                cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro.</p>`;
             }
 
             if(htmlResumen === '') htmlResumen = '<p style="color:var(--text-muted); font-size:13px;">No hay ahorros planificados este mes.</p>';
@@ -1162,6 +1173,7 @@
         };
 
         window.agregarObjetivoLinea = function(grupoName) {
+            if(!Array.isArray(gruposDistribucion[grupoName])) gruposDistribucion[grupoName] = [];
             gruposDistribucion[grupoName].push({ nombre: "Nuevo Objetivo", porc: 0, ahorro_id: "" });
             renderDistribucionDirecta();
         };
@@ -1252,7 +1264,7 @@
 
             for(let grupoName in gruposDistribucion) {
                 let totalGrupo = sumPorGrupo[grupoName] || 0;
-                let cfgItems = gruposDistribucion[grupoName];
+                let cfgItems = Array.isArray(gruposDistribucion[grupoName]) ? gruposDistribucion[grupoName] : [];
                 let sumPorcentajesGrupo = cfgItems.reduce((acc, el) => acc + (el.porc || 0), 0);
                 let colorValidacion = Math.abs(sumPorcentajesGrupo - 100) < 0.1 ? 'green' : 'red';
 
@@ -1275,8 +1287,8 @@
                 resHtml += `<strong style="font-size:13px; display:block; margin-top:10px;">${grupoName}:</strong><div style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">`;
 
                 cfgItems.forEach((it, idx) => {
+                    if(!it) return;
                     let dineroCalculado = totalGrupo * ((it.porc || 0) / 100);
-                    
                     let opcionesAhorroHTML = cuentasAhorro.map(c => `<option value="${c.id}" ${it.ahorro_id === c.id ? 'selected':''}>${c.nombre}</option>`).join('');
 
                     htmlBlock += `
@@ -1390,6 +1402,8 @@
                 type: 'pie', data: { labels: chartLabels, datasets: [{ data: chartData, backgroundColor: chartColors }] }, 
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
             });
+
+            renderDistribucionDirecta();
         }
 
         function calcularBalance() {
@@ -1431,6 +1445,8 @@
                     for(let k in oldTipos) {
                         if (typeof oldTipos[k] === 'string') {
                             oldTipos[k] = oldTipos[k] !== "" ? [oldTipos[k]] : [];
+                        } else if (!Array.isArray(oldTipos[k])) {
+                            oldTipos[k] = Object.values(oldTipos[k]);
                         }
                     }
                     tiposGastoLocal = oldTipos;
@@ -1471,8 +1487,9 @@
                 let totalAhorroMes = 0;
                 for(let gName in gruposDistLocal) {
                     let totalGrupo = sumPorGrupoLocal[gName] || 0;
-                    gruposDistLocal[gName].forEach(it => {
-                        if (it.ahorro_id) {
+                    let cfgItemsLocal = Array.isArray(gruposDistLocal[gName]) ? gruposDistLocal[gName] : [];
+                    cfgItemsLocal.forEach(it => {
+                        if (it && it.ahorro_id) {
                             totalAhorroMes += totalGrupo * (it.porc / 100);
                         }
                     });
