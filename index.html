@@ -61,19 +61,7 @@
 
         .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px;}
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;}
-        
-        .masonry-layout {
-            column-width: 320px;
-            column-gap: 20px;
-            width: 100%;
-        }
-        .masonry-layout > .card {
-            break-inside: avoid;
-            margin-bottom: 20px;
-            display: inline-block;
-            width: 100%;
-            box-sizing: border-box;
-        }
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 20px;}
 
         .card { background-color: #ffffff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); border: 1px solid var(--card-border); }
         
@@ -119,7 +107,7 @@
             .sidebar.open { transform: translateX(0); }
             .mobile-menu-btn { display: block; }
             .main-content { padding: 15px; }
-            .cards-grid, .grid-2, .masonry-layout { grid-template-columns: 1fr; column-count: 1; }
+            .cards-grid, .grid-2, .grid-3 { grid-template-columns: 1fr; }
             .filter-bar { flex-direction: column; align-items: stretch; }
         }
     </style>
@@ -185,6 +173,19 @@
                 <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
                     <button onclick="copiarMesAnterior()" class="btn-black" style="background-color: #e8eaed; color: #202124; border: 1px solid var(--card-border);">Importar Mes Anterior</button>
                 </div>
+
+                <div class="card" style="margin-bottom: 20px; border-top: 4px solid var(--text-muted);">
+                    <div class="card-header-toggle" onclick="toggleCard(this)">
+                        <h2 style="margin: 0; font-size: 16px;">Configuración USD</h2><span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="card-content" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                        <label>MEP (Ahorros): <input type="number" id="usd-mep" value="0" style="width: 100px; padding: 6px;" step="0.01"></label>
+                        <label>Débito (Gastos): <input type="number" id="usd-debito" value="0" style="width: 100px; padding: 6px;" step="0.01"></label>
+                        <label>Impuesto (Gastos): <input type="number" id="usd-impuesto" value="0" style="width: 100px; padding: 6px;" step="0.01"></label>
+                        <button id="btn-guardar-dolar" class="btn-black" style="padding: 6px 15px;">Guardar Rate</button>
+                    </div>
+                </div>
+
                 <div class="cards-grid">
                     <div class="card" style="border-top: 4px solid #f29900;">
                         <div class="card-header-toggle" onclick="toggleCard(this)">
@@ -261,12 +262,20 @@
                 <div class="cards-grid">
                     <div class="card" style="border-top: 4px solid #9c27b0;">
                         <h3>Total Global Ahorrado (Este mes)</h3>
-                        <div class="value" id="sum-ahorros-total">$0,0</div>
+                        <div class="value" id="sum-ahorros-total" style="display: flex; flex-direction: column; gap: 5px;">$0,0</div>
                     </div>
                 </div>
                 
                 <div id="contenedor-cuentas-ahorro" class="cards-grid">
                     <!-- Dinámico Cuentas -->
+                </div>
+
+                <div class="card" style="margin-top: 20px;">
+                    <h2>Historial de Fondos Separados Manuales</h2>
+                    <table>
+                        <thead><tr><th>Fecha</th><th>Objetivo Origen</th><th>Tipo Acción</th><th>Monto Acumulado</th><th>⚙️</th></tr></thead>
+                        <tbody id="tabla-ahorros"></tbody>
+                    </table>
                 </div>
             </div>
 
@@ -283,17 +292,6 @@
                     </div>
                 </div>
 
-                <div class="card" style="margin-bottom: 20px;">
-                    <div class="card-header-toggle" onclick="toggleCard(this)">
-                        <h2 style="margin: 0; font-size: 16px;">Configuración USD</h2><span class="toggle-icon">▼</span>
-                    </div>
-                    <div class="card-content" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                        <label>Débito: <input type="number" id="usd-debito" value="0" style="width: 100px; padding: 6px;" step="0.01"></label>
-                        <label>Impuesto: <input type="number" id="usd-impuesto" value="0" style="width: 100px; padding: 6px;" step="0.01"></label>
-                        <button id="btn-guardar-dolar" class="btn-black" style="padding: 6px 15px;">Guardar Rate</button>
-                    </div>
-                </div>
-
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
                     <h2 style="margin: 0;">Gestión de Gastos</h2>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
@@ -304,7 +302,7 @@
                 </div>
 
                 <div class="filter-bar"><input type="text" id="filtro-texto-gastos" placeholder="Buscar gasto por nombre..." style="flex: 1;"></div>
-                <div id="contenedor-dinamico-gastos" class="masonry-layout"></div>
+                <div id="contenedor-dinamico-gastos" class="grid-3"></div>
             </div>
 
             <!-- Estadísticas Anuales -->
@@ -431,7 +429,7 @@
         const colorPalette = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#9C27B0', '#00BCD4', '#FF9800', '#795548', '#8BC34A', '#E91E63', '#3F51B5'];
 
         let totalGastosGlobal = 0, subtotalTerceros = 0, totalIngresosGlobal = 0;
-        let listaGastos = [], listaIngresos = [];
+        let listaGastos = [], listaIngresos = [], listaAhorros = [];
         let chartResumen = null, chartIngresos = null, chartEstadisticas = null;
         
         let gruposDistribucion = {};
@@ -512,8 +510,9 @@
             
             const pGastos = cargarGastosFetch();
             const pIngresos = cargarIngresosFetch();
+            const pAhorros = cargarAhorrosFetch();
             
-            await Promise.all([pGastos, pIngresos]);
+            await Promise.all([pGastos, pIngresos, pAhorros]);
             
             calcularSaldosOrigenes();
             
@@ -536,10 +535,17 @@
             listaIngresos = []; snap.forEach(d => listaIngresos.push({ id: d.id, ...d.data() }));
         }
 
+        async function cargarAhorrosFetch() {
+            const snap = await getDocs(collection(db, "finanzas", obtenerMesId(), "ahorros"));
+            listaAhorros = [];
+            snap.forEach(d => listaAhorros.push({ id: d.id, ...d.data() }));
+        }
+
         async function cargarConfiguracion() {
             const docSnap = await getDoc(doc(db, "finanzas", obtenerMesId()));
             if (docSnap.exists() && docSnap.data().configuracion) {
                 const config = docSnap.data().configuracion;
+                document.getElementById('usd-mep').value = config.dolar_mep || 0;
                 document.getElementById('usd-debito').value = config.dolar_debito || 0;
                 document.getElementById('usd-impuesto').value = config.dolar_impuesto || 0;
                 gruposDistribucion = config.grupos_distribucion || {};
@@ -554,6 +560,7 @@
                 cuentasAhorro = config.cuentas_ahorro || [];
 
             } else {
+                document.getElementById('usd-mep').value = 0;
                 document.getElementById('usd-debito').value = 0;
                 document.getElementById('usd-impuesto').value = 0;
                 gruposDistribucion = {};
@@ -581,6 +588,7 @@
             } catch(e) {
                 const fullConfig = {
                     configuracion: {
+                        dolar_mep: parseFloat(document.getElementById('usd-mep').value) || 0,
                         dolar_debito: parseFloat(document.getElementById('usd-debito').value) || 0,
                         dolar_impuesto: parseFloat(document.getElementById('usd-impuesto').value) || 0,
                         grupos_distribucion: gruposDistribucion,
@@ -688,6 +696,7 @@
         async function guardarConfiguracionGlobalGlobal() {
             mostrarCargando(true);
             await actualizarConfiguracionDB({
+                "configuracion.dolar_mep": parseFloat(document.getElementById('usd-mep').value) || 0,
                 "configuracion.dolar_debito": parseFloat(document.getElementById('usd-debito').value) || 0,
                 "configuracion.dolar_impuesto": parseFloat(document.getElementById('usd-impuesto').value) || 0,
                 "configuracion.tipos_gasto": tiposGastoAsociaciones
@@ -965,6 +974,7 @@
             let totalAhorrosMes = 0;
             let ahorrosSuma = {};
             cuentasAhorro.forEach(c => ahorrosSuma[c.id] = 0);
+            const dMep = parseFloat(document.getElementById('usd-mep').value) || 0;
 
             for(let grupoName in gruposDistribucion) {
                 let totalGrupo = sumPorGrupo[grupoName] || 0;
@@ -978,6 +988,8 @@
             cuentasAhorro.forEach(c => {
                 let suma = ahorrosSuma[c.id] || 0;
                 totalAhorrosMes += suma;
+                let usdText = dMep > 0 ? `<div style="font-size:14px; color:var(--text-muted); margin-top:5px;">U$D ${(suma / dMep).toFixed(2)}</div>` : '';
+                
                 cont.innerHTML += `
                     <div class="card" style="border-top: 4px solid #673ab7; display:flex; flex-direction:column; justify-content:space-between;">
                         <div>
@@ -989,6 +1001,7 @@
                                 </div>
                             </div>
                             <div class="value" style="color:#673ab7; font-size:24px;">${formatearDinero(suma)}</div>
+                            ${usdText}
                         </div>
                     </div>
                 `;
@@ -998,7 +1011,9 @@
                 cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro. Haz click en "Nueva Cuenta" para empezar.</p>`;
             }
 
-            document.getElementById('sum-ahorros-total').innerText = formatearDinero(totalAhorrosMes);
+            let totalUsdText = dMep > 0 ? `<span style="font-size:16px; color:var(--text-muted);">U$D ${(totalAhorrosMes / dMep).toFixed(2)}</span>` : '';
+            document.getElementById('sum-ahorros-total').innerHTML = `<span>${formatearDinero(totalAhorrosMes)}</span> ${totalUsdText}`;
+            renderTablaAhorrosManuales();
         }
 
         window.crearNuevoGrupoDistribucion = function() {
@@ -1187,7 +1202,33 @@
             resDist.innerHTML = `<div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: var(--text-main);">Disponible Total para Objetivos: ${formatearDinero(totalDistribuibleGlobal)}</div>` + resHtml;
         }
 
-        // --- INGRESOS ---
+        window.eliminarRegistroAhorro = async function(id) {
+            if(confirm("¿Estás seguro de revertir o eliminar este registro de ahorro manual?")) {
+                mostrarCargando(true);
+                await deleteDoc(doc(db, "finanzas", obtenerMesId(), "ahorros", id));
+                await actualizarDashboard();
+            }
+        }
+
+        function renderTablaAhorrosManuales() {
+            const tabla = document.getElementById('tabla-ahorros');
+            tabla.innerHTML = '';
+            const dMep = parseFloat(document.getElementById('usd-mep').value) || 0;
+
+            listaAhorros.forEach(a => {
+                let usdText = dMep > 0 ? `<br><span style="font-size:11px; color:var(--text-muted);">U$D ${(a.monto / dMep).toFixed(2)}</span>` : '';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${new Date(a.fecha).toLocaleDateString()} ${new Date(a.fecha).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
+                    <td><strong>${a.origenObjetivo}</strong></td>
+                    <td><span style="background:#f3e5f5; color:#7b1fa2; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:600;">${a.tipoAccion}</span></td>
+                    <td style="font-weight:600; color:#7b1fa2;">+ ${formatearDinero(a.monto)}${usdText}</td>
+                    <td><button class="btn-icon" onclick="window.eliminarRegistroAhorro('${a.id}')">🗑️</button></td>
+                `;
+                tabla.appendChild(tr);
+            });
+        }
+
         window.abrirModalNuevoIngreso = function() {
             document.getElementById('form-ingreso').reset(); document.getElementById('ingreso-id').value = "";
             document.getElementById('titulo-modal-ingreso').innerText = "Nuevo Ingreso";
