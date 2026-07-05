@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Finanzas Priel</title>
+    
+    <!-- Etiquetas PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -198,6 +206,15 @@
                             <h3>Ingresos Netos del Mes</h3>
                             <div class="value" id="res-ingresos-mes">$0,0</div>
                         </div>
+                        
+                        <!-- NUEVA TARJETA: RESUMEN DE AHORROS -->
+                        <div class="card" style="border-top: 4px solid #9c27b0;">
+                            <div class="card-header-toggle" onclick="toggleCard(this)">
+                                <h3>Cuentas de Ahorro (Mes)</h3><span class="toggle-icon">▼</span>
+                            </div>
+                            <div class="card-content" id="res-ahorros-list"></div>
+                        </div>
+
                         <div class="card" style="border-top: 4px solid #174ea6;">
                             <h3>Gastos Totales (Propios)</h3>
                             <div class="value" id="res-gastos-fijos">$0,0</div>
@@ -313,7 +330,6 @@
                     <input type="text" id="filtro-texto-gastos" placeholder="Buscar gasto por panel o nombre de ítem..." style="flex: 1;">
                 </div>
                 
-                <!-- Contenedor general Acordeon -->
                 <div id="contenedor-dinamico-gastos" style="display: flex; flex-direction: column; gap: 15px;"></div>
             </div>
 
@@ -321,7 +337,7 @@
             <div id="estadisticas" class="view">
                 <div class="card" style="border-top: 4px solid var(--text-main);">
                     <div class="card-header-toggle" onclick="toggleCard(this)">
-                        <h3 style="font-size: 16px;">Estadísticas Anual de Ingresos vs Gastos</h3><span class="toggle-icon">▼</span>
+                        <h3 style="font-size: 16px;">Estadísticas Anual de Ingresos vs Gastos vs Ahorros</h3><span class="toggle-icon">▼</span>
                     </div>
                     <div class="card-content">
                         <div class="chart-container" style="height: 400px; margin-top: 20px;"><canvas id="chart-estadisticas"></canvas></div>
@@ -440,12 +456,12 @@
         const colorPalette = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#9C27B0', '#00BCD4', '#FF9800', '#795548', '#8BC34A', '#E91E63', '#3F51B5'];
 
         let totalGastosGlobal = 0, subtotalTerceros = 0, totalIngresosGlobal = 0;
-        let listaGastos = [], listaIngresos = [], listaAhorros = [];
+        let listaGastos = [], listaIngresos = [];
         let chartResumen = null, chartIngresos = null, chartEstadisticas = null;
         
         let gruposDistribucion = {};
-        let tiposGastoAsociaciones = {}; // { Categoria: [id_ing1, id_ing2] }
-        let cuentasAhorro = []; // [{id, nombre, depositado: bool}]
+        let tiposGastoAsociaciones = {}; 
+        let cuentasAhorro = [];
         let sumPorGrupo = {};
         let sumatoriaGastosPorOrigen = {};
         let debounceTimer;
@@ -483,7 +499,6 @@
             document.getElementById('view-title').innerText = element.innerText.replace(/[^\w\s]/gi, '').trim();
             if(window.innerWidth <= 768) toggleSidebar();
             if (viewId === 'estadisticas') await cargarEstadisticasAnuales();
-            if (viewId === 'ahorros') renderCuentasAhorro();
         };
 
         onAuthStateChanged(auth, (user) => {
@@ -521,15 +536,14 @@
             
             const pGastos = cargarGastosFetch();
             const pIngresos = cargarIngresosFetch();
-            const pAhorros = cargarAhorrosFetch();
             
-            await Promise.all([pGastos, pIngresos, pAhorros]);
+            await Promise.all([pGastos, pIngresos]);
             
             calcularSaldosOrigenes();
             
             renderizacioDinamicaGastosPaneles();
             renderTablaIngresos();
-            if (document.getElementById('ahorros').classList.contains('active')) renderCuentasAhorro();
+            renderCuentasAhorro(); 
             
             calcularBalance();
             mostrarCargando(false);
@@ -544,12 +558,6 @@
         async function cargarIngresosFetch() {
             const snap = await getDocs(collection(db, "finanzas", obtenerMesId(), "ingresos"));
             listaIngresos = []; snap.forEach(d => listaIngresos.push({ id: d.id, ...d.data() }));
-        }
-
-        async function cargarAhorrosFetch() {
-            const snap = await getDocs(collection(db, "finanzas", obtenerMesId(), "ahorros"));
-            listaAhorros = [];
-            snap.forEach(d => listaAhorros.push({ id: d.id, ...d.data() }));
         }
 
         async function cargarConfiguracion() {
@@ -1068,10 +1076,16 @@
                 });
             }
 
+            let htmlResumen = '';
+
             cuentasAhorro.forEach(c => {
                 let suma = ahorrosSuma[c.id] || 0;
                 totalAhorrosMes += suma;
                 if (c.depositado) totalDepositadoMes += suma;
+
+                if (suma > 0) {
+                    htmlResumen += `<div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;"><span>${c.nombre} ${c.depositado?'(Depositado)':''}</span> <strong style="color:#673ab7;">${formatearDinero(suma)}</strong></div>`;
+                }
 
                 let bgStyle = c.depositado ? 'background-color: #e6f4ea; border: 2px solid #137333;' : 'border-top: 4px solid #673ab7; cursor: pointer;';
                 let checkIcon = c.depositado ? '✅ ' : '⏳ ';
@@ -1098,6 +1112,9 @@
             if(cuentasAhorro.length === 0) {
                 cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro. Haz click en "Nueva Cuenta" para empezar.</p>`;
             }
+
+            if(htmlResumen === '') htmlResumen = '<p style="color:var(--text-muted); font-size:13px;">No hay ahorros planificados este mes.</p>';
+            document.getElementById('res-ahorros-list').innerHTML = htmlResumen;
 
             let totalUsdText = dMep > 0 ? `<span style="font-size:16px; color:var(--text-muted);">U$D ${(totalAhorrosMes / dMep).toFixed(2)}</span>` : '';
             let depositadoUsdText = dMep > 0 ? `<span style="font-size:16px; color:var(--text-muted);">U$D ${(totalDepositadoMes / dMep).toFixed(2)}</span>` : '';
@@ -1164,7 +1181,7 @@
         window.asignarAhorroObjetivo = function(grupoName, index, ahorroId) {
             gruposDistribucion[grupoName][index].ahorro_id = ahorroId;
             dispararDebounceAutoguardado();
-            if (document.getElementById('ahorros').classList.contains('active')) renderCuentasAhorro();
+            renderCuentasAhorro();
         }
 
         window.calcularBidireccionalLinea = function(grupoName, index, disparadoPor) {
@@ -1373,8 +1390,6 @@
                 type: 'pie', data: { labels: chartLabels, datasets: [{ data: chartData, backgroundColor: chartColors }] }, 
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
             });
-
-            renderDistribucionDirecta();
         }
 
         function calcularBalance() {
@@ -1397,6 +1412,7 @@
             
             let ingresosData = new Array(12).fill(0);
             let gastosData = new Array(12).fill(0);
+            let ahorrosData = new Array(12).fill(0);
 
             mostrarCargando(true);
 
@@ -1404,23 +1420,65 @@
                 const mesId = `${anio}-${mes}`;
                 const docSnap = await getDoc(doc(db, "finanzas", mesId));
                 let dDebito = 0, dImpuesto = 0;
+                let gruposDistLocal = {};
+                let tiposGastoLocal = {};
+                
                 if (docSnap.exists() && docSnap.data().configuracion) {
                     dDebito = docSnap.data().configuracion.dolar_debito || 0;
                     dImpuesto = docSnap.data().configuracion.dolar_impuesto || 0;
+                    gruposDistLocal = docSnap.data().configuracion.grupos_distribucion || {};
+                    let oldTipos = docSnap.data().configuracion.tipos_gasto || {};
+                    for(let k in oldTipos) {
+                        if (typeof oldTipos[k] === 'string') {
+                            oldTipos[k] = oldTipos[k] !== "" ? [oldTipos[k]] : [];
+                        }
+                    }
+                    tiposGastoLocal = oldTipos;
                 }
 
-                const ingSnap = await getDocs(collection(db, "finanzas", mesId, "ingresos"));
-                let totalIng = 0; ingSnap.forEach(d => { totalIng += d.data().monto; });
-                ingresosData[index] = totalIng;
-
+                let sumatoriaGastosPorOrigenLocal = {};
                 const gasSnap = await getDocs(collection(db, "finanzas", mesId, "gastos"));
                 let totalGas = 0;
                 gasSnap.forEach(d => {
-                    let data = d.data();
-                    if (data.propietario === 'Tercero') return;
-                    totalGas += getCostoCalculado(data, dDebito, dImpuesto);
+                    let g = d.data();
+                    if (g.propietario === 'Tercero') return;
+                    let costoCalculado = getCostoCalculado(g, dDebito, dImpuesto);
+                    totalGas += costoCalculado;
+                    
+                    let catAsociada = g.categoria || "Fijos";
+                    let origenesPanel = tiposGastoLocal[catAsociada] || [];
+                    let origenId = g.id_origen || (origenesPanel.length > 0 ? origenesPanel[0] : null);
+                    if (origenId) {
+                        sumatoriaGastosPorOrigenLocal[origenId] = (sumatoriaGastosPorOrigenLocal[origenId] || 0) + costoCalculado;
+                    }
                 });
                 gastosData[index] = totalGas;
+
+                let sumPorGrupoLocal = {};
+                const ingSnap = await getDocs(collection(db, "finanzas", mesId, "ingresos"));
+                let totalIng = 0; 
+                ingSnap.forEach(d => { 
+                    let ing = {id: d.id, ...d.data()};
+                    totalIng += ing.monto; 
+                    if (ing.grupo) {
+                        let consumido = sumatoriaGastosPorOrigenLocal[ing.id] || 0;
+                        let restante = ing.monto - consumido;
+                        sumPorGrupoLocal[ing.grupo] = (sumPorGrupoLocal[ing.grupo] || 0) + restante;
+                    }
+                });
+                ingresosData[index] = totalIng;
+
+                let totalAhorroMes = 0;
+                for(let gName in gruposDistLocal) {
+                    let totalGrupo = sumPorGrupoLocal[gName] || 0;
+                    gruposDistLocal[gName].forEach(it => {
+                        if (it.ahorro_id) {
+                            totalAhorroMes += totalGrupo * (it.porc / 100);
+                        }
+                    });
+                }
+                ahorrosData[index] = totalAhorroMes;
+
             });
 
             await Promise.all(promesas);
@@ -1432,7 +1490,8 @@
                     labels: nombresMeses,
                     datasets: [
                         { label: 'Ingresos', data: ingresosData, backgroundColor: '#34A853' },
-                        { label: 'Gastos Propios', data: gastosData, backgroundColor: '#EA4335' }
+                        { label: 'Gastos Propios', data: gastosData, backgroundColor: '#EA4335' },
+                        { label: 'Ahorro Planificado', data: ahorrosData, backgroundColor: '#9C27B0' }
                     ]
                 },
                 options: { 
@@ -1504,6 +1563,15 @@
                 await actualizarDashboard();
             } catch (e) { mostrarCargando(false); alert("Error al copiar datos."); }
         };
+
+        // PWA Setup
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').then(reg => {
+                    console.log('SW registrado correctamente.');
+                }).catch(err => console.log('Error registrando SW: ', err));
+            });
+        }
     </script>
 </body>
 </html>
