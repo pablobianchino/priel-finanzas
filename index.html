@@ -261,8 +261,16 @@
                 
                 <div class="cards-grid">
                     <div class="card" style="border-top: 4px solid #9c27b0;">
-                        <h3>Total Global Ahorrado (Este mes)</h3>
-                        <div class="value" id="sum-ahorros-total" style="display: flex; flex-direction: column; gap: 5px;">$0,0</div>
+                        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px;">
+                            <div>
+                                <h3>Total Global Ahorrado</h3>
+                                <div class="value" id="sum-ahorros-total" style="display: flex; flex-direction: column; gap: 5px; font-size: 22px;">$0,0</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <h3 style="color: #137333;">Total Depositado</h3>
+                                <div class="value" id="sum-ahorros-depositado" style="color: #137333; font-size: 22px; display: flex; flex-direction: column; gap: 5px;">$0,0</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
@@ -270,7 +278,7 @@
                     <!-- Dinámico Cuentas -->
                 </div>
 
-                <div class="card" style="margin-top: 20px;">
+                <div class="card" style="margin-top: 20px; display:none;">
                     <h2>Historial de Fondos Separados Manuales</h2>
                     <table>
                         <thead><tr><th>Fecha</th><th>Objetivo Origen</th><th>Tipo Acción</th><th>Monto Acumulado</th><th>⚙️</th></tr></thead>
@@ -301,8 +309,12 @@
                     </div>
                 </div>
 
-                <div class="filter-bar"><input type="text" id="filtro-texto-gastos" placeholder="Buscar gasto por nombre..." style="flex: 1;"></div>
-                <div id="contenedor-dinamico-gastos" class="grid-3"></div>
+                <div class="filter-bar">
+                    <input type="text" id="filtro-texto-gastos" placeholder="Buscar gasto por panel o nombre de ítem..." style="flex: 1;">
+                </div>
+                
+                <!-- Contenedor general Acordeon -->
+                <div id="contenedor-dinamico-gastos" style="display: flex; flex-direction: column; gap: 15px;"></div>
             </div>
 
             <!-- Estadísticas Anuales -->
@@ -345,7 +357,6 @@
                     <select id="gasto-categoria-select" style="width: 100%; margin-top: 5px;" required onchange="actualizarOrigenesGastoModal()"></select>
                 </div>
                 
-                <!-- Box dinámico para Orígenes de Ingreso Múltiple -->
                 <div id="box-gasto-origen" style="display:none;">
                     <label style="font-size: 12px; color: var(--text-muted);">Selecciona a qué ingreso descontar:</label>
                     <select id="gasto-origen-select" style="width: 100%; margin-top: 5px;"></select>
@@ -434,7 +445,7 @@
         
         let gruposDistribucion = {};
         let tiposGastoAsociaciones = {}; // { Categoria: [id_ing1, id_ing2] }
-        let cuentasAhorro = []; // [{id, nombre}]
+        let cuentasAhorro = []; // [{id, nombre, depositado: bool}]
         let sumPorGrupo = {};
         let sumatoriaGastosPorOrigen = {};
         let debounceTimer;
@@ -722,48 +733,104 @@
                 totalGastosGlobal += g.costoCalculado;
             });
 
+            let panelesData = [];
+
             for (let categoria in tiposGastoAsociaciones) {
                 let origenesDelPanel = tiposGastoAsociaciones[categoria] || [];
                 
-                let itemsPanel = gastosProcesados.filter(g => (g.categoria || "Fijos") === categoria && (!buscador || g.nombre.toLowerCase().includes(buscador)));
+                let matchesCatName = buscador && categoria.toLowerCase().includes(buscador);
+
+                let itemsPanel = gastosProcesados.filter(g => {
+                    if ((g.categoria || "Fijos") !== categoria) return false;
+                    if (!buscador) return true;
+                    if (matchesCatName) return true;
+                    return g.nombre.toLowerCase().includes(buscador);
+                });
+
+                if (buscador && !matchesCatName && itemsPanel.length === 0) continue;
+
                 let totalPanel = itemsPanel.reduce((sum, g) => sum + g.costoCalculado, 0);
+
+                let origenAsignadoId = origenesDelPanel.length > 0 ? origenesDelPanel[0] : "";
+                let origenDoc = listaIngresos.find(i => i.id === origenAsignadoId);
+                
+                let saldoTexto = "Sin origen vinculado";
+                let saldoClass = "saldo-ok";
+                if (origenDoc && origenesDelPanel.length === 1) {
+                    let consumido = sumatoriaGastosPorOrigen[origenAsignadoId] || 0;
+                    let restante = origenDoc.monto - consumido;
+                    saldoTexto = `Restante de ${origenDoc.nombre}: ${formatearDinero(restante)}`;
+                    saldoClass = restante < 0 ? "saldo-danger" : "saldo-ok";
+                } else if (origenesDelPanel.length > 1) {
+                    saldoTexto = "Múltiples orígenes vinculados";
+                    saldoClass = "saldo-ok";
+                }
+
+                panelesData.push({
+                    categoria, totalPanel, itemsPanel, origenesDelPanel, saldoTexto, saldoClass
+                });
+            }
+
+            panelesData.sort((a, b) => b.totalPanel - a.totalPanel);
+
+            panelesData.forEach(p => {
+                let itemsHTML = p.itemsPanel.map(g => {
+                    let originName = '';
+                    if (p.origenesDelPanel.length > 1 && g.id_origen) {
+                        let io = listaIngresos.find(i=>i.id === g.id_origen);
+                        if(io) originName = `<br><span style="font-size:10px; color:var(--text-muted);">De: ${io.nombre}</span>`;
+                    }
+                    return `<tr><td><strong>${g.nombre}</strong>${originName}</td><td style="font-weight:600;">${formatearDinero(g.costoCalculado)}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick='abrirModalEditarGasto(${JSON.stringify(g)})'>✏️</button><button class="btn-icon" onclick="borrarGasto('${g.id}')">🗑️</button></td></tr>`;
+                }).join('');
 
                 contenedor.innerHTML += `
                     <div class="card" style="border-top: 4px solid var(--primary-color);">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <h2 style="margin:0; font-size:15px;">${categoria} <span style="font-weight:normal;">| Total: <b>${formatearDinero(totalPanel)}</b></span></h2>
-                            <div style="display: flex; gap: 5px;">
-                                <button class="btn-icon" onclick="window.editarNombreTipoGastoPanel('${categoria}')" title="Editar Panel">✏️</button>
-                                <button class="btn-icon" onclick="window.eliminarTipoGastoPanel('${categoria}')" title="Eliminar Panel">🗑️</button>
-                            </div>
+                        <div class="card-header-toggle" onclick="toggleCard(this)" style="margin-bottom:0;">
+                            <h2 style="margin:0; font-size:15px; flex:1;">
+                                ${p.categoria} 
+                                <span style="font-weight:normal; font-size:13px; color:var(--text-muted);">
+                                    | Total: <b style="color:var(--text-main);">${formatearDinero(p.totalPanel)}</b>
+                                </span>
+                            </h2>
+                            <span class="toggle-icon">▶</span>
                         </div>
                         
-                        <div style="margin-top:10px; border-bottom:1px solid #eee; padding-bottom:10px;">
-                            <label style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:5px;">Ingresos que alimentan este panel:</label>
-                            <div style="display:flex; flex-wrap:wrap; gap:5px;">
-                                ${listaIngresos.map(ing => `
-                                    <label style="font-size:11px; background:#e8eaed; padding:3px 6px; border-radius:4px; cursor:pointer;">
-                                        <input type="checkbox" onchange="window.toggleOrigenPanel('${categoria}', '${ing.id}', this.checked)" ${origenesDelPanel.includes(ing.id)?'checked':''}>
-                                        ${ing.nombre}
-                                    </label>
-                                `).join('')}
+                        <div class="card-content" style="display:none; margin-top:15px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
+                                <button class="btn-black" style="padding: 4px 10px; font-size: 11px;" onclick="window.abrirModalNuevoGasto('${p.categoria}')">➕ Añadir Gasto Aquí</button>
+                                <div style="display: flex; gap: 5px;">
+                                    <button class="btn-icon" onclick="window.editarNombreTipoGastoPanel('${p.categoria}')" title="Editar Panel">✏️</button>
+                                    <button class="btn-icon" onclick="window.eliminarTipoGastoPanel('${p.categoria}')" title="Eliminar Panel">🗑️</button>
+                                </div>
                             </div>
-                        </div>
 
-                        <table><thead><tr><th>Gasto</th><th>Costo Mes</th><th>⚙️</th></tr></thead>
-                        <tbody>${itemsPanel.map(g => {
-                            let originName = '';
-                            if (origenesDelPanel.length > 1 && g.id_origen) {
-                                let io = listaIngresos.find(i=>i.id === g.id_origen);
-                                if(io) originName = `<br><span style="font-size:10px; color:var(--text-muted);">De: ${io.nombre}</span>`;
-                            }
-                            return `<tr><td><strong>${g.nombre}</strong>${originName}</td><td style="font-weight:600;">${formatearDinero(g.costoCalculado)}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick='abrirModalEditarGasto(${JSON.stringify(g)})'>✏️</button><button class="btn-icon" onclick="borrarGasto('${g.id}')">🗑️</button></td></tr>`;
-                        }).join('')}
-                        ${itemsPanel.length === 0 ? '<tr><td colspan="3" style="color:var(--text-muted); text-align:center;">No hay gastos</td></tr>' : ''}
-                        </tbody></table>
+                            <div style="margin-top:10px; border-bottom:1px solid #eee; padding-bottom:10px;">
+                                <label style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:5px;">Ingresos que alimentan este panel:</label>
+                                <div style="display:flex; flex-wrap:wrap; gap:5px;">
+                                    ${listaIngresos.map(ing => `
+                                        <label style="font-size:11px; background:#e8eaed; padding:3px 6px; border-radius:4px; cursor:pointer;">
+                                            <input type="checkbox" onchange="window.toggleOrigenPanel('${p.categoria}', '${ing.id}', this.checked)" ${p.origenesDelPanel.includes(ing.id)?'checked':''}>
+                                            ${ing.nombre}
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            <div class="saldo-restante-container ${p.saldoClass}">${p.saldoTexto}</div>
+
+                            <table style="width:100%; margin-top:10px;">
+                                <thead>
+                                    <tr><th>Gasto</th><th>Costo Mes</th><th>⚙️</th></tr>
+                                </thead>
+                                <tbody>
+                                    ${itemsHTML}
+                                    ${p.itemsPanel.length === 0 ? '<tr><td colspan="3" style="color:var(--text-muted); text-align:center;">No hay gastos</td></tr>' : ''}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 `;
-            }
+            });
 
             document.getElementById('res-gastos-fijos').innerText = formatearDinero(totalGastosGlobal);
             document.getElementById('sum-gastos-total').innerText = formatearDinero(totalGastosGlobal);
@@ -772,7 +839,7 @@
 
         // --- MANEJO DE MODAL GASTOS ---
 
-        window.abrirModalNuevoGasto = function() {
+        window.abrirModalNuevoGasto = function(categoriaPredefinida = '') {
             document.getElementById('form-gasto').reset();
             document.getElementById('gasto-id').value = "";
             document.getElementById('titulo-modal-gasto').innerText = "Nuevo Gasto";
@@ -780,6 +847,13 @@
             toggleCamposTarjeta('gasto');
             document.getElementById('gasto-compartir').checked = false;
             toggleDivisor('gasto');
+            
+            if (categoriaPredefinida && tiposGastoAsociaciones.hasOwnProperty(categoriaPredefinida)) {
+                document.getElementById('gasto-categoria-select').value = categoriaPredefinida;
+            } else if (Object.keys(tiposGastoAsociaciones).length > 0) {
+                document.getElementById('gasto-categoria-select').value = Object.keys(tiposGastoAsociaciones)[0];
+            }
+            
             actualizarOrigenesGastoModal();
             document.getElementById('modal-gasto').style.display = 'flex';
         }
@@ -932,7 +1006,7 @@
         window.crearCuentaAhorro = function() {
             let n = prompt("Nombre de la nueva Cuenta de Ahorro:");
             if(!n || n.trim() === "") return;
-            cuentasAhorro.push({ id: 'ah_' + Date.now(), nombre: n.trim() });
+            cuentasAhorro.push({ id: 'ah_' + Date.now(), nombre: n.trim(), depositado: false });
             guardarConfiguracionAhorros();
         }
 
@@ -958,6 +1032,14 @@
             }
         }
 
+        window.toggleDepositoCuenta = function(id) {
+            let acc = cuentasAhorro.find(c => c.id === id);
+            if(acc) {
+                acc.depositado = !acc.depositado;
+                guardarConfiguracionAhorros();
+            }
+        }
+
         async function guardarConfiguracionAhorros() {
             mostrarCargando(true);
             await actualizarConfiguracionDB({
@@ -972,6 +1054,7 @@
             cont.innerHTML = '';
             
             let totalAhorrosMes = 0;
+            let totalDepositadoMes = 0;
             let ahorrosSuma = {};
             cuentasAhorro.forEach(c => ahorrosSuma[c.id] = 0);
             const dMep = parseFloat(document.getElementById('usd-mep').value) || 0;
@@ -988,19 +1071,24 @@
             cuentasAhorro.forEach(c => {
                 let suma = ahorrosSuma[c.id] || 0;
                 totalAhorrosMes += suma;
+                if (c.depositado) totalDepositadoMes += suma;
+
+                let bgStyle = c.depositado ? 'background-color: #e6f4ea; border: 2px solid #137333;' : 'border-top: 4px solid #673ab7; cursor: pointer;';
+                let checkIcon = c.depositado ? '✅ ' : '⏳ ';
+                let fontColor = c.depositado ? '#137333' : '#673ab7';
                 let usdText = dMep > 0 ? `<div style="font-size:14px; color:var(--text-muted); margin-top:5px;">U$D ${(suma / dMep).toFixed(2)}</div>` : '';
                 
                 cont.innerHTML += `
-                    <div class="card" style="border-top: 4px solid #673ab7; display:flex; flex-direction:column; justify-content:space-between;">
+                    <div class="card tr-clickable" style="${bgStyle} display:flex; flex-direction:column; justify-content:space-between;" onclick="window.toggleDepositoCuenta('${c.id}')">
                         <div>
-                            <div style="display:flex; justify-content:space-between;">
-                                <h3 style="font-size:15px; color:var(--text-main); font-weight:600; margin:0;">${c.nombre}</h3>
-                                <div>
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                                <h3 style="font-size:15px; color:var(--text-main); font-weight:600; margin:0;">${checkIcon}${c.nombre}</h3>
+                                <div onclick="event.stopPropagation();">
                                     <button class="btn-icon" onclick="window.editarCuentaAhorro('${c.id}')" style="font-size:12px;">✏️</button>
                                     <button class="btn-icon" onclick="window.borrarCuentaAhorro('${c.id}')" style="font-size:12px;">🗑️</button>
                                 </div>
                             </div>
-                            <div class="value" style="color:#673ab7; font-size:24px;">${formatearDinero(suma)}</div>
+                            <div class="value" style="color:${fontColor}; font-size:24px;">${formatearDinero(suma)}</div>
                             ${usdText}
                         </div>
                     </div>
@@ -1012,8 +1100,10 @@
             }
 
             let totalUsdText = dMep > 0 ? `<span style="font-size:16px; color:var(--text-muted);">U$D ${(totalAhorrosMes / dMep).toFixed(2)}</span>` : '';
+            let depositadoUsdText = dMep > 0 ? `<span style="font-size:16px; color:var(--text-muted);">U$D ${(totalDepositadoMes / dMep).toFixed(2)}</span>` : '';
+            
             document.getElementById('sum-ahorros-total').innerHTML = `<span>${formatearDinero(totalAhorrosMes)}</span> ${totalUsdText}`;
-            renderTablaAhorrosManuales();
+            document.getElementById('sum-ahorros-depositado').innerHTML = `<span>${formatearDinero(totalDepositadoMes)}</span> ${depositadoUsdText}`;
         }
 
         window.crearNuevoGrupoDistribucion = function() {
@@ -1200,33 +1290,6 @@
             }
 
             resDist.innerHTML = `<div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: var(--text-main);">Disponible Total para Objetivos: ${formatearDinero(totalDistribuibleGlobal)}</div>` + resHtml;
-        }
-
-        window.eliminarRegistroAhorro = async function(id) {
-            if(confirm("¿Estás seguro de revertir o eliminar este registro de ahorro manual?")) {
-                mostrarCargando(true);
-                await deleteDoc(doc(db, "finanzas", obtenerMesId(), "ahorros", id));
-                await actualizarDashboard();
-            }
-        }
-
-        function renderTablaAhorrosManuales() {
-            const tabla = document.getElementById('tabla-ahorros');
-            tabla.innerHTML = '';
-            const dMep = parseFloat(document.getElementById('usd-mep').value) || 0;
-
-            listaAhorros.forEach(a => {
-                let usdText = dMep > 0 ? `<br><span style="font-size:11px; color:var(--text-muted);">U$D ${(a.monto / dMep).toFixed(2)}</span>` : '';
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${new Date(a.fecha).toLocaleDateString()} ${new Date(a.fecha).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
-                    <td><strong>${a.origenObjetivo}</strong></td>
-                    <td><span style="background:#f3e5f5; color:#7b1fa2; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:600;">${a.tipoAccion}</span></td>
-                    <td style="font-weight:600; color:#7b1fa2;">+ ${formatearDinero(a.monto)}${usdText}</td>
-                    <td><button class="btn-icon" onclick="window.eliminarRegistroAhorro('${a.id}')">🗑️</button></td>
-                `;
-                tabla.appendChild(tr);
-            });
         }
 
         window.abrirModalNuevoIngreso = function() {
