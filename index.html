@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Finanzas Priel</title>
     
-    <!-- Etiquetas PWA actualizadas -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffffff">
     <meta name="mobile-web-app-capable" content="yes">
@@ -58,7 +57,7 @@
 
         .main-content { flex: 1; display: flex; flex-direction: column; padding: 30px; overflow-y: auto; position: relative; }
 
-        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px; }
         .title { display: flex; align-items: center; gap: 15px; }
         .title h1 { margin: 0; font-size: 24px; font-weight: 600; }
         
@@ -164,7 +163,7 @@
                     <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
                     <h1 id="view-title">Resumen</h1>
                 </div>
-                <div class="selectors">
+                <div class="selectors" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                     <select id="mes-selector">
                         <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option>
                         <option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option>
@@ -177,10 +176,10 @@
                 </div>
             </div>
 
-            <!-- Resumen -->
             <div id="resumen" class="view active">
-                <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
-                    <button onclick="copiarMesAnterior()" class="btn-black" style="background-color: #e8eaed; color: #202124; border: 1px solid var(--card-border);">Importar Mes Anterior</button>
+                <div style="display: flex; justify-content: flex-end; gap:10px; margin-bottom: 15px; flex-wrap:wrap;">
+                    <button onclick="exportarBackupMes()" class="btn-black" style="background-color: #34A853; border: 1px solid #137333;">📥 Backup JSON</button>
+                    <button onclick="copiarMesAnterior()" class="btn-black" style="background-color: #e8eaed; color: #202124; border: 1px solid var(--card-border);">🔄 Importar Mes Anterior</button>
                 </div>
 
                 <div class="card" style="margin-bottom: 20px; border-top: 4px solid var(--text-muted);">
@@ -202,6 +201,7 @@
                         </div>
                         <div class="card-content" id="res-ingresos-dist"></div>
                     </div>
+                    
                     <div style="display:flex; flex-direction:column; gap:20px;">
                         <div class="card" style="border-top: 4px solid #34A853;">
                             <h3>Ingresos Netos del Mes</h3>
@@ -219,6 +219,13 @@
                             <h3>Gastos Totales (Propios)</h3>
                             <div class="value" id="res-gastos-fijos">$0,0</div>
                         </div>
+
+                        <div class="card" style="border-top: 4px solid #e91e63;">
+                            <h3>Deuda Futura (Tarjetas)</h3>
+                            <div class="value" id="res-deuda-futura" style="color: #e91e63;">$0,0</div>
+                            <p style="font-size:11px; color:var(--text-muted); margin-top:5px; margin-bottom:0;">Suma total de cuotas pendientes a futuro</p>
+                        </div>
+
                         <div class="card" style="border-top: 4px solid #EA4335;">
                             <h3>Saldo a favor general</h3>
                             <div class="value" id="res-balance">$0,0</div>
@@ -228,7 +235,6 @@
                 </div>
             </div>
 
-            <!-- Ingresos y Distribución Directa -->
             <div id="ingresos" class="view">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
                     <h2 style="margin: 0;">Gestión de Ingresos</h2>
@@ -267,7 +273,6 @@
                 </div>
             </div>
 
-            <!-- Módulo de Ahorros Acumulados -->
             <div id="ahorros" class="view">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
                     <h2 style="margin: 0;">Cuentas de Ahorro</h2>
@@ -292,19 +297,9 @@
                 </div>
                 
                 <div id="contenedor-cuentas-ahorro" class="cards-grid">
-                    <!-- Dinámico Cuentas -->
-                </div>
-
-                <div class="card" style="margin-top: 20px; display:none;">
-                    <h2>Historial de Fondos Separados Manuales</h2>
-                    <table>
-                        <thead><tr><th>Fecha</th><th>Objetivo Origen</th><th>Tipo Acción</th><th>Monto Acumulado</th><th>⚙️</th></tr></thead>
-                        <tbody id="tabla-ahorros"></tbody>
-                    </table>
-                </div>
+                    </div>
             </div>
 
-            <!-- Gastos con Paneles Dinámicos -->
             <div id="gastos" class="view">
                 <div class="cards-grid">
                     <div class="card" style="border-top: 4px solid var(--text-main);">
@@ -326,14 +321,10 @@
                     </div>
                 </div>
 
-                <div class="filter-bar">
-                    <input type="text" id="filtro-texto-gastos" placeholder="Buscar gasto por panel o nombre de ítem..." style="flex: 1;">
-                </div>
-                
-                <div id="contenedor-dinamico-gastos" style="display: flex; flex-direction: column; gap: 15px;"></div>
+                <div class="filter-bar"><input type="text" id="filtro-texto-gastos" placeholder="Buscar gasto por nombre..." style="flex: 1;"></div>
+                <div id="contenedor-dinamico-gastos" class="grid-3"></div>
             </div>
 
-            <!-- Estadísticas Anuales -->
             <div id="estadisticas" class="view">
                 <div class="card" style="border-top: 4px solid var(--text-main);">
                     <div class="card-header-toggle" onclick="toggleCard(this)">
@@ -347,7 +338,6 @@
         </main>
     </div>
 
-    <!-- Modales -->
     <div id="modal-gasto" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
@@ -381,6 +371,12 @@
                 <select id="gasto-tipo" onchange="toggleCamposTarjeta('gasto')">
                     <option value="Fijo">Fijo / Pago Único</option><option value="Tarjeta">Tarjeta de Crédito</option>
                 </select>
+
+                <div id="box-recurrente" style="display: flex; align-items: center; gap: 10px; margin-top:5px;">
+                    <input type="checkbox" id="gasto-recurrente" checked style="width: 16px; height: 16px; cursor: pointer;">
+                    <label for="gasto-recurrente" style="font-size: 13px; cursor: pointer; color: var(--text-main);">Gasto Fijo Recurrente (copiar al próximo mes)</label>
+                </div>
+
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;" id="box-compartir">
                     <input type="checkbox" id="gasto-compartir" style="width: 16px; height: 16px;" onchange="toggleDivisor('gasto')">
                     <label for="gasto-compartir" style="font-size: 14px; cursor: pointer;">Compartir / Dividir gasto</label>
@@ -433,9 +429,10 @@
     </div>
 
     <script type="module">
+        // Importación PWA Offline Persistance Integrada
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, addDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, addDoc, deleteDoc, writeBatch, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyC8S5y_TJJFiL6Sqqwp6f2uidh4OiHDbnM",
@@ -451,12 +448,17 @@
         const db = getFirestore(app);
         const provider = new GoogleAuthProvider();
 
+        // Activar soporte Offline Nativo (Base de Datos)
+        enableIndexedDbPersistence(db).catch((err) => {
+            console.log("Error persistence: ", err.code);
+        });
+
         const mesSelector = document.getElementById('mes-selector');
         const anioSelector = document.getElementById('anio-selector');
         const colorPalette = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#9C27B0', '#00BCD4', '#FF9800', '#795548', '#8BC34A', '#E91E63', '#3F51B5'];
 
         let totalGastosGlobal = 0, subtotalTerceros = 0, totalIngresosGlobal = 0;
-        let listaGastos = [], listaIngresos = [], listaAhorros = [];
+        let listaGastos = [], listaIngresos = [];
         let chartResumen = null, chartIngresos = null, chartEstadisticas = null;
         
         let gruposDistribucion = {};
@@ -529,6 +531,23 @@
 
         function obtenerMesId() { return `${anioSelector.value}-${mesSelector.value}`; }
 
+        // --- BACKUP ---
+        window.exportarBackupMes = async function() {
+            mostrarCargando(true);
+            try {
+                let backup = { mes: obtenerMesId(), configuracion: {}, ingresos: listaIngresos, gastos: listaGastos };
+                const docSnap = await getDoc(doc(db, "finanzas", obtenerMesId()));
+                if(docSnap.exists()) backup.configuracion = docSnap.data().configuracion || {};
+                
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup, null, 2));
+                const dlAnchorElem = document.createElement('a');
+                dlAnchorElem.setAttribute("href",     dataStr     );
+                dlAnchorElem.setAttribute("download", `backup_finanzas_${obtenerMesId()}.json`);
+                dlAnchorElem.click();
+            } catch(e) { alert("Error exportando backup."); }
+            mostrarCargando(false);
+        }
+
         async function actualizarDashboard() {
             if (!auth.currentUser) return;
             mostrarCargando(true);
@@ -536,9 +555,8 @@
             
             const pGastos = cargarGastosFetch();
             const pIngresos = cargarIngresosFetch();
-            const pAhorros = cargarAhorrosFetch();
             
-            await Promise.all([pGastos, pIngresos, pAhorros]);
+            await Promise.all([pGastos, pIngresos]);
             
             calcularSaldosOrigenes();
             
@@ -561,12 +579,6 @@
             listaIngresos = []; snap.forEach(d => listaIngresos.push({ id: d.id, ...d.data() }));
         }
 
-        async function cargarAhorrosFetch() {
-            const snap = await getDocs(collection(db, "finanzas", obtenerMesId(), "ahorros"));
-            listaAhorros = [];
-            snap.forEach(d => listaAhorros.push({ id: d.id, ...d.data() }));
-        }
-
         async function cargarConfiguracion() {
             const docSnap = await getDoc(doc(db, "finanzas", obtenerMesId()));
             if (docSnap.exists() && docSnap.data().configuracion) {
@@ -575,7 +587,6 @@
                 document.getElementById('usd-debito').value = config.dolar_debito || 0;
                 document.getElementById('usd-impuesto').value = config.dolar_impuesto || 0;
                 
-                // Normalizador Array Firestore
                 gruposDistribucion = config.grupos_distribucion || {};
                 for (let g in gruposDistribucion) {
                     if (!Array.isArray(gruposDistribucion[g])) {
@@ -671,6 +682,9 @@
             });
         }
 
+
+        // --- PANELES DINÁMICOS DE GASTOS ---
+
         window.crearNuevoTipoGastoPanel = function() {
             const nombre = prompt("Ingresa el nombre para el nuevo tipo de gasto (Nuevo Panel):");
             if (!nombre || nombre.trim() === "") return;
@@ -744,6 +758,8 @@
             contenedor.innerHTML = '';
             
             totalGastosGlobal = 0; subtotalTerceros = 0;
+            let deudaFuturaTotal = 0;
+
             const dDebito = parseFloat(document.getElementById('usd-debito').value) || 0;
             const dImpuesto = parseFloat(document.getElementById('usd-impuesto').value) || 0;
             const buscador = document.getElementById('filtro-texto-gastos').value.toLowerCase();
@@ -753,111 +769,66 @@
             gastosProcesados.forEach(g => {
                 if (g.propietario === 'Tercero') { subtotalTerceros += g.costoCalculado; return; }
                 totalGastosGlobal += g.costoCalculado;
-            });
 
-            let panelesData = [];
+                // Deuda futura
+                if (g.tipo === 'Tarjeta') {
+                    let cTot = g.cuotas_totales || 1;
+                    let cPag = g.cuotas_pagadas || 1;
+                    if (cTot > cPag) {
+                        deudaFuturaTotal += (g.costoCalculado * (cTot - cPag));
+                    }
+                }
+            });
 
             for (let categoria in tiposGastoAsociaciones) {
                 let origenesDelPanel = tiposGastoAsociaciones[categoria] || [];
-                
-                let matchesCatName = buscador && categoria.toLowerCase().includes(buscador);
-
-                let itemsPanel = gastosProcesados.filter(g => {
-                    if ((g.categoria || "Fijos") !== categoria) return false;
-                    if (!buscador) return true;
-                    if (matchesCatName) return true;
-                    return g.nombre.toLowerCase().includes(buscador);
-                });
-
-                if (buscador && !matchesCatName && itemsPanel.length === 0) continue;
-
+                let itemsPanel = gastosProcesados.filter(g => (g.categoria || "Fijos") === categoria && (!buscador || g.nombre.toLowerCase().includes(buscador)));
                 let totalPanel = itemsPanel.reduce((sum, g) => sum + g.costoCalculado, 0);
-
-                let origenAsignadoId = origenesDelPanel.length > 0 ? origenesDelPanel[0] : "";
-                let origenDoc = listaIngresos.find(i => i.id === origenAsignadoId);
-                
-                let saldoTexto = "Sin origen vinculado";
-                let saldoClass = "saldo-ok";
-                if (origenDoc && origenesDelPanel.length === 1) {
-                    let consumido = sumatoriaGastosPorOrigen[origenAsignadoId] || 0;
-                    let restante = origenDoc.monto - consumido;
-                    saldoTexto = `Restante de ${origenDoc.nombre}: ${formatearDinero(restante)}`;
-                    saldoClass = restante < 0 ? "saldo-danger" : "saldo-ok";
-                } else if (origenesDelPanel.length > 1) {
-                    saldoTexto = "Múltiples orígenes vinculados";
-                    saldoClass = "saldo-ok";
-                }
-
-                panelesData.push({
-                    categoria, totalPanel, itemsPanel, origenesDelPanel, saldoTexto, saldoClass
-                });
-            }
-
-            panelesData.sort((a, b) => b.totalPanel - a.totalPanel);
-
-            panelesData.forEach(p => {
-                let itemsHTML = p.itemsPanel.map(g => {
-                    let originName = '';
-                    if (p.origenesDelPanel.length > 1 && g.id_origen) {
-                        let io = listaIngresos.find(i=>i.id === g.id_origen);
-                        if(io) originName = `<br><span style="font-size:10px; color:var(--text-muted);">De: ${io.nombre}</span>`;
-                    }
-                    return `<tr><td><strong>${g.nombre}</strong>${originName}</td><td style="font-weight:600;">${formatearDinero(g.costoCalculado)}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick='abrirModalEditarGasto(${JSON.stringify(g)})'>✏️</button><button class="btn-icon" onclick="borrarGasto('${g.id}')">🗑️</button></td></tr>`;
-                }).join('');
 
                 contenedor.innerHTML += `
                     <div class="card" style="border-top: 4px solid var(--primary-color);">
-                        <div class="card-header-toggle" onclick="toggleCard(this)" style="margin-bottom:0;">
-                            <h2 style="margin:0; font-size:15px; flex:1;">
-                                ${p.categoria} 
-                                <span style="font-weight:normal; font-size:13px; color:var(--text-muted);">
-                                    | Total: <b style="color:var(--text-main);">${formatearDinero(p.totalPanel)}</b>
-                                </span>
-                            </h2>
-                            <span class="toggle-icon">▶</span>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h2 style="margin:0; font-size:15px;">${categoria} <span style="font-weight:normal;">| Total: <b>${formatearDinero(totalPanel)}</b></span></h2>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="btn-icon" onclick="window.editarNombreTipoGastoPanel('${categoria}')" title="Editar Panel">✏️</button>
+                                <button class="btn-icon" onclick="window.eliminarTipoGastoPanel('${categoria}')" title="Eliminar Panel">🗑️</button>
+                            </div>
                         </div>
                         
-                        <div class="card-content" style="display:none; margin-top:15px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
-                                <button class="btn-black" style="padding: 4px 10px; font-size: 11px;" onclick="window.abrirModalNuevoGasto('${p.categoria}')">➕ Añadir Gasto Aquí</button>
-                                <div style="display: flex; gap: 5px;">
-                                    <button class="btn-icon" onclick="window.editarNombreTipoGastoPanel('${p.categoria}')" title="Editar Panel">✏️</button>
-                                    <button class="btn-icon" onclick="window.eliminarTipoGastoPanel('${p.categoria}')" title="Eliminar Panel">🗑️</button>
-                                </div>
+                        <div style="margin-top:10px; border-bottom:1px solid #eee; padding-bottom:10px;">
+                            <label style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:5px;">Ingresos que alimentan este panel:</label>
+                            <div style="display:flex; flex-wrap:wrap; gap:5px;">
+                                ${listaIngresos.map(ing => `
+                                    <label style="font-size:11px; background:#e8eaed; padding:3px 6px; border-radius:4px; cursor:pointer;">
+                                        <input type="checkbox" onchange="window.toggleOrigenPanel('${categoria}', '${ing.id}', this.checked)" ${origenesDelPanel.includes(ing.id)?'checked':''}>
+                                        ${ing.nombre}
+                                    </label>
+                                `).join('')}
                             </div>
-
-                            <div style="margin-top:10px; border-bottom:1px solid #eee; padding-bottom:10px;">
-                                <label style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:5px;">Ingresos que alimentan este panel:</label>
-                                <div style="display:flex; flex-wrap:wrap; gap:5px;">
-                                    ${listaIngresos.map(ing => `
-                                        <label style="font-size:11px; background:#e8eaed; padding:3px 6px; border-radius:4px; cursor:pointer;">
-                                            <input type="checkbox" onchange="window.toggleOrigenPanel('${p.categoria}', '${ing.id}', this.checked)" ${p.origenesDelPanel.includes(ing.id)?'checked':''}>
-                                            ${ing.nombre}
-                                        </label>
-                                    `).join('')}
-                                </div>
-                            </div>
-
-                            <div class="saldo-restante-container ${p.saldoClass}">${p.saldoTexto}</div>
-
-                            <table style="width:100%; margin-top:10px;">
-                                <thead>
-                                    <tr><th>Gasto</th><th>Costo Mes</th><th>⚙️</th></tr>
-                                </thead>
-                                <tbody>
-                                    ${itemsHTML}
-                                    ${p.itemsPanel.length === 0 ? '<tr><td colspan="3" style="color:var(--text-muted); text-align:center;">No hay gastos</td></tr>' : ''}
-                                </tbody>
-                            </table>
                         </div>
+
+                        <table><thead><tr><th>Gasto</th><th>Costo Mes</th><th>⚙️</th></tr></thead>
+                        <tbody>${itemsPanel.map(g => {
+                            let originName = '';
+                            if (origenesDelPanel.length > 1 && g.id_origen) {
+                                let io = listaIngresos.find(i=>i.id === g.id_origen);
+                                if(io) originName = `<br><span style="font-size:10px; color:var(--text-muted);">De: ${io.nombre}</span>`;
+                            }
+                            return `<tr><td><strong>${g.nombre}</strong>${originName}</td><td style="font-weight:600;">${formatearDinero(g.costoCalculado)}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick='abrirModalEditarGasto(${JSON.stringify(g)})'>✏️</button><button class="btn-icon" onclick="borrarGasto('${g.id}')">🗑️</button></td></tr>`;
+                        }).join('')}
+                        ${itemsPanel.length === 0 ? '<tr><td colspan="3" style="color:var(--text-muted); text-align:center;">No hay gastos</td></tr>' : ''}
+                        </tbody></table>
                     </div>
                 `;
-            });
+            }
 
             document.getElementById('res-gastos-fijos').innerText = formatearDinero(totalGastosGlobal);
             document.getElementById('sum-gastos-total').innerText = formatearDinero(totalGastosGlobal);
             document.getElementById('sum-gastos-terceros').innerText = formatearDinero(subtotalTerceros);
+            document.getElementById('res-deuda-futura').innerText = formatearDinero(deudaFuturaTotal);
         }
+
+        // --- MANEJO DE MODAL GASTOS ---
 
         window.abrirModalNuevoGasto = function(categoriaPredefinida = '') {
             document.getElementById('form-gasto').reset();
@@ -867,6 +838,7 @@
             toggleCamposTarjeta('gasto');
             document.getElementById('gasto-compartir').checked = false;
             toggleDivisor('gasto');
+            document.getElementById('gasto-recurrente').checked = true; // Por defecto
             
             if (categoriaPredefinida && tiposGastoAsociaciones.hasOwnProperty(categoriaPredefinida)) {
                 document.getElementById('gasto-categoria-select').value = categoriaPredefinida;
@@ -886,6 +858,9 @@
             document.getElementById('gasto-monto').value = data.monto;
             document.getElementById('gasto-moneda').value = data.moneda;
             
+            // Recurrencia
+            document.getElementById('gasto-recurrente').checked = data.recurrente !== false; // if undefined it is true
+
             const catSelect = document.getElementById('gasto-categoria-select');
             let catValue = data.categoria || "Fijos";
             if(!tiposGastoAsociaciones.hasOwnProperty(catValue)) catValue = Object.keys(tiposGastoAsociaciones)[0] || "";
@@ -948,6 +923,7 @@
             const cat = document.getElementById('gasto-categoria-select').value;
             const checkboxCompartir = document.getElementById('gasto-compartir').checked;
             const compTipo = document.getElementById('gasto-compartir-tipo').value;
+            const isRecurrente = document.getElementById('gasto-recurrente').checked;
             
             const origenesPanel = tiposGastoAsociaciones[cat] || [];
             let id_origen = "";
@@ -961,7 +937,7 @@
                 propietario: prop, tercero_nombre: prop === 'Tercero' ? document.getElementById('gasto-tercero-nombre').value : '',
                 nombre: document.getElementById('gasto-nombre').value, monto: parseFloat(document.getElementById('gasto-monto').value),
                 moneda: document.getElementById('gasto-moneda').value, tipo: tipo,
-                categoria: cat, id_origen: id_origen,
+                categoria: cat, id_origen: id_origen, recurrente: isRecurrente,
                 compartir_tipo: (prop === 'Propio' && checkboxCompartir) ? compTipo : 'divisor',
                 divisor: (prop === 'Propio' && checkboxCompartir && compTipo === 'divisor') ? parseInt(document.getElementById('gasto-divisor').value) || 1 : 1,
                 monto_fijo: (prop === 'Propio' && checkboxCompartir && compTipo === 'fijo') ? parseFloat(document.getElementById('gasto-monto-fijo').value) || 0 : null
@@ -989,7 +965,13 @@
         window.toggleCamposTarjeta = function(prefix) {
             prefix = prefix || 'gasto';
             const tipo = document.getElementById(`${prefix}-tipo`).value;
-            document.getElementById(`campos-tarjeta`).style.display = tipo === 'Tarjeta' ? 'flex' : 'none';
+            if (tipo === 'Tarjeta') {
+                document.getElementById(`campos-tarjeta`).style.display = 'flex';
+                document.getElementById(`box-recurrente`).style.display = 'none';
+            } else {
+                document.getElementById(`campos-tarjeta`).style.display = 'none';
+                document.getElementById(`box-recurrente`).style.display = 'flex';
+            }
         };
         
         window.toggleDivisor = function(prefix) {
@@ -1020,6 +1002,8 @@
             document.getElementById('box-compartir').style.display = isTercero ? 'none' : 'flex';
             if(isTercero) { document.getElementById(`${prefix}-compartir`).checked = false; toggleDivisor(prefix); }
         };
+
+        // --- GESTIÓN DE AHORROS Y DISTRIBUCIÓN ---
 
         window.crearCuentaAhorro = function() {
             let n = prompt("Nombre de la nueva Cuenta de Ahorro:");
@@ -1121,7 +1105,7 @@
             });
 
             if(cuentasAhorro.length === 0) {
-                cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro.</p>`;
+                cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro. Haz click en "Nueva Cuenta" para empezar.</p>`;
             }
 
             if(htmlResumen === '') htmlResumen = '<p style="color:var(--text-muted); font-size:13px;">No hay ahorros planificados este mes.</p>';
@@ -1540,7 +1524,7 @@
                             let tipo = (col[3]||'').toLowerCase().includes('tarjeta') ? 'Tarjeta' : 'Fijo';
                             batch.set(doc(ref), {
                                 propietario: 'Propio', tercero_nombre: '', nombre: col[0], monto: monto, moneda: col[2].toUpperCase() === 'USD' ? 'USD' : 'ARS',
-                                tipo: tipo, categoria: "Fijos", id_origen: "", compartir_tipo: 'divisor', divisor: parseInt(col[4]) || 1, tarjeta: tipo === 'Tarjeta' ? (col[5]||'VISA') : null,
+                                tipo: tipo, categoria: "Fijos", id_origen: "", recurrente: true, compartir_tipo: 'divisor', divisor: parseInt(col[4]) || 1, tarjeta: tipo === 'Tarjeta' ? (col[5]||'VISA') : null,
                                 cuotas_totales: tipo === 'Tarjeta' ? (parseInt(col[6])||1) : null, cuotas_pagadas: tipo === 'Tarjeta' ? (parseInt(col[7])||1) : null
                             });
                             count++;
@@ -1572,8 +1556,11 @@
                     if(data.tipo==='Tarjeta'){ 
                         if(data.cuotas_pagadas>=data.cuotas_totales) continue; 
                         data.cuotas_pagadas++; 
+                        await addDoc(collection(db, "finanzas", actual, "gastos"), data);
+                    } else if (data.tipo === 'Fijo' && data.recurrente !== false) {
+                        // Se copia solo si está marcado como recurrente
+                        await addDoc(collection(db, "finanzas", actual, "gastos"), data);
                     }
-                    await addDoc(collection(db, "finanzas", actual, "gastos"), data);
                 }
                 const snapI = await getDocs(collection(db, "finanzas", prev, "ingresos"));
                 for(const d of snapI.docs){ await addDoc(collection(db, "finanzas", actual, "ingresos"), d.data()); }
