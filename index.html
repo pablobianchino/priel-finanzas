@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Finanzas Priel</title>
     
+    <!-- Etiquetas PWA actualizadas -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffffff">
     <meta name="mobile-web-app-capable" content="yes">
@@ -176,6 +177,7 @@
                 </div>
             </div>
 
+            <!-- Resumen -->
             <div id="resumen" class="view active">
                 <div style="display: flex; justify-content: flex-end; gap:10px; margin-bottom: 15px; flex-wrap:wrap;">
                     <button onclick="exportarBackupMes()" class="btn-black" style="background-color: #34A853; border: 1px solid #137333;">📥 Backup JSON</button>
@@ -235,6 +237,7 @@
                 </div>
             </div>
 
+            <!-- Ingresos y Distribución Directa -->
             <div id="ingresos" class="view">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
                     <h2 style="margin: 0;">Gestión de Ingresos</h2>
@@ -273,6 +276,7 @@
                 </div>
             </div>
 
+            <!-- Módulo de Ahorros Acumulados -->
             <div id="ahorros" class="view">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
                     <h2 style="margin: 0;">Cuentas de Ahorro</h2>
@@ -297,9 +301,11 @@
                 </div>
                 
                 <div id="contenedor-cuentas-ahorro" class="cards-grid">
-                    </div>
+                    <!-- Dinámico Cuentas -->
+                </div>
             </div>
 
+            <!-- Gastos con Paneles Dinámicos -->
             <div id="gastos" class="view">
                 <div class="cards-grid">
                     <div class="card" style="border-top: 4px solid var(--text-main);">
@@ -325,6 +331,7 @@
                 <div id="contenedor-dinamico-gastos" class="grid-3"></div>
             </div>
 
+            <!-- Estadísticas Anuales -->
             <div id="estadisticas" class="view">
                 <div class="card" style="border-top: 4px solid var(--text-main);">
                     <div class="card-header-toggle" onclick="toggleCard(this)">
@@ -338,6 +345,7 @@
         </main>
     </div>
 
+    <!-- Modales -->
     <div id="modal-gasto" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
@@ -372,6 +380,7 @@
                     <option value="Fijo">Fijo / Pago Único</option><option value="Tarjeta">Tarjeta de Crédito</option>
                 </select>
 
+                <!-- CHECK RECURRENCIA -->
                 <div id="box-recurrente" style="display: flex; align-items: center; gap: 10px; margin-top:5px;">
                     <input type="checkbox" id="gasto-recurrente" checked style="width: 16px; height: 16px; cursor: pointer;">
                     <label for="gasto-recurrente" style="font-size: 13px; cursor: pointer; color: var(--text-main);">Gasto Fijo Recurrente (copiar al próximo mes)</label>
@@ -448,7 +457,6 @@
         const db = getFirestore(app);
         const provider = new GoogleAuthProvider();
 
-        // Activar soporte Offline Nativo (Base de Datos)
         enableIndexedDbPersistence(db).catch((err) => {
             console.log("Error persistence: ", err.code);
         });
@@ -531,7 +539,6 @@
 
         function obtenerMesId() { return `${anioSelector.value}-${mesSelector.value}`; }
 
-        // --- BACKUP ---
         window.exportarBackupMes = async function() {
             mostrarCargando(true);
             try {
@@ -562,7 +569,7 @@
             
             renderizacioDinamicaGastosPaneles();
             renderTablaIngresos();
-            renderCuentasAhorro();
+            renderCuentasAhorro(); 
             
             calcularBalance();
             mostrarCargando(false);
@@ -682,9 +689,6 @@
             });
         }
 
-
-        // --- PANELES DINÁMICOS DE GASTOS ---
-
         window.crearNuevoTipoGastoPanel = function() {
             const nombre = prompt("Ingresa el nombre para el nuevo tipo de gasto (Nuevo Panel):");
             if (!nombre || nombre.trim() === "") return;
@@ -723,7 +727,7 @@
         };
 
         window.eliminarTipoGastoPanel = function(categoria) {
-            if (confirm(`¿Estás seguro de eliminar el panel '${categoria}'?`)) {
+            if (confirm(`¿Estás seguro de eliminar el panel '${categoria}'? No se borrarán los gastos asignados pero quedarán huérfanos.`)) {
                 delete tiposGastoAsociaciones[categoria];
                 guardarConfiguracionGlobalGlobal();
             }
@@ -753,6 +757,16 @@
 
         document.getElementById('btn-guardar-dolar').addEventListener('click', guardarConfiguracionGlobalGlobal);
 
+        window.toggleRecurrenciaGasto = async function(id, isChecked) {
+            let gasto = listaGastos.find(g => g.id === id);
+            if(gasto) {
+                gasto.recurrente = isChecked;
+                try {
+                    await updateDoc(doc(db, "finanzas", obtenerMesId(), "gastos", id), { recurrente: isChecked });
+                } catch(e) { console.error("Error al actualizar recurrencia:", e); }
+            }
+        };
+
         function renderizacioDinamicaGastosPaneles() {
             const contenedor = document.getElementById('contenedor-dinamico-gastos');
             contenedor.innerHTML = '';
@@ -770,7 +784,6 @@
                 if (g.propietario === 'Tercero') { subtotalTerceros += g.costoCalculado; return; }
                 totalGastosGlobal += g.costoCalculado;
 
-                // Deuda futura
                 if (g.tipo === 'Tarjeta') {
                     let cTot = g.cuotas_totales || 1;
                     let cPag = g.cuotas_pagadas || 1;
@@ -782,8 +795,34 @@
 
             for (let categoria in tiposGastoAsociaciones) {
                 let origenesDelPanel = tiposGastoAsociaciones[categoria] || [];
-                let itemsPanel = gastosProcesados.filter(g => (g.categoria || "Fijos") === categoria && (!buscador || g.nombre.toLowerCase().includes(buscador)));
+                
+                let matchesCatName = buscador && categoria.toLowerCase().includes(buscador);
+
+                let itemsPanel = gastosProcesados.filter(g => {
+                    if ((g.categoria || "Fijos") !== categoria) return false;
+                    if (!buscador) return true;
+                    if (matchesCatName) return true;
+                    return g.nombre.toLowerCase().includes(buscador);
+                });
+
+                if (buscador && !matchesCatName && itemsPanel.length === 0) continue;
+
                 let totalPanel = itemsPanel.reduce((sum, g) => sum + g.costoCalculado, 0);
+
+                let origenAsignadoId = origenesDelPanel.length > 0 ? origenesDelPanel[0] : "";
+                let origenDoc = listaIngresos.find(i => i.id === origenAsignadoId);
+                
+                let saldoTexto = "Sin origen vinculado";
+                let saldoClass = "saldo-ok";
+                if (origenDoc && origenesDelPanel.length === 1) {
+                    let consumido = sumatoriaGastosPorOrigen[origenAsignadoId] || 0;
+                    let restante = origenDoc.monto - consumido;
+                    saldoTexto = `Restante de ${origenDoc.nombre}: ${formatearDinero(restante)}`;
+                    saldoClass = restante < 0 ? "saldo-danger" : "saldo-ok";
+                } else if (origenesDelPanel.length > 1) {
+                    saldoTexto = "Múltiples orígenes vinculados";
+                    saldoClass = "saldo-ok";
+                }
 
                 contenedor.innerHTML += `
                     <div class="card" style="border-top: 4px solid var(--primary-color);">
@@ -807,16 +846,26 @@
                             </div>
                         </div>
 
-                        <table><thead><tr><th>Gasto</th><th>Costo Mes</th><th>⚙️</th></tr></thead>
+                        <table><thead><tr><th>Gasto</th><th>Costo Mes</th><th>Recurr.</th><th>⚙️</th></tr></thead>
                         <tbody>${itemsPanel.map(g => {
                             let originName = '';
                             if (origenesDelPanel.length > 1 && g.id_origen) {
                                 let io = listaIngresos.find(i=>i.id === g.id_origen);
                                 if(io) originName = `<br><span style="font-size:10px; color:var(--text-muted);">De: ${io.nombre}</span>`;
                             }
-                            return `<tr><td><strong>${g.nombre}</strong>${originName}</td><td style="font-weight:600;">${formatearDinero(g.costoCalculado)}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick='abrirModalEditarGasto(${JSON.stringify(g)})'>✏️</button><button class="btn-icon" onclick="borrarGasto('${g.id}')">🗑️</button></td></tr>`;
+                            let recCheckbox = g.tipo === 'Tarjeta' ? '<span style="color:#ccc; font-size:10px;">N/A</span>' : `<input type="checkbox" style="cursor:pointer;" onchange="window.toggleRecurrenciaGasto('${g.id}', this.checked)" ${g.recurrente !== false ? 'checked' : ''}>`;
+
+                            return `<tr>
+                                <td><strong>${g.nombre}</strong>${originName}</td>
+                                <td style="font-weight:600;">${formatearDinero(g.costoCalculado)}</td>
+                                <td style="text-align:center;">${recCheckbox}</td>
+                                <td style="white-space:nowrap;">
+                                    <button class="btn-icon" onclick='abrirModalEditarGasto(${JSON.stringify(g)})'>✏️</button>
+                                    <button class="btn-icon" onclick="borrarGasto('${g.id}')">🗑️</button>
+                                </td>
+                            </tr>`;
                         }).join('')}
-                        ${itemsPanel.length === 0 ? '<tr><td colspan="3" style="color:var(--text-muted); text-align:center;">No hay gastos</td></tr>' : ''}
+                        ${itemsPanel.length === 0 ? '<tr><td colspan="4" style="color:var(--text-muted); text-align:center;">No hay gastos</td></tr>' : ''}
                         </tbody></table>
                     </div>
                 `;
@@ -828,8 +877,6 @@
             document.getElementById('res-deuda-futura').innerText = formatearDinero(deudaFuturaTotal);
         }
 
-        // --- MANEJO DE MODAL GASTOS ---
-
         window.abrirModalNuevoGasto = function(categoriaPredefinida = '') {
             document.getElementById('form-gasto').reset();
             document.getElementById('gasto-id').value = "";
@@ -838,7 +885,7 @@
             toggleCamposTarjeta('gasto');
             document.getElementById('gasto-compartir').checked = false;
             toggleDivisor('gasto');
-            document.getElementById('gasto-recurrente').checked = true; // Por defecto
+            document.getElementById('gasto-recurrente').checked = true; 
             
             if (categoriaPredefinida && tiposGastoAsociaciones.hasOwnProperty(categoriaPredefinida)) {
                 document.getElementById('gasto-categoria-select').value = categoriaPredefinida;
@@ -858,8 +905,7 @@
             document.getElementById('gasto-monto').value = data.monto;
             document.getElementById('gasto-moneda').value = data.moneda;
             
-            // Recurrencia
-            document.getElementById('gasto-recurrente').checked = data.recurrente !== false; // if undefined it is true
+            document.getElementById('gasto-recurrente').checked = data.recurrente !== false; 
 
             const catSelect = document.getElementById('gasto-categoria-select');
             let catValue = data.categoria || "Fijos";
@@ -1003,8 +1049,6 @@
             if(isTercero) { document.getElementById(`${prefix}-compartir`).checked = false; toggleDivisor(prefix); }
         };
 
-        // --- GESTIÓN DE AHORROS Y DISTRIBUCIÓN ---
-
         window.crearCuentaAhorro = function() {
             let n = prompt("Nombre de la nueva Cuenta de Ahorro:");
             if(!n || n.trim() === "") return;
@@ -1124,7 +1168,7 @@
             const gNombre = nombre.trim();
             if (gruposDistribucion[gNombre]) return alert("Este grupo ya existe.");
             gruposDistribucion[gNombre] = [{ nombre: "Objetivo Inicial", porc: 100 }];
-            autoGuardarDistribucionEstructura();
+            autoGuardarDistribucionEstructura(true);
         };
 
         window.editarNombreGrupoDistribucion = async function(oldName) {
@@ -1152,7 +1196,7 @@
         window.eliminarGrupoDistribucion = function(grupoName) {
             if (confirm(`¿Estás seguro de borrar por completo el grupo '${grupoName}' y todos sus objetivos asignados?`)) {
                 delete gruposDistribucion[grupoName];
-                autoGuardarDistribucionEstructura();
+                autoGuardarDistribucionEstructura(true);
             }
         };
 
@@ -1160,12 +1204,13 @@
             if(!Array.isArray(gruposDistribucion[grupoName])) gruposDistribucion[grupoName] = [];
             gruposDistribucion[grupoName].push({ nombre: "Nuevo Objetivo", porc: 0, ahorro_id: "" });
             renderDistribucionDirecta();
+            dispararDebounceAutoguardado();
         };
 
         window.eliminarObjetivoLinea = function(grupoName, index) {
             if (confirm("¿Seguro que deseas eliminar este objetivo?")) {
                 gruposDistribucion[grupoName].splice(index, 1);
-                autoGuardarDistribucionEstructura();
+                autoGuardarDistribucionEstructura(true);
             }
         };
 
@@ -1213,14 +1258,15 @@
         function dispararDebounceAutoguardado() {
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
-                autoGuardarDistribucionEstructura();
+                autoGuardarDistribucionEstructura(false);
             }, 800);
         }
 
-        async function autoGuardarDistribucionEstructura() {
+        async function autoGuardarDistribucionEstructura(recargarUI = false) {
             try {
+                if(recargarUI) mostrarCargando(true);
                 await actualizarConfiguracionDB({"configuracion.grupos_distribucion": gruposDistribucion});
-                await actualizarDashboard();
+                if(recargarUI) await actualizarDashboard();
             } catch(e) { console.error("Error autoguardando:", e); }
         }
 
@@ -1558,7 +1604,6 @@
                         data.cuotas_pagadas++; 
                         await addDoc(collection(db, "finanzas", actual, "gastos"), data);
                     } else if (data.tipo === 'Fijo' && data.recurrente !== false) {
-                        // Se copia solo si está marcado como recurrente
                         await addDoc(collection(db, "finanzas", actual, "gastos"), data);
                     }
                 }
@@ -1568,7 +1613,6 @@
             } catch (e) { mostrarCargando(false); alert("Error al copiar datos."); }
         };
 
-        // PWA Setup
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('sw.js').then(reg => {
