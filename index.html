@@ -279,7 +279,7 @@
             <!-- Módulo de Ahorros Acumulados -->
             <div id="ahorros" class="view">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
-                    <h2 style="margin: 0;">Cuentas de Ahorro</h2>
+                    <h2 style="margin: 0;">Cuentas de Ahorro Histórico</h2>
                     <div style="display: flex; gap: 10px;">
                         <button onclick="crearCuentaAhorro()" class="btn-black">➕ Nueva Cuenta</button>
                     </div>
@@ -289,11 +289,11 @@
                     <div class="card" style="border-top: 4px solid #9c27b0;">
                         <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px;">
                             <div>
-                                <h3>Total Global Ahorrado</h3>
+                                <h3>Total Global Ahorrado (Histórico)</h3>
                                 <div class="value" id="sum-ahorros-total" style="display: flex; flex-direction: column; gap: 5px; font-size: 22px;">$0,0</div>
                             </div>
                             <div style="text-align: right;">
-                                <h3 style="color: #137333;">Total Depositado</h3>
+                                <h3 style="color: #137333;">Total Depositado (Mes Actual)</h3>
                                 <div class="value" id="sum-ahorros-depositado" style="color: #137333; font-size: 22px; display: flex; flex-direction: column; gap: 5px;">$0,0</div>
                             </div>
                         </div>
@@ -438,7 +438,6 @@
     </div>
 
     <script type="module">
-        // Importación PWA Offline Persistance Integrada
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, addDoc, deleteDoc, writeBatch, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -727,7 +726,7 @@
         };
 
         window.eliminarTipoGastoPanel = function(categoria) {
-            if (confirm(`¿Estás seguro de eliminar el panel '${categoria}'? No se borrarán los gastos asignados pero quedarán huérfanos.`)) {
+            if (confirm(`¿Estás seguro de eliminar el panel '${categoria}'?`)) {
                 delete tiposGastoAsociaciones[categoria];
                 guardarConfiguracionGlobalGlobal();
             }
@@ -795,18 +794,12 @@
 
             for (let categoria in tiposGastoAsociaciones) {
                 let origenesDelPanel = tiposGastoAsociaciones[categoria] || [];
-                
-                let matchesCatName = buscador && categoria.toLowerCase().includes(buscador);
-
                 let itemsPanel = gastosProcesados.filter(g => {
-                    if ((g.categoria || "Fijos") !== categoria) return false;
-                    if (!buscador) return true;
-                    if (matchesCatName) return true;
-                    return g.nombre.toLowerCase().includes(buscador);
+                    let catMatch = (g.categoria || "Fijos") === categoria;
+                    let textMatch = !buscador || g.nombre.toLowerCase().includes(buscador);
+                    return catMatch && textMatch;
                 });
-
-                if (buscador && !matchesCatName && itemsPanel.length === 0) continue;
-
+                
                 let totalPanel = itemsPanel.reduce((sum, g) => sum + g.costoCalculado, 0);
 
                 let origenAsignadoId = origenesDelPanel.length > 0 ? origenesDelPanel[0] : "";
@@ -846,27 +839,36 @@
                             </div>
                         </div>
 
-                        <table><thead><tr><th>Gasto</th><th>Costo Mes</th><th>Recurr.</th><th>⚙️</th></tr></thead>
-                        <tbody>${itemsPanel.map(g => {
-                            let originName = '';
-                            if (origenesDelPanel.length > 1 && g.id_origen) {
-                                let io = listaIngresos.find(i=>i.id === g.id_origen);
-                                if(io) originName = `<br><span style="font-size:10px; color:var(--text-muted);">De: ${io.nombre}</span>`;
-                            }
-                            let recCheckbox = g.tipo === 'Tarjeta' ? '<span style="color:#ccc; font-size:10px;">N/A</span>' : `<input type="checkbox" style="cursor:pointer;" onchange="window.toggleRecurrenciaGasto('${g.id}', this.checked)" ${g.recurrente !== false ? 'checked' : ''}>`;
+                        <div class="saldo-restante-container ${saldoClass}">${saldoTexto}</div>
 
-                            return `<tr>
-                                <td><strong>${g.nombre}</strong>${originName}</td>
-                                <td style="font-weight:600;">${formatearDinero(g.costoCalculado)}</td>
-                                <td style="text-align:center;">${recCheckbox}</td>
-                                <td style="white-space:nowrap;">
-                                    <button class="btn-icon" onclick='abrirModalEditarGasto(${JSON.stringify(g)})'>✏️</button>
-                                    <button class="btn-icon" onclick="borrarGasto('${g.id}')">🗑️</button>
-                                </td>
-                            </tr>`;
-                        }).join('')}
-                        ${itemsPanel.length === 0 ? '<tr><td colspan="4" style="color:var(--text-muted); text-align:center;">No hay gastos</td></tr>' : ''}
-                        </tbody></table>
+                        <table style="width:100%; margin-top:10px;">
+                            <thead>
+                                <tr><th>Gasto</th><th>Costo Mes</th><th>Recurr.</th><th>⚙️</th></tr>
+                            </thead>
+                            <tbody>
+                                ${itemsPanel.map(g => {
+                                    let originName = '';
+                                    if (origenesDelPanel.length > 1 && g.id_origen) {
+                                        let io = listaIngresos.find(i=>i.id === g.id_origen);
+                                        if(io) originName = `<br><span style="font-size:10px; color:var(--text-muted);">De: ${io.nombre}</span>`;
+                                    }
+                                    let recCheckbox = g.tipo === 'Tarjeta' ? '<span style="color:#ccc; font-size:10px;">N/A</span>' : `<input type="checkbox" style="cursor:pointer;" onchange="window.toggleRecurrenciaGasto('${g.id}', this.checked)" ${g.recurrente !== false ? 'checked' : ''}>`;
+
+                                    return `
+                                        <tr>
+                                            <td><strong>${g.nombre}</strong>${originName}</td>
+                                            <td style="font-weight:600;">${formatearDinero(g.costoCalculado)}</td>
+                                            <td style="text-align:center;">${recCheckbox}</td>
+                                            <td style="white-space:nowrap;">
+                                                <button class="btn-icon" onclick='abrirModalEditarGasto(${JSON.stringify(g)})'>✏️</button>
+                                                <button class="btn-icon" onclick="borrarGasto('${g.id}')">🗑️</button>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                                ${itemsPanel.length === 0 ? '<tr><td colspan="4" style="color:var(--text-muted); text-align:center;">No hay gastos</td></tr>' : ''}
+                            </tbody>
+                        </table>
                     </div>
                 `;
             }
@@ -1049,20 +1051,23 @@
             if(isTercero) { document.getElementById(`${prefix}-compartir`).checked = false; toggleDivisor(prefix); }
         };
 
+        // --- GESTIÓN DE AHORROS Y DISTRIBUCIÓN ---
+
         window.crearCuentaAhorro = function() {
-            let n = prompt("Nombre de la nueva Cuenta de Ahorro:");
+            let n = prompt("Nombre de la nueva Cuenta de Ahorro (Histórico):");
             if(!n || n.trim() === "") return;
-            cuentasAhorro.push({ id: 'ah_' + Date.now(), nombre: n.trim(), depositado: false });
+            cuentasAhorro.push({ id: 'ah_' + Date.now(), nombre: n.trim(), depositado: false, saldo_anterior: 0, retiros: 0 });
             guardarConfiguracionAhorros();
         }
 
         window.borrarCuentaAhorro = function(id) {
-            if(!confirm("¿Seguro que quieres eliminar esta cuenta de ahorro? Los porcentajes asignados a ella quedarán libres.")) return;
+            if(!confirm("¿Seguro que quieres eliminar esta cuenta de ahorro? Los porcentajes asignados a ella quedarán libres y su saldo histórico se perderá.")) return;
             cuentasAhorro = cuentasAhorro.filter(c => c.id !== id);
             
             for(let g in gruposDistribucion) {
-                gruposDistribucion[g].forEach(item => {
-                    if (item.ahorro_id === id) item.ahorro_id = "";
+                let arrItems = Array.isArray(gruposDistribucion[g]) ? gruposDistribucion[g] : [];
+                arrItems.forEach(item => {
+                    if (item && item.ahorro_id === id) item.ahorro_id = "";
                 });
             }
             guardarConfiguracionAhorros();
@@ -1086,6 +1091,19 @@
             }
         }
 
+        window.rescatarAhorro = function(id) {
+            let acc = cuentasAhorro.find(c => c.id === id);
+            if(!acc) return;
+            let val = prompt(`¿Cuánto dinero quieres rescatar (retirar) de '${acc.nombre}'?\nUsa números negativos si quieres deshacer un rescate.`);
+            if(val !== null && val.trim() !== "") {
+                let monto = parseFloat(val);
+                if(!isNaN(monto)) {
+                    acc.retiros = (acc.retiros || 0) + monto;
+                    guardarConfiguracionAhorros();
+                }
+            }
+        }
+
         async function guardarConfiguracionAhorros() {
             mostrarCargando(true);
             await actualizarConfiguracionDB({
@@ -1099,18 +1117,18 @@
             const cont = document.getElementById('contenedor-cuentas-ahorro');
             cont.innerHTML = '';
             
-            let totalAhorrosMes = 0;
+            let totalAhorrosHistorico = 0;
             let totalDepositadoMes = 0;
-            let ahorrosSuma = {};
-            cuentasAhorro.forEach(c => ahorrosSuma[c.id] = 0);
+            let ahorrosSumaMesActual = {};
+            cuentasAhorro.forEach(c => ahorrosSumaMesActual[c.id] = 0);
             const dMep = parseFloat(document.getElementById('usd-mep').value) || 0;
 
             for(let grupoName in gruposDistribucion) {
                 let totalGrupo = sumPorGrupo[grupoName] || 0;
                 let arrItems = Array.isArray(gruposDistribucion[grupoName]) ? gruposDistribucion[grupoName] : [];
                 arrItems.forEach(it => {
-                    if(it && it.ahorro_id && ahorrosSuma[it.ahorro_id] !== undefined) {
-                        ahorrosSuma[it.ahorro_id] += totalGrupo * (it.porc / 100);
+                    if(it && it.ahorro_id && ahorrosSumaMesActual[it.ahorro_id] !== undefined) {
+                        ahorrosSumaMesActual[it.ahorro_id] += totalGrupo * (it.porc / 100);
                     }
                 });
             }
@@ -1118,30 +1136,44 @@
             let htmlResumen = '';
 
             cuentasAhorro.forEach(c => {
-                let suma = ahorrosSuma[c.id] || 0;
-                totalAhorrosMes += suma;
-                if (c.depositado) totalDepositadoMes += suma;
+                let aporteMes = ahorrosSumaMesActual[c.id] || 0;
+                let saldoAnt = c.saldo_anterior || 0;
+                let retiros = c.retiros || 0;
+                let sumaTotal = saldoAnt + aporteMes - retiros;
 
-                if (suma > 0) {
-                    htmlResumen += `<div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;"><span>${c.nombre} ${c.depositado?'(Depositado)':''}</span> <strong style="color:#673ab7;">${formatearDinero(suma)}</strong></div>`;
+                totalAhorrosHistorico += sumaTotal;
+                if (c.depositado) totalDepositadoMes += aporteMes;
+
+                if (aporteMes > 0) {
+                    htmlResumen += `<div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;"><span>${c.nombre} ${c.depositado?'(Depositado)':''}</span> <strong style="color:#673ab7;">${formatearDinero(aporteMes)}</strong></div>`;
                 }
 
                 let bgStyle = c.depositado ? 'background-color: #e6f4ea; border: 2px solid #137333;' : 'border-top: 4px solid #673ab7; cursor: pointer;';
                 let checkIcon = c.depositado ? '✅ ' : '⏳ ';
                 let fontColor = c.depositado ? '#137333' : '#673ab7';
-                let usdText = dMep > 0 ? `<div style="font-size:14px; color:var(--text-muted); margin-top:5px;">U$D ${(suma / dMep).toFixed(2)}</div>` : '';
+                let usdText = dMep > 0 ? `<div style="font-size:14px; color:var(--text-muted); margin-top:5px;">U$D ${(sumaTotal / dMep).toFixed(2)}</div>` : '';
                 
+                let textSaldoAnt = saldoAnt > 0 ? `<div style="font-size:11px; color:var(--text-muted);">Saldo ant.: ${formatearDinero(saldoAnt)}</div>` : '';
+                let textAporte = `<div style="font-size:11px; color:var(--text-muted);">Aporte mes: ${formatearDinero(aporteMes)}</div>`;
+                let textRetiros = retiros !== 0 ? `<div style="font-size:11px; color:#d93025;">Retiros: -${formatearDinero(retiros)}</div>` : '';
+
                 cont.innerHTML += `
                     <div class="card tr-clickable" style="${bgStyle} display:flex; flex-direction:column; justify-content:space-between;" onclick="window.toggleDepositoCuenta('${c.id}')">
                         <div>
                             <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                                 <h3 style="font-size:15px; color:var(--text-main); font-weight:600; margin:0;">${checkIcon}${c.nombre}</h3>
                                 <div onclick="event.stopPropagation();">
+                                    <button class="btn-icon" onclick="window.rescatarAhorro('${c.id}')" style="font-size:12px;" title="Rescatar / Retirar dinero">💰</button>
                                     <button class="btn-icon" onclick="window.editarCuentaAhorro('${c.id}')" style="font-size:12px;">✏️</button>
                                     <button class="btn-icon" onclick="window.borrarCuentaAhorro('${c.id}')" style="font-size:12px;">🗑️</button>
                                 </div>
                             </div>
-                            <div class="value" style="color:${fontColor}; font-size:24px;">${formatearDinero(suma)}</div>
+                            <div style="margin-top: 10px; display:flex; flex-direction:column; gap:2px;">
+                                ${textSaldoAnt}
+                                ${textAporte}
+                                ${textRetiros}
+                            </div>
+                            <div class="value" style="color:${fontColor}; font-size:24px; margin-top:5px;">${formatearDinero(sumaTotal)}</div>
                             ${usdText}
                         </div>
                     </div>
@@ -1155,10 +1187,10 @@
             if(htmlResumen === '') htmlResumen = '<p style="color:var(--text-muted); font-size:13px;">No hay ahorros planificados este mes.</p>';
             document.getElementById('res-ahorros-list').innerHTML = htmlResumen;
 
-            let totalUsdText = dMep > 0 ? `<span style="font-size:16px; color:var(--text-muted);">U$D ${(totalAhorrosMes / dMep).toFixed(2)}</span>` : '';
+            let totalUsdText = dMep > 0 ? `<span style="font-size:16px; color:var(--text-muted);">U$D ${(totalAhorrosHistorico / dMep).toFixed(2)}</span>` : '';
             let depositadoUsdText = dMep > 0 ? `<span style="font-size:16px; color:var(--text-muted);">U$D ${(totalDepositadoMes / dMep).toFixed(2)}</span>` : '';
             
-            document.getElementById('sum-ahorros-total').innerHTML = `<span>${formatearDinero(totalAhorrosMes)}</span> ${totalUsdText}`;
+            document.getElementById('sum-ahorros-total').innerHTML = `<span>${formatearDinero(totalAhorrosHistorico)}</span> ${totalUsdText}`;
             document.getElementById('sum-ahorros-depositado').innerHTML = `<span>${formatearDinero(totalDepositadoMes)}</span> ${depositadoUsdText}`;
         }
 
@@ -1584,7 +1616,7 @@
         };
 
         window.copiarMesAnterior = async function() {
-            if(!confirm("¿Importar todos los datos del mes anterior? Puede duplicar registros si ya cargaste información.")) return;
+            if(!confirm("¿Importar todos los datos y saldo acumulado de ahorros del mes anterior?")) return;
             mostrarCargando(true);
             let m = parseInt(mesSelector.value)-1, a = parseInt(anioSelector.value);
             if(m===0){ m=12; a--; }
@@ -1593,26 +1625,93 @@
 
             try {
                 const prevDocSnap = await getDoc(doc(db, "finanzas", prev));
-                if(prevDocSnap.exists()) {
-                    await setDoc(doc(db, "finanzas", actual), prevDocSnap.data(), { merge: true });
-                }
+                let prevData = prevDocSnap.exists() ? prevDocSnap.data() : { configuracion: {} };
+                let prevConfig = prevData.configuracion || {};
+
+                let dDebito = prevConfig.dolar_debito || 0;
+                let dImpuesto = prevConfig.dolar_impuesto || 0;
+                let prevTipos = prevConfig.tipos_gasto || {};
+                let prevDist = prevConfig.grupos_distribucion || {};
+                let prevCuentas = prevConfig.cuentas_ahorro || [];
+
+                let sumatoriaGastosPrev = {};
                 const snapG = await getDocs(collection(db, "finanzas", prev, "gastos"));
-                for(const d of snapG.docs){
-                    let data = d.data();
-                    if(data.tipo==='Tarjeta'){ 
-                        if(data.cuotas_pagadas>=data.cuotas_totales) continue; 
-                        data.cuotas_pagadas++; 
-                        await addDoc(collection(db, "finanzas", actual, "gastos"), data);
-                    } else if (data.tipo === 'Fijo' && data.recurrente !== false) {
-                        await addDoc(collection(db, "finanzas", actual, "gastos"), data);
+                let prevGastosToCopy = [];
+                snapG.forEach(d => {
+                    let g = d.data();
+                    if(g.tipo==='Tarjeta'){ 
+                        if(g.cuotas_pagadas < g.cuotas_totales) {
+                            let gCopy = {...g};
+                            gCopy.cuotas_pagadas++; 
+                            prevGastosToCopy.push(gCopy);
+                        }
+                    } else if (g.tipo === 'Fijo' && g.recurrente !== false) {
+                        prevGastosToCopy.push({...g});
                     }
-                }
+
+                    if(g.propietario !== 'Tercero') {
+                        let costo = getCostoCalculado(g, dDebito, dImpuesto);
+                        let catAsociada = g.categoria || "Fijos";
+                        let origenesPanel = prevTipos[catAsociada] || [];
+                        let origenId = g.id_origen || (origenesPanel.length > 0 ? origenesPanel[0] : null);
+                        if (origenId) {
+                            sumatoriaGastosPrev[origenId] = (sumatoriaGastosPrev[origenId] || 0) + costo;
+                        }
+                    }
+                });
+
+                let sumPorGrupoPrev = {};
                 const snapI = await getDocs(collection(db, "finanzas", prev, "ingresos"));
-                for(const d of snapI.docs){ await addDoc(collection(db, "finanzas", actual, "ingresos"), d.data()); }
+                let prevIngresosToCopy = [];
+                snapI.forEach(d => {
+                    let ing = {id: d.id, ...d.data()};
+                    prevIngresosToCopy.push(d.data());
+                    if (ing.grupo) {
+                        let consumido = sumatoriaGastosPrev[ing.id] || 0;
+                        let restante = ing.monto - consumido;
+                        sumPorGrupoPrev[ing.grupo] = (sumPorGrupoPrev[ing.grupo] || 0) + restante;
+                    }
+                });
+
+                let ahorrosSumaPrev = {};
+                for(let gName in prevDist) {
+                    let totalGrupo = sumPorGrupoPrev[gName] || 0;
+                    let arrItems = Array.isArray(prevDist[gName]) ? prevDist[gName] : [];
+                    arrItems.forEach(it => {
+                        if (it && it.ahorro_id) {
+                            ahorrosSumaPrev[it.ahorro_id] = (ahorrosSumaPrev[it.ahorro_id] || 0) + (totalGrupo * (it.porc / 100));
+                        }
+                    });
+                }
+
+                let nuevasCuentas = prevCuentas.map(c => {
+                    let aportePrev = ahorrosSumaPrev[c.id] || 0;
+                    let saldoFinalPrev = (c.saldo_anterior || 0) + aportePrev - (c.retiros || 0);
+                    return {
+                        id: c.id,
+                        nombre: c.nombre,
+                        depositado: false,
+                        saldo_anterior: saldoFinalPrev,
+                        retiros: 0
+                    };
+                });
+
+                prevConfig.cuentas_ahorro = nuevasCuentas;
+
+                await setDoc(doc(db, "finanzas", actual), { configuracion: prevConfig }, { merge: true });
+
+                for(const g of prevGastosToCopy) { await addDoc(collection(db, "finanzas", actual, "gastos"), g); }
+                for(const ing of prevIngresosToCopy) { await addDoc(collection(db, "finanzas", actual, "ingresos"), ing); }
+
                 await actualizarDashboard();
-            } catch (e) { mostrarCargando(false); alert("Error al copiar datos."); }
+            } catch (e) { 
+                console.error(e);
+                mostrarCargando(false); 
+                alert("Error al copiar datos: " + e.message); 
+            }
         };
 
+        // PWA Setup
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('sw.js').then(reg => {
