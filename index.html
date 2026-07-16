@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Finanzas Priel</title>
     
-    <!-- Etiquetas PWA actualizadas -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffffff">
     <meta name="mobile-web-app-capable" content="yes">
@@ -177,7 +176,6 @@
                 </div>
             </div>
 
-            <!-- Resumen -->
             <div id="resumen" class="view active">
                 <div style="display: flex; justify-content: flex-end; gap:10px; margin-bottom: 15px; flex-wrap:wrap;">
                     <button onclick="exportarBackupMes()" class="btn-black" style="background-color: #34A853; border: 1px solid #137333;">📥 Backup JSON</button>
@@ -237,7 +235,6 @@
                 </div>
             </div>
 
-            <!-- Ingresos y Distribución Directa -->
             <div id="ingresos" class="view">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
                     <h2 style="margin: 0;">Gestión de Ingresos</h2>
@@ -276,7 +273,6 @@
                 </div>
             </div>
 
-            <!-- Módulo de Ahorros Acumulados -->
             <div id="ahorros" class="view">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
                     <h2 style="margin: 0;">Cuentas de Ahorro Histórico</h2>
@@ -301,11 +297,9 @@
                 </div>
                 
                 <div id="contenedor-cuentas-ahorro" class="cards-grid">
-                    <!-- Dinámico Cuentas -->
-                </div>
+                    </div>
             </div>
 
-            <!-- Gastos con Paneles Dinámicos -->
             <div id="gastos" class="view">
                 <div class="cards-grid">
                     <div class="card" style="border-top: 4px solid var(--text-main);">
@@ -331,7 +325,6 @@
                 <div id="contenedor-dinamico-gastos" class="grid-3"></div>
             </div>
 
-            <!-- Estadísticas Anuales -->
             <div id="estadisticas" class="view">
                 <div class="card" style="border-top: 4px solid var(--text-main);">
                     <div class="card-header-toggle" onclick="toggleCard(this)">
@@ -345,7 +338,6 @@
         </main>
     </div>
 
-    <!-- Modales -->
     <div id="modal-gasto" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
@@ -380,7 +372,6 @@
                     <option value="Fijo">Fijo / Pago Único</option><option value="Tarjeta">Tarjeta de Crédito</option>
                 </select>
 
-                <!-- CHECK RECURRENCIA -->
                 <div id="box-recurrente" style="display: flex; align-items: center; gap: 10px; margin-top:5px;">
                     <input type="checkbox" id="gasto-recurrente" checked style="width: 16px; height: 16px; cursor: pointer;">
                     <label for="gasto-recurrente" style="font-size: 13px; cursor: pointer; color: var(--text-main);">Gasto Fijo Recurrente (copiar al próximo mes)</label>
@@ -438,6 +429,7 @@
     </div>
 
     <script type="module">
+        // Importación PWA Offline Persistance Integrada
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, addDoc, deleteDoc, writeBatch, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -726,7 +718,7 @@
         };
 
         window.eliminarTipoGastoPanel = function(categoria) {
-            if (confirm(`¿Estás seguro de eliminar el panel '${categoria}'? No se borrarán los gastos asignados pero quedarán huérfanos.`)) {
+            if (confirm(`¿Estás seguro de eliminar el panel '${categoria}'?`)) {
                 delete tiposGastoAsociaciones[categoria];
                 guardarConfiguracionGlobalGlobal();
             }
@@ -854,11 +846,18 @@
                                     }
                                     let recCheckbox = g.tipo === 'Tarjeta' ? '<span style="color:#ccc; font-size:10px;">N/A</span>' : `<input type="checkbox" style="cursor:pointer;" onchange="window.toggleRecurrenciaGasto('${g.id}', this.checked)" ${g.recurrente !== false ? 'checked' : ''}>`;
 
-                                    let bgRowStyle = (g.tipo === 'Tarjeta' && g.cuotas_pagadas >= g.cuotas_totales) ? 'background-color: #e6f4ea;' : '';
+                                    let cuotasDetalle = '';
+                                    let bgRowStyle = '';
+                                    if (g.tipo === 'Tarjeta') {
+                                        cuotasDetalle = `<br><span style="font-size:11px; color:#174ea6;">${g.tarjeta || 'Tarjeta'} (${g.cuotas_pagadas}/${g.cuotas_totales})</span>`;
+                                        if (parseInt(g.cuotas_pagadas) >= parseInt(g.cuotas_totales)) {
+                                            bgRowStyle = 'background-color: #e6f4ea;';
+                                        }
+                                    }
 
                                     return `
                                         <tr style="${bgRowStyle}">
-                                            <td><strong>${g.nombre}</strong>${originName}</td>
+                                            <td><strong>${g.nombre}</strong>${cuotasDetalle}${originName}</td>
                                             <td style="font-weight:600;">${formatearDinero(g.costoCalculado)}</td>
                                             <td style="text-align:center;">${recCheckbox}</td>
                                             <td style="white-space:nowrap;">
@@ -1052,8 +1051,6 @@
             document.getElementById('box-compartir').style.display = isTercero ? 'none' : 'flex';
             if(isTercero) { document.getElementById(`${prefix}-compartir`).checked = false; toggleDivisor(prefix); }
         };
-
-        // --- GESTIÓN DE AHORROS Y DISTRIBUCIÓN ---
 
         window.crearCuentaAhorro = function() {
             let n = prompt("Nombre de la nueva Cuenta de Ahorro (Histórico):");
