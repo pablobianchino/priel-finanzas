@@ -434,7 +434,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, addDoc, deleteDoc, writeBatch, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, addDoc, deleteDoc, writeBatch, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyC8S5y_TJJFiL6Sqqwp6f2uidh4OiHDbnM",
@@ -447,19 +447,20 @@
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        const db = getFirestore(app);
-        const provider = new GoogleAuthProvider();
-
-        enableIndexedDbPersistence(db).catch((err) => {
-            console.log("Error persistence: ", err.code);
+        
+        // Configuración Offline (Nueva versión API Firestore)
+        const db = initializeFirestore(app, {
+            localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
         });
+        
+        const provider = new GoogleAuthProvider();
 
         const mesSelector = document.getElementById('mes-selector');
         const anioSelector = document.getElementById('anio-selector');
         const colorPalette = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#9C27B0', '#00BCD4', '#FF9800', '#795548', '#8BC34A', '#E91E63', '#3F51B5'];
 
         let totalGastosGlobal = 0, subtotalTerceros = 0, totalIngresosGlobal = 0;
-        let listaGastos = [], listaIngresos = [];
+        let listaGastos = [], listaIngresos = [], listaAhorros = [];
         let chartResumen = null, chartIngresos = null, chartEstadisticas = null;
         
         let gruposDistribucion = {};
@@ -565,84 +566,105 @@
         async function actualizarDashboard() {
             if (!auth.currentUser) return;
             mostrarCargando(true);
-            await cargarConfiguracion();
             
-            const pGastos = cargarGastosFetch();
-            const pIngresos = cargarIngresosFetch();
-            const pAhorros = cargarAhorrosFetch();
-            
-            await Promise.all([pGastos, pIngresos, pAhorros]);
-            
-            calcularSaldosOrigenes();
-            
-            renderizacioDinamicaGastosPaneles();
-            renderTablaIngresos();
-            renderCuentasAhorro(); 
-            
-            calcularBalance();
-            mostrarCargando(false);
+            try {
+                await cargarConfiguracion();
+                
+                const pGastos = cargarGastosFetch();
+                const pIngresos = cargarIngresosFetch();
+                const pAhorros = cargarAhorrosFetch();
+                
+                await Promise.all([pGastos, pIngresos, pAhorros]);
+                
+                calcularSaldosOrigenes();
+                
+                renderizacioDinamicaGastosPaneles();
+                renderTablaIngresos();
+                renderCuentasAhorro(); 
+                
+                calcularBalance();
+            } catch(error) {
+                console.error("Error cargando dashboard:", error);
+            } finally {
+                mostrarCargando(false);
+            }
         }
 
         async function cargarGastosFetch() {
-            const querySnapshot = await getDocs(collection(db, "finanzas", obtenerMesId(), "gastos"));
-            listaGastos = [];
-            querySnapshot.forEach(d => listaGastos.push({ id: d.id, ...d.data() }));
+            try {
+                const querySnapshot = await getDocs(collection(db, "finanzas", obtenerMesId(), "gastos"));
+                listaGastos = [];
+                querySnapshot.forEach(d => listaGastos.push({ id: d.id, ...d.data() }));
+            } catch(e) { console.error("Error cargando gastos:", e); listaGastos = []; }
         }
 
         async function cargarIngresosFetch() {
-            const snap = await getDocs(collection(db, "finanzas", obtenerMesId(), "ingresos"));
-            listaIngresos = []; snap.forEach(d => listaIngresos.push({ id: d.id, ...d.data() }));
+            try {
+                const snap = await getDocs(collection(db, "finanzas", obtenerMesId(), "ingresos"));
+                listaIngresos = []; 
+                snap.forEach(d => listaIngresos.push({ id: d.id, ...d.data() }));
+            } catch(e) { console.error("Error cargando ingresos:", e); listaIngresos = []; }
         }
 
         async function cargarAhorrosFetch() {
-            const snap = await getDocs(collection(db, "finanzas", obtenerMesId(), "ahorros"));
-            listaAhorros = [];
-            snap.forEach(d => listaAhorros.push({ id: d.id, ...d.data() }));
+            try {
+                const snap = await getDocs(collection(db, "finanzas", obtenerMesId(), "ahorros"));
+                listaAhorros = [];
+                snap.forEach(d => listaAhorros.push({ id: d.id, ...d.data() }));
+            } catch(e) { console.error("Error cargando ahorros:", e); listaAhorros = []; }
         }
 
         async function cargarConfiguracion() {
-            const docSnap = await getDoc(doc(db, "finanzas", obtenerMesId()));
-            if (docSnap.exists() && docSnap.data().configuracion) {
-                const config = docSnap.data().configuracion;
-                document.getElementById('usd-mep').value = config.dolar_mep || 0;
-                document.getElementById('usd-debito').value = config.dolar_debito || 0;
-                document.getElementById('usd-impuesto').value = config.dolar_impuesto || 0;
+            try {
+                const docSnap = await getDoc(doc(db, "finanzas", obtenerMesId()));
+                if (docSnap.exists() && docSnap.data().configuracion) {
+                    const config = docSnap.data().configuracion;
+                    document.getElementById('usd-mep').value = config.dolar_mep || 0;
+                    document.getElementById('usd-debito').value = config.dolar_debito || 0;
+                    document.getElementById('usd-impuesto').value = config.dolar_impuesto || 0;
+                    
+                    gruposDistribucion = config.grupos_distribucion || {};
+                    for (let g in gruposDistribucion) {
+                        if (!Array.isArray(gruposDistribucion[g])) {
+                            gruposDistribucion[g] = Object.values(gruposDistribucion[g]);
+                        }
+                        gruposDistribucion[g] = gruposDistribucion[g].filter(it => it !== null);
+                    }
+
+                    let oldTipos = config.tipos_gasto || { "Fijos": [], "Tarjeta": [], "Terceros": [] };
+                    for(let k in oldTipos) {
+                        if (typeof oldTipos[k] === 'string') {
+                            oldTipos[k] = oldTipos[k] !== "" ? [oldTipos[k]] : [];
+                        } else if (!Array.isArray(oldTipos[k])) {
+                            oldTipos[k] = Object.values(oldTipos[k]);
+                        }
+                    }
+                    tiposGastoAsociaciones = oldTipos;
+                    cuentasAhorro = config.cuentas_ahorro || [];
+                    ordenPanelesGasto = config.orden_paneles_gasto || [];
+
+                } else {
+                    document.getElementById('usd-mep').value = 0;
+                    document.getElementById('usd-debito').value = 0;
+                    document.getElementById('usd-impuesto').value = 0;
+                    gruposDistribucion = {};
+                    tiposGastoAsociaciones = { "Fijos": [], "Tarjeta": [], "Terceros": [] };
+                    cuentasAhorro = [];
+                    ordenPanelesGasto = [];
+                }
                 
-                gruposDistribucion = config.grupos_distribucion || {};
-                for (let g in gruposDistribucion) {
-                    if (!Array.isArray(gruposDistribucion[g])) {
-                        gruposDistribucion[g] = Object.values(gruposDistribucion[g]);
-                    }
-                    gruposDistribucion[g] = gruposDistribucion[g].filter(it => it !== null);
-                }
+                Object.keys(tiposGastoAsociaciones).forEach(cat => {
+                    if(!ordenPanelesGasto.includes(cat)) ordenPanelesGasto.push(cat);
+                });
 
-                let oldTipos = config.tipos_gasto || { "Fijos": [], "Tarjeta": [], "Terceros": [] };
-                for(let k in oldTipos) {
-                    if (typeof oldTipos[k] === 'string') {
-                        oldTipos[k] = oldTipos[k] !== "" ? [oldTipos[k]] : [];
-                    } else if (!Array.isArray(oldTipos[k])) {
-                        oldTipos[k] = Object.values(oldTipos[k]);
-                    }
-                }
-                tiposGastoAsociaciones = oldTipos;
-                cuentasAhorro = config.cuentas_ahorro || [];
-                ordenPanelesGasto = config.orden_paneles_gasto || [];
-
-            } else {
-                document.getElementById('usd-mep').value = 0;
-                document.getElementById('usd-debito').value = 0;
-                document.getElementById('usd-impuesto').value = 0;
+                actualizarSelectsConfig();
+            } catch(e) {
+                console.error("Error cargando configuración:", e);
                 gruposDistribucion = {};
                 tiposGastoAsociaciones = { "Fijos": [], "Tarjeta": [], "Terceros": [] };
                 cuentasAhorro = [];
                 ordenPanelesGasto = [];
             }
-            
-            Object.keys(tiposGastoAsociaciones).forEach(cat => {
-                if(!ordenPanelesGasto.includes(cat)) ordenPanelesGasto.push(cat);
-            });
-
-            actualizarSelectsConfig();
         }
 
         function actualizarSelectsConfig() {
@@ -695,6 +717,8 @@
             sumatoriaGastosPorOrigen = {};
             const dDebito = parseFloat(document.getElementById('usd-debito').value) || 0;
             const dImpuesto = parseFloat(document.getElementById('usd-impuesto').value) || 0;
+
+            if(!listaGastos) return;
 
             listaGastos.forEach(g => {
                 if (g.propietario === 'Tercero') return;
@@ -810,7 +834,10 @@
             const dImpuesto = parseFloat(document.getElementById('usd-impuesto').value) || 0;
             const buscador = document.getElementById('filtro-texto-gastos').value.toLowerCase();
 
-            let gastosProcesados = listaGastos.map(g => ({ ...g, costoCalculado: getCostoCalculado(g, dDebito, dImpuesto) }));
+            let gastosProcesados = [];
+            if(listaGastos) {
+                gastosProcesados = listaGastos.map(g => ({ ...g, costoCalculado: getCostoCalculado(g, dDebito, dImpuesto) }));
+            }
 
             gastosProcesados.forEach(g => {
                 if (g.propietario === 'Tercero') { subtotalTerceros += g.costoCalculado; return; }
@@ -843,7 +870,7 @@
                 let totalPanel = itemsPanel.reduce((sum, g) => sum + g.costoCalculado, 0);
 
                 let origenAsignadoId = origenesDelPanel.length > 0 ? origenesDelPanel[0] : "";
-                let origenDoc = listaIngresos.find(i => i.id === origenAsignadoId);
+                let origenDoc = listaIngresos ? listaIngresos.find(i => i.id === origenAsignadoId) : null;
                 
                 let saldoTexto = "Sin origen vinculado";
                 let saldoClass = "saldo-ok";
@@ -958,7 +985,6 @@
             document.getElementById('sum-gastos-terceros').innerText = formatearDinero(subtotalTerceros);
             document.getElementById('res-deuda-futura').innerText = formatearDinero(deudaFuturaTotal);
 
-            // Initialize SortableJS for Drag and Drop panels
             sortablePaneles = Sortable.create(contenedor, {
                 handle: '.drag-handle',
                 animation: 150,
@@ -1273,7 +1299,7 @@
             });
 
             if(cuentasAhorro.length === 0) {
-                cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro.</p>`;
+                cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro. Haz click en "Nueva Cuenta" para empezar.</p>`;
             }
 
             if(htmlResumen === '') htmlResumen = '<p style="color:var(--text-muted); font-size:13px;">No hay ahorros planificados este mes.</p>';
@@ -1306,11 +1332,13 @@
             delete gruposDistribucion[oldName];
             
             const batch = writeBatch(db);
-            listaIngresos.forEach(ing => {
-                if (ing.grupo === oldName) {
-                    batch.update(doc(db, "finanzas", obtenerMesId(), "ingresos", ing.id), { grupo: limpio });
-                }
-            });
+            if (listaIngresos) {
+                listaIngresos.forEach(ing => {
+                    if (ing.grupo === oldName) {
+                        batch.update(doc(db, "finanzas", obtenerMesId(), "ingresos", ing.id), { grupo: limpio });
+                    }
+                });
+            }
             await batch.commit();
             
             await actualizarConfiguracionDB({"configuracion.grupos_distribucion": gruposDistribucion});
@@ -1402,14 +1430,16 @@
             let totalDistribuibleGlobal = 0;
             sumPorGrupo = {};
             
-            listaIngresos.forEach(ing => {
-                if (ing.grupo) {
-                    let consumido = sumatoriaGastosPorOrigen[ing.id] || 0;
-                    let restante = ing.monto - consumido;
-                    sumPorGrupo[ing.grupo] = (sumPorGrupo[ing.grupo] || 0) + restante;
-                    totalDistribuibleGlobal += restante;
-                }
-            });
+            if(listaIngresos) {
+                listaIngresos.forEach(ing => {
+                    if (ing.grupo) {
+                        let consumido = sumatoriaGastosPorOrigen[ing.id] || 0;
+                        let restante = ing.monto - consumido;
+                        sumPorGrupo[ing.grupo] = (sumPorGrupo[ing.grupo] || 0) + restante;
+                        totalDistribuibleGlobal += restante;
+                    }
+                });
+            }
 
             let resHtml = '';
             if(Object.keys(gruposDistribucion).length === 0) {
@@ -1514,38 +1544,40 @@
 
             const filter = document.getElementById('filtro-texto-ingresos').value.toLowerCase();
 
-            listaIngresos.forEach((data, index) => {
-                if (filter && !data.nombre.toLowerCase().includes(filter)) return;
-                
-                let assignedColor = colorPalette[index % colorPalette.length];
-                totalIngresosGlobal += data.monto;
-                
-                let consumido = sumatoriaGastosPorOrigen[data.id] || 0;
-                let disponibleReal = data.monto - consumido;
-                totalDisponibleGlobalIngresos += disponibleReal;
+            if(listaIngresos) {
+                listaIngresos.forEach((data, index) => {
+                    if (filter && !data.nombre.toLowerCase().includes(filter)) return;
+                    
+                    let assignedColor = colorPalette[index % colorPalette.length];
+                    totalIngresosGlobal += data.monto;
+                    
+                    let consumido = sumatoriaGastosPorOrigen[data.id] || 0;
+                    let disponibleReal = data.monto - consumido;
+                    totalDisponibleGlobalIngresos += disponibleReal;
 
-                chartLabels.push(data.nombre); 
-                chartData.push(data.monto); 
-                chartColors.push(assignedColor);
+                    chartLabels.push(data.nombre); 
+                    chartData.push(data.monto); 
+                    chartColors.push(assignedColor);
 
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${assignedColor};"></span>
-                            ${data.nombre}
-                        </div>
-                    </td>
-                    <td><span style="background:#e8eaed; padding:2px 6px; border-radius:4px; font-size:11px;">${data.grupo || 'Ninguno'}</span></td>
-                    <td style="color:var(--text-muted);">${formatearDinero(data.monto)}</td>
-                    <td style="font-weight:600; color:${disponibleReal < 0 ? '#d93025' : '#137333'}">${formatearDinero(disponibleReal)}</td>
-                    <td style="white-space: nowrap;">
-                        <button class="btn-icon" onclick='abrirModalEditarIngreso(${JSON.stringify(data)})'>✏️</button>
-                        <button class="btn-icon" onclick="borrarIngreso('${data.id}')">🗑️</button>
-                    </td>
-                `;
-                tabla.appendChild(tr);
-            });
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${assignedColor};"></span>
+                                ${data.nombre}
+                            </div>
+                        </td>
+                        <td><span style="background:#e8eaed; padding:2px 6px; border-radius:4px; font-size:11px;">${data.grupo || 'Ninguno'}</span></td>
+                        <td style="color:var(--text-muted);">${formatearDinero(data.monto)}</td>
+                        <td style="font-weight:600; color:${disponibleReal < 0 ? '#d93025' : '#137333'}">${formatearDinero(disponibleReal)}</td>
+                        <td style="white-space: nowrap;">
+                            <button class="btn-icon" onclick='abrirModalEditarIngreso(${JSON.stringify(data)})'>✏️</button>
+                            <button class="btn-icon" onclick="borrarIngreso('${data.id}')">🗑️</button>
+                        </td>
+                    `;
+                    tabla.appendChild(tr);
+                });
+            }
 
             document.getElementById('sum-ingresos-mes').innerText = formatearDinero(totalIngresosGlobal);
             document.getElementById('sum-ingresos-disponible').innerText = `${formatearDinero(totalDisponibleGlobalIngresos)} Disp.`;
