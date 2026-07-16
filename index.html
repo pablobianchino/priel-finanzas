@@ -13,6 +13,8 @@
     <link rel="apple-touch-icon" href="icon-192.png">
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    
     <style>
         :root {
             --bg-color: #f8f9fa;
@@ -321,8 +323,9 @@
                     </div>
                 </div>
 
-                <div class="filter-bar"><input type="text" id="filtro-texto-gastos" placeholder="Buscar gasto por nombre..." style="flex: 1;"></div>
-                <div id="contenedor-dinamico-gastos" class="grid-3"></div>
+                <div class="filter-bar"><input type="text" id="filtro-texto-gastos" placeholder="Buscar gasto por panel o nombre de ítem..." style="flex: 1;"></div>
+                
+                <div id="contenedor-dinamico-gastos" style="display: flex; flex-direction: column; gap: 15px;"></div>
             </div>
 
             <div id="estadisticas" class="view">
@@ -429,7 +432,6 @@
     </div>
 
     <script type="module">
-        // Importación PWA Offline Persistance Integrada
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, addDoc, deleteDoc, writeBatch, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -462,10 +464,12 @@
         
         let gruposDistribucion = {};
         let tiposGastoAsociaciones = {}; 
+        let ordenPanelesGasto = [];
         let cuentasAhorro = []; 
         let sumPorGrupo = {};
         let sumatoriaGastosPorOrigen = {};
         let debounceTimer;
+        let sortablePaneles = null;
 
         window.formatearDinero = function(num) {
             if (isNaN(num) || num === null) num = 0;
@@ -481,6 +485,18 @@
         window.toggleCard = function(headerEl) {
             const content = headerEl.nextElementSibling;
             const icon = headerEl.querySelector('.toggle-icon');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                if(icon) icon.innerText = '▼';
+            } else {
+                content.style.display = 'none';
+                if(icon) icon.innerText = '▶';
+            }
+        };
+
+        window.togglePanelGasto = function(toggleEl) {
+            const content = toggleEl.parentElement.nextElementSibling;
+            const icon = toggleEl.querySelector('.toggle-icon');
             if (content.style.display === 'none') {
                 content.style.display = 'block';
                 if(icon) icon.innerText = '▼';
@@ -553,8 +569,9 @@
             
             const pGastos = cargarGastosFetch();
             const pIngresos = cargarIngresosFetch();
+            const pAhorros = cargarAhorrosFetch();
             
-            await Promise.all([pGastos, pIngresos]);
+            await Promise.all([pGastos, pIngresos, pAhorros]);
             
             calcularSaldosOrigenes();
             
@@ -575,6 +592,12 @@
         async function cargarIngresosFetch() {
             const snap = await getDocs(collection(db, "finanzas", obtenerMesId(), "ingresos"));
             listaIngresos = []; snap.forEach(d => listaIngresos.push({ id: d.id, ...d.data() }));
+        }
+
+        async function cargarAhorrosFetch() {
+            const snap = await getDocs(collection(db, "finanzas", obtenerMesId(), "ahorros"));
+            listaAhorros = [];
+            snap.forEach(d => listaAhorros.push({ id: d.id, ...d.data() }));
         }
 
         async function cargarConfiguracion() {
@@ -603,6 +626,7 @@
                 }
                 tiposGastoAsociaciones = oldTipos;
                 cuentasAhorro = config.cuentas_ahorro || [];
+                ordenPanelesGasto = config.orden_paneles_gasto || [];
 
             } else {
                 document.getElementById('usd-mep').value = 0;
@@ -611,7 +635,13 @@
                 gruposDistribucion = {};
                 tiposGastoAsociaciones = { "Fijos": [], "Tarjeta": [], "Terceros": [] };
                 cuentasAhorro = [];
+                ordenPanelesGasto = [];
             }
+            
+            Object.keys(tiposGastoAsociaciones).forEach(cat => {
+                if(!ordenPanelesGasto.includes(cat)) ordenPanelesGasto.push(cat);
+            });
+
             actualizarSelectsConfig();
         }
 
@@ -638,7 +668,8 @@
                         dolar_impuesto: parseFloat(document.getElementById('usd-impuesto').value) || 0,
                         grupos_distribucion: gruposDistribucion,
                         tipos_gasto: tiposGastoAsociaciones,
-                        cuentas_ahorro: cuentasAhorro
+                        cuentas_ahorro: cuentasAhorro,
+                        orden_paneles_gasto: ordenPanelesGasto
                     }
                 };
                 await setDoc(docRef, fullConfig);
@@ -687,6 +718,7 @@
             if (tiposGastoAsociaciones[limpio] !== undefined) return alert("Este tipo de panel ya existe.");
             
             tiposGastoAsociaciones[limpio] = [];
+            ordenPanelesGasto.push(limpio);
             guardarConfiguracionGlobalGlobal();
         };
 
@@ -701,7 +733,13 @@
             tiposGastoAsociaciones[limpio] = origenesVinculados;
             delete tiposGastoAsociaciones[oldCategoria];
             
-            await actualizarConfiguracionDB({"configuracion.tipos_gasto": tiposGastoAsociaciones});
+            let idx = ordenPanelesGasto.indexOf(oldCategoria);
+            if(idx > -1) ordenPanelesGasto[idx] = limpio;
+
+            await actualizarConfiguracionDB({
+                "configuracion.tipos_gasto": tiposGastoAsociaciones,
+                "configuracion.orden_paneles_gasto": ordenPanelesGasto
+            });
             
             const batch = writeBatch(db);
             let updatedCount = 0;
@@ -718,8 +756,9 @@
         };
 
         window.eliminarTipoGastoPanel = function(categoria) {
-            if (confirm(`¿Estás seguro de eliminar el panel '${categoria}'?`)) {
+            if (confirm(`¿Estás seguro de eliminar el panel '${categoria}'? No se borrarán los gastos asignados pero quedarán huérfanos.`)) {
                 delete tiposGastoAsociaciones[categoria];
+                ordenPanelesGasto = ordenPanelesGasto.filter(c => c !== categoria);
                 guardarConfiguracionGlobalGlobal();
             }
         };
@@ -741,7 +780,8 @@
                 "configuracion.dolar_mep": parseFloat(document.getElementById('usd-mep').value) || 0,
                 "configuracion.dolar_debito": parseFloat(document.getElementById('usd-debito').value) || 0,
                 "configuracion.dolar_impuesto": parseFloat(document.getElementById('usd-impuesto').value) || 0,
-                "configuracion.tipos_gasto": tiposGastoAsociaciones
+                "configuracion.tipos_gasto": tiposGastoAsociaciones,
+                "configuracion.orden_paneles_gasto": ordenPanelesGasto
             });
             await actualizarDashboard();
         }
@@ -761,6 +801,7 @@
         function renderizacioDinamicaGastosPaneles() {
             const contenedor = document.getElementById('contenedor-dinamico-gastos');
             contenedor.innerHTML = '';
+            if (sortablePaneles) sortablePaneles.destroy();
             
             totalGastosGlobal = 0; subtotalTerceros = 0;
             let deudaFuturaTotal = 0;
@@ -784,14 +825,21 @@
                 }
             });
 
+            let panelesData = [];
+
             for (let categoria in tiposGastoAsociaciones) {
                 let origenesDelPanel = tiposGastoAsociaciones[categoria] || [];
+                let matchesCatName = buscador && categoria.toLowerCase().includes(buscador);
+
                 let itemsPanel = gastosProcesados.filter(g => {
-                    let catMatch = (g.categoria || "Fijos") === categoria;
-                    let textMatch = !buscador || g.nombre.toLowerCase().includes(buscador);
-                    return catMatch && textMatch;
+                    if ((g.categoria || "Fijos") !== categoria) return false;
+                    if (!buscador) return true;
+                    if (matchesCatName) return true;
+                    return g.nombre.toLowerCase().includes(buscador);
                 });
-                
+
+                if (buscador && !matchesCatName && itemsPanel.length === 0) continue;
+
                 let totalPanel = itemsPanel.reduce((sum, g) => sum + g.costoCalculado, 0);
 
                 let origenAsignadoId = origenesDelPanel.length > 0 ? origenesDelPanel[0] : "";
@@ -809,75 +857,120 @@
                     saldoClass = "saldo-ok";
                 }
 
+                panelesData.push({
+                    categoria, totalPanel, itemsPanel, origenesDelPanel, saldoTexto, saldoClass
+                });
+            }
+
+            panelesData.sort((a, b) => {
+                let indexA = ordenPanelesGasto.indexOf(a.categoria);
+                let indexB = ordenPanelesGasto.indexOf(b.categoria);
+                if(indexA === -1) indexA = 999;
+                if(indexB === -1) indexB = 999;
+                return indexA - indexB;
+            });
+
+            panelesData.forEach(p => {
+                let itemsHTML = p.itemsPanel.map(g => {
+                    let originName = '';
+                    if (p.origenesDelPanel.length > 1 && g.id_origen) {
+                        let io = listaIngresos.find(i=>i.id === g.id_origen);
+                        if(io) originName = `<br><span style="font-size:10px; color:var(--text-muted);">De: ${io.nombre}</span>`;
+                    }
+                    let recCheckbox = g.tipo === 'Tarjeta' ? '<span style="color:#ccc; font-size:10px;">N/A</span>' : `<input type="checkbox" style="cursor:pointer;" onchange="window.toggleRecurrenciaGasto('${g.id}', this.checked)" ${g.recurrente !== false ? 'checked' : ''}>`;
+
+                    let cuotasDetalle = '';
+                    let bgRowStyle = '';
+                    if (g.tipo === 'Tarjeta') {
+                        cuotasDetalle = `<br><span style="font-size:11px; color:#174ea6;">${g.tarjeta || 'Tarjeta'} (${g.cuotas_pagadas}/${g.cuotas_totales})</span>`;
+                        if (parseInt(g.cuotas_pagadas) >= parseInt(g.cuotas_totales)) {
+                            bgRowStyle = 'background-color: #e6f4ea;';
+                        }
+                    }
+
+                    return `
+                        <tr style="${bgRowStyle}">
+                            <td><strong>${g.nombre}</strong>${cuotasDetalle}${originName}</td>
+                            <td style="font-weight:600;">${formatearDinero(g.costoCalculado)}</td>
+                            <td style="text-align:center;">${recCheckbox}</td>
+                            <td style="white-space:nowrap;">
+                                <button class="btn-icon" onclick='abrirModalEditarGasto(${JSON.stringify(g)})'>✏️</button>
+                                <button class="btn-icon" onclick="borrarGasto('${g.id}')">🗑️</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
                 contenedor.innerHTML += `
-                    <div class="card" style="border-top: 4px solid var(--primary-color);">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <h2 style="margin:0; font-size:15px;">${categoria} <span style="font-weight:normal;">| Total: <b>${formatearDinero(totalPanel)}</b></span></h2>
-                            <div style="display: flex; gap: 5px;">
-                                <button class="btn-icon" onclick="window.editarNombreTipoGastoPanel('${categoria}')" title="Editar Panel">✏️</button>
-                                <button class="btn-icon" onclick="window.eliminarTipoGastoPanel('${categoria}')" title="Eliminar Panel">🗑️</button>
+                    <div class="card panel-gasto-item" data-categoria="${p.categoria}" style="border-top: 4px solid var(--primary-color);">
+                        <div style="display:flex; align-items:center;">
+                            <span class="drag-handle" style="cursor:grab; margin-right:10px; font-size:20px; color:#ccc;">⠿</span>
+                            <div class="card-header-toggle" onclick="window.togglePanelGasto(this)" style="margin-bottom:0; flex:1; display:flex; justify-content:space-between; align-items:center;">
+                                <h2 style="margin:0; font-size:15px; flex:1;">
+                                    ${p.categoria} 
+                                    <span style="font-weight:normal; font-size:13px; color:var(--text-muted);">
+                                        | Total: <b style="color:var(--text-main);">${formatearDinero(p.totalPanel)}</b>
+                                    </span>
+                                </h2>
+                                <span class="toggle-icon">▶</span>
                             </div>
                         </div>
                         
-                        <div style="margin-top:10px; border-bottom:1px solid #eee; padding-bottom:10px;">
-                            <label style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:5px;">Ingresos que alimentan este panel:</label>
-                            <div style="display:flex; flex-wrap:wrap; gap:5px;">
-                                ${listaIngresos.map(ing => `
-                                    <label style="font-size:11px; background:#e8eaed; padding:3px 6px; border-radius:4px; cursor:pointer;">
-                                        <input type="checkbox" onchange="window.toggleOrigenPanel('${categoria}', '${ing.id}', this.checked)" ${origenesDelPanel.includes(ing.id)?'checked':''}>
-                                        ${ing.nombre}
-                                    </label>
-                                `).join('')}
+                        <div class="card-content" style="display:none; margin-top:15px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
+                                <button class="btn-black" style="padding: 4px 10px; font-size: 11px;" onclick="window.abrirModalNuevoGasto('${p.categoria}')">➕ Añadir Gasto Aquí</button>
+                                <div style="display: flex; gap: 5px;">
+                                    <button class="btn-icon" onclick="window.editarNombreTipoGastoPanel('${p.categoria}')" title="Editar Panel">✏️</button>
+                                    <button class="btn-icon" onclick="window.eliminarTipoGastoPanel('${p.categoria}')" title="Eliminar Panel">🗑️</button>
+                                </div>
                             </div>
+
+                            <div style="margin-top:10px; border-bottom:1px solid #eee; padding-bottom:10px;">
+                                <label style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:5px;">Ingresos que alimentan este panel:</label>
+                                <div style="display:flex; flex-wrap:wrap; gap:5px;">
+                                    ${listaIngresos.map(ing => `
+                                        <label style="font-size:11px; background:#e8eaed; padding:3px 6px; border-radius:4px; cursor:pointer;">
+                                            <input type="checkbox" onchange="window.toggleOrigenPanel('${p.categoria}', '${ing.id}', this.checked)" ${p.origenesDelPanel.includes(ing.id)?'checked':''}>
+                                            ${ing.nombre}
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            <div class="saldo-restante-container ${p.saldoClass}">${p.saldoTexto}</div>
+
+                            <table style="width:100%; margin-top:10px;">
+                                <thead>
+                                    <tr><th>Gasto</th><th>Costo Mes</th><th>Recurr.</th><th>⚙️</th></tr>
+                                </thead>
+                                <tbody>
+                                    ${itemsHTML}
+                                    ${p.itemsPanel.length === 0 ? '<tr><td colspan="4" style="color:var(--text-muted); text-align:center;">No hay gastos</td></tr>' : ''}
+                                </tbody>
+                            </table>
                         </div>
-
-                        <div class="saldo-restante-container ${saldoClass}">${saldoTexto}</div>
-
-                        <table style="width:100%; margin-top:10px;">
-                            <thead>
-                                <tr><th>Gasto</th><th>Costo Mes</th><th>Recurr.</th><th>⚙️</th></tr>
-                            </thead>
-                            <tbody>
-                                ${itemsPanel.map(g => {
-                                    let originName = '';
-                                    if (origenesDelPanel.length > 1 && g.id_origen) {
-                                        let io = listaIngresos.find(i=>i.id === g.id_origen);
-                                        if(io) originName = `<br><span style="font-size:10px; color:var(--text-muted);">De: ${io.nombre}</span>`;
-                                    }
-                                    let recCheckbox = g.tipo === 'Tarjeta' ? '<span style="color:#ccc; font-size:10px;">N/A</span>' : `<input type="checkbox" style="cursor:pointer;" onchange="window.toggleRecurrenciaGasto('${g.id}', this.checked)" ${g.recurrente !== false ? 'checked' : ''}>`;
-
-                                    let cuotasDetalle = '';
-                                    let bgRowStyle = '';
-                                    if (g.tipo === 'Tarjeta') {
-                                        cuotasDetalle = `<br><span style="font-size:11px; color:#174ea6;">${g.tarjeta || 'Tarjeta'} (${g.cuotas_pagadas}/${g.cuotas_totales})</span>`;
-                                        if (parseInt(g.cuotas_pagadas) >= parseInt(g.cuotas_totales)) {
-                                            bgRowStyle = 'background-color: #e6f4ea;';
-                                        }
-                                    }
-
-                                    return `
-                                        <tr style="${bgRowStyle}">
-                                            <td><strong>${g.nombre}</strong>${cuotasDetalle}${originName}</td>
-                                            <td style="font-weight:600;">${formatearDinero(g.costoCalculado)}</td>
-                                            <td style="text-align:center;">${recCheckbox}</td>
-                                            <td style="white-space:nowrap;">
-                                                <button class="btn-icon" onclick='abrirModalEditarGasto(${JSON.stringify(g)})'>✏️</button>
-                                                <button class="btn-icon" onclick="borrarGasto('${g.id}')">🗑️</button>
-                                            </td>
-                                        </tr>
-                                    `;
-                                }).join('')}
-                                ${itemsPanel.length === 0 ? '<tr><td colspan="4" style="color:var(--text-muted); text-align:center;">No hay gastos</td></tr>' : ''}
-                            </tbody>
-                        </table>
                     </div>
                 `;
-            }
+            });
 
             document.getElementById('res-gastos-fijos').innerText = formatearDinero(totalGastosGlobal);
             document.getElementById('sum-gastos-total').innerText = formatearDinero(totalGastosGlobal);
             document.getElementById('sum-gastos-terceros').innerText = formatearDinero(subtotalTerceros);
             document.getElementById('res-deuda-futura').innerText = formatearDinero(deudaFuturaTotal);
+
+            // Initialize SortableJS for Drag and Drop panels
+            sortablePaneles = Sortable.create(contenedor, {
+                handle: '.drag-handle',
+                animation: 150,
+                onEnd: function (evt) {
+                    const order = [];
+                    contenedor.querySelectorAll('.panel-gasto-item').forEach(el => {
+                        order.push(el.getAttribute('data-categoria'));
+                    });
+                    ordenPanelesGasto = order;
+                    guardarConfiguracionGlobalGlobal();
+                }
+            });
         }
 
         window.abrirModalNuevoGasto = function(categoriaPredefinida = '') {
@@ -1180,7 +1273,7 @@
             });
 
             if(cuentasAhorro.length === 0) {
-                cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro. Haz click en "Nueva Cuenta" para empezar.</p>`;
+                cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro.</p>`;
             }
 
             if(htmlResumen === '') htmlResumen = '<p style="color:var(--text-muted); font-size:13px;">No hay ahorros planificados este mes.</p>';
