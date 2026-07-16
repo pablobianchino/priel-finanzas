@@ -726,7 +726,7 @@
         };
 
         window.eliminarTipoGastoPanel = function(categoria) {
-            if (confirm(`¿Estás seguro de eliminar el panel '${categoria}'?`)) {
+            if (confirm(`¿Estás seguro de eliminar el panel '${categoria}'? No se borrarán los gastos asignados pero quedarán huérfanos.`)) {
                 delete tiposGastoAsociaciones[categoria];
                 guardarConfiguracionGlobalGlobal();
             }
@@ -854,8 +854,10 @@
                                     }
                                     let recCheckbox = g.tipo === 'Tarjeta' ? '<span style="color:#ccc; font-size:10px;">N/A</span>' : `<input type="checkbox" style="cursor:pointer;" onchange="window.toggleRecurrenciaGasto('${g.id}', this.checked)" ${g.recurrente !== false ? 'checked' : ''}>`;
 
+                                    let bgRowStyle = (g.tipo === 'Tarjeta' && g.cuotas_pagadas >= g.cuotas_totales) ? 'background-color: #e6f4ea;' : '';
+
                                     return `
-                                        <tr>
+                                        <tr style="${bgRowStyle}">
                                             <td><strong>${g.nombre}</strong>${originName}</td>
                                             <td style="font-weight:600;">${formatearDinero(g.costoCalculado)}</td>
                                             <td style="text-align:center;">${recCheckbox}</td>
