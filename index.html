@@ -342,7 +342,9 @@
                     </div>
                 </div>
 
-                <div class="filter-bar"><input type="text" id="filtro-texto-gastos" placeholder="Buscar gasto por panel o nombre de ítem..." style="flex: 1;"></div>
+                <div class="filter-bar">
+                    <input type="text" id="filtro-texto-gastos" placeholder="Buscar gasto por panel o nombre de ítem..." style="flex: 1;">
+                </div>
                 
                 <!-- Contenedor general Acordeon para Gastos -->
                 <div id="contenedor-dinamico-gastos" style="display: flex; flex-direction: column; gap: 15px;"></div>
@@ -538,6 +540,7 @@
             document.getElementById('view-title').innerText = element.innerText.replace(/[^\w\s]/gi, '').trim();
             if(window.innerWidth <= 768) toggleSidebar();
             if (viewId === 'estadisticas') await cargarEstadisticasAnuales();
+            if (viewId === 'ahorros') renderCuentasAhorro();
         };
 
         onAuthStateChanged(auth, (user) => {
@@ -661,6 +664,7 @@
                         } else if (!Array.isArray(oldTipos[k])) {
                             oldTipos[k] = Object.values(oldTipos[k]);
                         }
+                        oldTipos[k] = oldTipos[k].filter(id => id !== null && id !== undefined && id.trim() !== "");
                     }
                     tiposGastoAsociaciones = oldTipos;
                     cuentasAhorro = config.cuentas_ahorro || [];
@@ -753,7 +757,14 @@
                 let costoCalculado = getCostoCalculado(g, dDebito, dImpuesto);
                 let catAsociada = g.categoria || "Fijos";
                 let origenesPanel = tiposGastoAsociaciones[catAsociada] || [];
-                let origenId = g.id_origen || (origenesPanel.length > 0 ? origenesPanel[0] : null);
+                origenesPanel = origenesPanel.filter(id => id && id.trim() !== "");
+                
+                let origenId = null;
+                if (origenesPanel.length === 1) {
+                    origenId = origenesPanel[0]; 
+                } else if (origenesPanel.length > 1) {
+                    origenId = origenesPanel.includes(g.id_origen) ? g.id_origen : origenesPanel[0];
+                }
                 
                 if (origenId) {
                     sumatoriaGastosPorOrigen[origenId] = (sumatoriaGastosPorOrigen[origenId] || 0) + costoCalculado;
@@ -815,13 +826,21 @@
 
         window.toggleOrigenPanel = function(categoria, idOrigen, isChecked) {
             let origenes = tiposGastoAsociaciones[categoria] || [];
+            origenes = origenes.filter(id => id && id.trim() !== "");
+
             if (isChecked) {
                 if(!origenes.includes(idOrigen)) origenes.push(idOrigen);
             } else {
                 origenes = origenes.filter(id => id !== idOrigen);
             }
             tiposGastoAsociaciones[categoria] = origenes;
-            guardarConfiguracionGlobalGlobal();
+            
+            calcularSaldosOrigenes();
+            renderizacioDinamicaGastosPaneles();
+            renderTablaIngresos();
+            renderDistribucionDirecta();
+
+            guardarConfiguracionGlobalGlobal(false);
         }
 
         window.guardarConfiguracionDolar = async function(origenPanel) {
@@ -850,13 +869,13 @@
             await actualizarDashboard();
         }
 
-        async function guardarConfiguracionGlobalGlobal() {
-            mostrarCargando(true);
+        async function guardarConfiguracionGlobalGlobal(recargarCompleto = true) {
+            if(recargarCompleto) mostrarCargando(true);
             await actualizarConfiguracionDB({
                 "configuracion.tipos_gasto": tiposGastoAsociaciones,
                 "configuracion.orden_paneles_gasto": ordenPanelesGasto
             });
-            await actualizarDashboard();
+            if(recargarCompleto) await actualizarDashboard();
         }
 
         window.toggleRecurrenciaGasto = async function(id, isChecked) {
@@ -870,7 +889,6 @@
         };
 
         function renderizacioDinamicaGastosPaneles() {
-            // Memory state panels
             let panelesAbiertos = [];
             document.querySelectorAll('.panel-gasto-item').forEach(panel => {
                 const content = panel.querySelector('.card-content');
@@ -912,6 +930,7 @@
 
             for (let categoria in tiposGastoAsociaciones) {
                 let origenesDelPanel = tiposGastoAsociaciones[categoria] || [];
+                origenesDelPanel = origenesDelPanel.filter(id => id && id.trim() !== "");
                 let matchesCatName = buscador && categoria.toLowerCase().includes(buscador);
 
                 let itemsPanel = gastosProcesados.filter(g => {
@@ -960,10 +979,12 @@
 
                 let itemsHTML = p.itemsPanel.map(g => {
                     let originName = '';
-                    if (p.origenesDelPanel.length > 1 && g.id_origen) {
-                        let io = listaIngresos.find(i=>i.id === g.id_origen);
+                    if (p.origenesDelPanel.length > 1) {
+                        let effectiveOrigen = p.origenesDelPanel.includes(g.id_origen) ? g.id_origen : p.origenesDelPanel[0];
+                        let io = listaIngresos.find(i=>i.id === effectiveOrigen);
                         if(io) originName = `<br><span style="font-size:10px; color:var(--text-muted);">De: ${io.nombre}</span>`;
                     }
+                    
                     let recCheckbox = g.tipo === 'Tarjeta' ? '<span style="color:#ccc; font-size:10px;">N/A</span>' : `<input type="checkbox" style="cursor:pointer;" onchange="window.toggleRecurrenciaGasto('${g.id}', this.checked)" ${g.recurrente !== false ? 'checked' : ''}>`;
 
                     let cuotasDetalle = '';
@@ -971,11 +992,10 @@
                     if (g.tipo === 'Tarjeta') {
                         cuotasDetalle = `<br><span style="font-size:11px; color:#174ea6;">${g.tarjeta || 'Tarjeta'} (${g.cuotas_pagadas}/${g.cuotas_totales})</span>`;
                         if (parseInt(g.cuotas_pagadas) >= parseInt(g.cuotas_totales)) {
-                            bgRowStyle = 'background-color: #e6f4ea;'; // Verde claro para última cuota
+                            bgRowStyle = 'background-color: #e6f4ea;';
                         }
                     }
 
-                    // Boton Desglose USD
                     let usdBtn = '';
                     let breakdownHtml = '';
                     if (g.moneda === 'USD') {
@@ -1079,7 +1099,7 @@
                         order.push(el.getAttribute('data-categoria'));
                     });
                     ordenPanelesGasto = order;
-                    guardarConfiguracionGlobalGlobal();
+                    guardarConfiguracionGlobalGlobal(false); // don't reload UI just to save sort
                 }
             });
         }
@@ -1149,7 +1169,9 @@
 
         window.actualizarOrigenesGastoModal = function() {
             const cat = document.getElementById('gasto-categoria-select').value;
-            const origenesPanel = tiposGastoAsociaciones[cat] || [];
+            let origenesPanel = tiposGastoAsociaciones[cat] || [];
+            origenesPanel = origenesPanel.filter(id => id && id.trim() !== "");
+
             const boxOrigen = document.getElementById('box-gasto-origen');
             const selOrigen = document.getElementById('gasto-origen-select');
             
@@ -1178,7 +1200,9 @@
             const compTipo = document.getElementById('gasto-compartir-tipo').value;
             const isRecurrente = document.getElementById('gasto-recurrente').checked;
             
-            const origenesPanel = tiposGastoAsociaciones[cat] || [];
+            let origenesPanel = tiposGastoAsociaciones[cat] || [];
+            origenesPanel = origenesPanel.filter(id => id && id.trim() !== "");
+
             let id_origen = "";
             if(origenesPanel.length > 1) {
                 id_origen = document.getElementById('gasto-origen-select').value;
@@ -1255,6 +1279,8 @@
             document.getElementById('box-compartir').style.display = isTercero ? 'none' : 'flex';
             if(isTercero) { document.getElementById(`${prefix}-compartir`).checked = false; toggleDivisor(prefix); }
         };
+
+        // --- GESTIÓN DE AHORROS Y DISTRIBUCIÓN ---
 
         window.crearCuentaAhorro = function() {
             let n = prompt("Nombre de la nueva Cuenta de Ahorro (Histórico):");
