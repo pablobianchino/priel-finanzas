@@ -170,11 +170,11 @@
                     <select id="mes-selector">
                         <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option>
                         <option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option>
-                        <option value="07" selected>Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option>
+                        <option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option>
                         <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
                     </select>
                     <select id="anio-selector">
-                        <option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option>
+                        <option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
                     </select>
                 </div>
             </div>
@@ -342,9 +342,7 @@
                     </div>
                 </div>
 
-                <div class="filter-bar">
-                    <input type="text" id="filtro-texto-gastos" placeholder="Buscar gasto por panel o nombre de ítem..." style="flex: 1;">
-                </div>
+                <div class="filter-bar"><input type="text" id="filtro-texto-gastos" placeholder="Buscar gasto por panel o nombre de ítem..." style="flex: 1;"></div>
                 
                 <!-- Contenedor general Acordeon para Gastos -->
                 <div id="contenedor-dinamico-gastos" style="display: flex; flex-direction: column; gap: 15px;"></div>
@@ -482,6 +480,25 @@
         const anioSelector = document.getElementById('anio-selector');
         const colorPalette = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#9C27B0', '#00BCD4', '#FF9800', '#795548', '#8BC34A', '#E91E63', '#3F51B5'];
 
+        // --- NEW CODE START ---
+        // Seteo de fecha actual automatica al cargar scripts
+        const today = new Date();
+        const currentMonth = String(today.getMonth() + 1).padStart(2, '0');
+        const currentYear = String(today.getFullYear());
+        
+        mesSelector.value = currentMonth;
+        
+        let yearExists = Array.from(anioSelector.options).some(opt => opt.value === currentYear);
+        if (!yearExists) {
+            anioSelector.add(new Option(currentYear, currentYear));
+            // Opcional: ordenar los años de menor a mayor
+            const opts = Array.from(anioSelector.options).sort((a, b) => a.value - b.value);
+            anioSelector.innerHTML = '';
+            opts.forEach(opt => anioSelector.add(opt));
+        }
+        anioSelector.value = currentYear;
+        // --- NEW CODE END ---
+
         let totalGastosGlobal = 0, subtotalTerceros = 0, totalIngresosGlobal = 0;
         let listaGastos = [], listaIngresos = [], listaAhorros = [];
         let chartResumen = null, chartIngresos = null, chartEstadisticas = null;
@@ -540,7 +557,6 @@
             document.getElementById('view-title').innerText = element.innerText.replace(/[^\w\s]/gi, '').trim();
             if(window.innerWidth <= 768) toggleSidebar();
             if (viewId === 'estadisticas') await cargarEstadisticasAnuales();
-            if (viewId === 'ahorros') renderCuentasAhorro();
         };
 
         onAuthStateChanged(auth, (user) => {
@@ -566,11 +582,9 @@
             if (document.getElementById('estadisticas').classList.contains('active')) cargarEstadisticasAnuales();
         });
 
-        document.getElementById('filtro-texto-gastos').addEventListener('input', renderizacioDinamicaGastosPaneles);
-        document.getElementById('filtro-texto-ingresos').addEventListener('input', renderTablaIngresos);
-
         function obtenerMesId() { return `${anioSelector.value}-${mesSelector.value}`; }
 
+        // --- BACKUP ---
         window.exportarBackupMes = async function() {
             mostrarCargando(true);
             try {
@@ -593,6 +607,7 @@
             
             try {
                 await cargarConfiguracion();
+                
                 const pGastos = cargarGastosFetch();
                 const pIngresos = cargarIngresosFetch();
                 const pAhorros = cargarAhorrosFetch();
@@ -600,9 +615,11 @@
                 await Promise.all([pGastos, pIngresos, pAhorros]);
                 
                 calcularSaldosOrigenes();
+                
                 renderizacioDinamicaGastosPaneles();
                 renderTablaIngresos();
                 renderCuentasAhorro(); 
+                
                 calcularBalance();
             } catch(error) {
                 console.error("Error cargando dashboard:", error);
@@ -640,15 +657,14 @@
                 const docSnap = await getDoc(doc(db, "finanzas", obtenerMesId()));
                 if (docSnap.exists() && docSnap.data().configuracion) {
                     const config = docSnap.data().configuracion;
-                    
                     document.getElementById('usd-mep').value = config.dolar_mep || 0;
                     document.getElementById('usd-debito').value = config.dolar_debito || 0;
                     document.getElementById('usd-impuesto').value = config.dolar_impuesto || 0;
-
+                    
                     document.getElementById('usd-mep-gastos').value = config.dolar_mep || 0;
                     document.getElementById('usd-debito-gastos').value = config.dolar_debito || 0;
                     document.getElementById('usd-impuesto-gastos').value = config.dolar_impuesto || 0;
-                    
+
                     gruposDistribucion = config.grupos_distribucion || {};
                     for (let g in gruposDistribucion) {
                         if (!Array.isArray(gruposDistribucion[g])) {
@@ -664,7 +680,6 @@
                         } else if (!Array.isArray(oldTipos[k])) {
                             oldTipos[k] = Object.values(oldTipos[k]);
                         }
-                        oldTipos[k] = oldTipos[k].filter(id => id !== null && id !== undefined && id.trim() !== "");
                     }
                     tiposGastoAsociaciones = oldTipos;
                     cuentasAhorro = config.cuentas_ahorro || [];
@@ -757,14 +772,8 @@
                 let costoCalculado = getCostoCalculado(g, dDebito, dImpuesto);
                 let catAsociada = g.categoria || "Fijos";
                 let origenesPanel = tiposGastoAsociaciones[catAsociada] || [];
-                origenesPanel = origenesPanel.filter(id => id && id.trim() !== "");
                 
-                let origenId = null;
-                if (origenesPanel.length === 1) {
-                    origenId = origenesPanel[0]; 
-                } else if (origenesPanel.length > 1) {
-                    origenId = origenesPanel.includes(g.id_origen) ? g.id_origen : origenesPanel[0];
-                }
+                let origenId = g.id_origen || (origenesPanel.length > 0 ? origenesPanel[0] : null);
                 
                 if (origenId) {
                     sumatoriaGastosPorOrigen[origenId] = (sumatoriaGastosPorOrigen[origenId] || 0) + costoCalculado;
@@ -826,21 +835,13 @@
 
         window.toggleOrigenPanel = function(categoria, idOrigen, isChecked) {
             let origenes = tiposGastoAsociaciones[categoria] || [];
-            origenes = origenes.filter(id => id && id.trim() !== "");
-
             if (isChecked) {
                 if(!origenes.includes(idOrigen)) origenes.push(idOrigen);
             } else {
                 origenes = origenes.filter(id => id !== idOrigen);
             }
             tiposGastoAsociaciones[categoria] = origenes;
-            
-            calcularSaldosOrigenes();
-            renderizacioDinamicaGastosPaneles();
-            renderTablaIngresos();
-            renderDistribucionDirecta();
-
-            guardarConfiguracionGlobalGlobal(false);
+            guardarConfiguracionGlobalGlobal();
         }
 
         window.guardarConfiguracionDolar = async function(origenPanel) {
@@ -888,7 +889,24 @@
             }
         };
 
+        // NEW METHOD: Change Origin directly from the table row
+        window.cambiarOrigenGastoDirecto = async function(idGasto, idOrigen) {
+            let gasto = listaGastos.find(g => g.id === idGasto);
+            if(gasto) {
+                gasto.id_origen = idOrigen;
+                try {
+                    await updateDoc(doc(db, "finanzas", obtenerMesId(), "gastos", idGasto), { id_origen: idOrigen });
+                    // Recalculate silently
+                    calcularSaldosOrigenes();
+                    renderizacioDinamicaGastosPaneles();
+                    renderTablaIngresos();
+                    renderDistribucionDirecta();
+                } catch(e) { console.error("Error al actualizar origen del gasto:", e); }
+            }
+        };
+
         function renderizacioDinamicaGastosPaneles() {
+            // Memory state panels
             let panelesAbiertos = [];
             document.querySelectorAll('.panel-gasto-item').forEach(panel => {
                 const content = panel.querySelector('.card-content');
@@ -930,7 +948,6 @@
 
             for (let categoria in tiposGastoAsociaciones) {
                 let origenesDelPanel = tiposGastoAsociaciones[categoria] || [];
-                origenesDelPanel = origenesDelPanel.filter(id => id && id.trim() !== "");
                 let matchesCatName = buscador && categoria.toLowerCase().includes(buscador);
 
                 let itemsPanel = gastosProcesados.filter(g => {
@@ -978,11 +995,24 @@
                 let iconText = isOpen ? '▼' : '▶';
 
                 let itemsHTML = p.itemsPanel.map(g => {
-                    let originName = '';
+                    let originHtml = '';
                     if (p.origenesDelPanel.length > 1) {
-                        let effectiveOrigen = p.origenesDelPanel.includes(g.id_origen) ? g.id_origen : p.origenesDelPanel[0];
-                        let io = listaIngresos.find(i=>i.id === effectiveOrigen);
-                        if(io) originName = `<br><span style="font-size:10px; color:var(--text-muted);">De: ${io.nombre}</span>`;
+                        let options = p.origenesDelPanel.map(idInc => {
+                            let io = listaIngresos.find(i => i.id === idInc);
+                            let isSelected = (g.id_origen === idInc) ? 'selected' : '';
+                            return io ? `<option value="${io.id}" ${isSelected}>${io.nombre}</option>` : '';
+                        }).join('');
+                        
+                        originHtml = `
+                            <br>
+                            <select onchange="window.cambiarOrigenGastoDirecto('${g.id}', this.value)" style="font-size:10px; padding:2px; margin-top:4px; max-width: 140px; border-radius:4px; border:1px solid #ccc; background:#fff;">
+                                <option value="" ${!g.id_origen ? 'selected' : ''}>- Seleccionar Origen -</option>
+                                ${options}
+                            </select>
+                        `;
+                    } else if (p.origenesDelPanel.length === 1) {
+                        let io = listaIngresos.find(i=>i.id === p.origenesDelPanel[0]);
+                        if(io) originHtml = `<br><span style="font-size:10px; color:var(--text-muted);">De: ${io.nombre}</span>`;
                     }
                     
                     let recCheckbox = g.tipo === 'Tarjeta' ? '<span style="color:#ccc; font-size:10px;">N/A</span>' : `<input type="checkbox" style="cursor:pointer;" onchange="window.toggleRecurrenciaGasto('${g.id}', this.checked)" ${g.recurrente !== false ? 'checked' : ''}>`;
@@ -992,10 +1022,11 @@
                     if (g.tipo === 'Tarjeta') {
                         cuotasDetalle = `<br><span style="font-size:11px; color:#174ea6;">${g.tarjeta || 'Tarjeta'} (${g.cuotas_pagadas}/${g.cuotas_totales})</span>`;
                         if (parseInt(g.cuotas_pagadas) >= parseInt(g.cuotas_totales)) {
-                            bgRowStyle = 'background-color: #e6f4ea;';
+                            bgRowStyle = 'background-color: #e6f4ea;'; // Verde claro para última cuota
                         }
                     }
 
+                    // Boton Desglose USD
                     let usdBtn = '';
                     let breakdownHtml = '';
                     if (g.moneda === 'USD') {
@@ -1021,7 +1052,7 @@
 
                     return `
                         <tr style="${bgRowStyle}">
-                            <td><strong>${g.nombre}</strong>${cuotasDetalle}${originName}${usdBtn}</td>
+                            <td><strong>${g.nombre}</strong>${cuotasDetalle}${originHtml}${usdBtn}</td>
                             <td style="font-weight:600;">${formatearDinero(g.costoCalculado)}</td>
                             <td style="text-align:center;">${recCheckbox}</td>
                             <td style="white-space:nowrap;">
@@ -1099,7 +1130,7 @@
                         order.push(el.getAttribute('data-categoria'));
                     });
                     ordenPanelesGasto = order;
-                    guardarConfiguracionGlobalGlobal(false); // don't reload UI just to save sort
+                    guardarConfiguracionGlobalGlobal(false); 
                 }
             });
         }
@@ -1279,8 +1310,6 @@
             document.getElementById('box-compartir').style.display = isTercero ? 'none' : 'flex';
             if(isTercero) { document.getElementById(`${prefix}-compartir`).checked = false; toggleDivisor(prefix); }
         };
-
-        // --- GESTIÓN DE AHORROS Y DISTRIBUCIÓN ---
 
         window.crearCuentaAhorro = function() {
             let n = prompt("Nombre de la nueva Cuenta de Ahorro (Histórico):");
@@ -1944,7 +1973,6 @@
             }
         };
 
-        // PWA Setup
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('sw.js').then(reg => {
