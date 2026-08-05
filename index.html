@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Finanzas Priel</title>
     
+    <!-- Etiquetas PWA actualizadas -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffffff">
     <meta name="mobile-web-app-capable" content="yes">
@@ -661,14 +662,20 @@
         }
 
         window.recargarDatosVisuales = function() {
-            let gastosProc = procesarListaGastos();
+            const dDebito = parseFloat(document.getElementById('usd-debito').dataset.raw || 0);
+            const dImpuesto = parseFloat(document.getElementById('usd-impuesto').dataset.raw || 0);
+            
+            let gastosProc = procesarListaGastos(dDebito, dImpuesto);
             calcularSaldosOrigenes(gastosProc);
-            renderizacioDinamicaGastosPaneles(gastosProc);
+            
+            renderizacioDinamicaGastosPaneles(gastosProc, dDebito, dImpuesto);
             renderTablaIngresos();
             renderDistribucionDirecta(); 
             renderCuentasAhorro(); 
             calcularBalance();
         }
+
+        document.getElementById('filtro-texto-gastos').addEventListener('input', window.recargarDatosVisuales);
 
         async function cargarGastosFetch() {
             try {
@@ -798,25 +805,7 @@
             }
         }
 
-        function getCostoCalculado(g, dDebito, dImpuesto) {
-            let costoArsBase = g.monto;
-            if (g.moneda === 'USD') {
-                let vImp = g.monto * dImpuesto;
-                costoArsBase = (vImp * 0.02) + (vImp * 0.21) + (vImp * 0.30) + (g.monto * dDebito);
-            }
-            let divisor = g.divisor || 1;
-            if (g.propietario !== 'Tercero' && g.compartir_tipo === 'fijo') {
-                return g.monto_fijo || 0;
-            } else {
-                let cuotaBase = g.tipo === 'Tarjeta' ? (costoArsBase / (g.cuotas_totales || 1)) : costoArsBase;
-                return cuotaBase / divisor;
-            }
-        }
-
-        function procesarListaGastos() {
-            const dDebito = parseFloat(document.getElementById('usd-debito').dataset.raw || 0);
-            const dImpuesto = parseFloat(document.getElementById('usd-impuesto').dataset.raw || 0);
-            
+        function procesarListaGastos(dDebito, dImpuesto) {
             let arr = [];
             totalGastosGlobal = 0; subtotalTerceros = 0; deudaFuturaTotal = 0;
 
@@ -831,7 +820,7 @@
                 
                 let cuotaTotal = g.tipo === 'Tarjeta' ? (totalMesBase / (g.cuotas_totales || 1)) : totalMesBase;
 
-                if (g.compartir_con && g.compartir_tipo) {
+                if (g.compartir_con && g.compartir_tipo && g.propietario === 'Propio') {
                     let miParte = 0, suParte = 0;
                     if (g.compartir_tipo === 'divisor') {
                         miParte = cuotaTotal / (g.divisor || 2);
@@ -856,9 +845,7 @@
                         if (cTot > cPag) deudaFuturaTotal += (miParte * (cTot - cPag));
                     }
                     
-                    if (g.propietario !== 'Tercero') totalGastosGlobal += miParte;
-                    else subtotalTerceros += miParte;
-                    
+                    totalGastosGlobal += miParte;
                     subtotalTerceros += suParte; 
                 } else {
                     arr.push({ ...g, costoCalculado: cuotaTotal });
@@ -886,7 +873,7 @@
             if(!gastosProc) return;
 
             gastosProc.forEach(g => {
-                if (g.propietario === 'Tercero' && !g.es_clon_destino) return; 
+                if (g.propietario === 'Tercero') return; 
                 
                 let catAsociada = g.categoria || "Fijos";
                 let origenesPanel = tiposGastoAsociaciones[catAsociada] || [];
@@ -1022,7 +1009,7 @@
             }
         };
 
-        function renderizacioDinamicaGastosPaneles(gastosProcesados) {
+        function renderizacioDinamicaGastosPaneles(gastosProcesados, dDebito, dImpuesto) {
             let panelesAbiertos = [];
             document.querySelectorAll('.panel-gasto-item').forEach(panel => {
                 const content = panel.querySelector('.card-content');
@@ -1035,8 +1022,6 @@
             contenedor.innerHTML = '';
             if (sortablePaneles) sortablePaneles.destroy();
 
-            const dDebito = parseFloat(document.getElementById('usd-debito').dataset.raw || 0);
-            const dImpuesto = parseFloat(document.getElementById('usd-impuesto').dataset.raw || 0);
             const buscador = document.getElementById('filtro-texto-gastos').value.toLowerCase();
 
             let panelesData = [];
@@ -1120,11 +1105,10 @@
                     if (g.tipo === 'Tarjeta') {
                         cuotasDetalle = `<br><span style="font-size:11px; color:#174ea6;">${g.tarjeta || 'Tarjeta'} (${g.cuotas_pagadas}/${g.cuotas_totales})</span>`;
                         if (parseInt(g.cuotas_pagadas) >= parseInt(g.cuotas_totales)) {
-                            bgRowStyle = 'background-color: #e6f4ea;'; // Verde claro para última cuota
+                            bgRowStyle = 'background-color: #e6f4ea;';
                         }
                     }
 
-                    // Boton Desglose USD
                     let usdBtn = '';
                     let breakdownHtml = '';
                     if (g.moneda === 'USD') {
@@ -1577,7 +1561,7 @@
             });
 
             if(cuentasAhorro.length === 0) {
-                cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro.</p>`;
+                cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro. Haz click en "Nueva Cuenta" para empezar.</p>`;
             }
 
             if(htmlResumen === '') htmlResumen = '<p style="color:var(--text-muted); font-size:13px;">No hay ahorros planificados este mes.</p>';
