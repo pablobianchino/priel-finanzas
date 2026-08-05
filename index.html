@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Finanzas Priel</title>
     
-    <!-- Etiquetas PWA actualizadas -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffffff">
     <meta name="mobile-web-app-capable" content="yes">
@@ -88,7 +87,7 @@
         th { padding: 10px 0; border-bottom: 2px solid var(--card-border); color: var(--text-muted); font-weight: 500; }
         td { padding: 10px 0; border-bottom: 1px solid #f1f3f4; }
         
-        input, select { padding: 10px; border: 1px solid var(--card-border); border-radius: 8px; outline: none; box-sizing: border-box; }
+        input, select { padding: 10px; border: 1px solid var(--card-border); border-radius: 8px; outline: none; box-sizing: border-box; font-family: inherit; }
 
         .btn-black {
             background-color: #000000; color: #ffffff; border: none; padding: 10px 24px;
@@ -109,6 +108,9 @@
         .tr-clickable:hover { background-color: #fcfcfc; cursor: pointer; }
         .details-row td { background-color: #f8f9fa; border-radius: 8px; border: 1px solid #eee;}
         .chart-container { position: relative; width: 100%; }
+
+        .saldo-ok { background-color: #e6f4ea; color: #137333; }
+        .saldo-danger { background-color: #fce8e6; color: #c5221f; }
 
         @media (max-width: 768px) {
             .sidebar { position: fixed; height: 100vh; transform: translateX(-100%); z-index: 2001; box-shadow: 2px 0 10px rgba(0,0,0,0.1); }
@@ -188,9 +190,9 @@
                         <h2 style="margin: 0; font-size: 16px;">Configuración USD</h2><span class="toggle-icon">▼</span>
                     </div>
                     <div class="card-content" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                        <label>MEP (Ahorros): <input type="number" id="usd-mep" value="0" style="width: 100px; padding: 6px;" step="0.01"></label>
-                        <label>Débito (Gastos): <input type="number" id="usd-debito" value="0" style="width: 100px; padding: 6px;" step="0.01"></label>
-                        <label>Impuesto (Gastos): <input type="number" id="usd-impuesto" value="0" style="width: 100px; padding: 6px;" step="0.01"></label>
+                        <label>MEP (Ahorros): <input type="text" id="usd-mep" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
+                        <label>Débito (Gastos): <input type="text" id="usd-debito" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
+                        <label>Impuesto (Gastos): <input type="text" id="usd-impuesto" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
                         <button class="btn-black" style="padding: 6px 15px;" onclick="window.guardarConfiguracionDolar('resumen')">Guardar Rate</button>
                     </div>
                 </div>
@@ -206,7 +208,7 @@
                     <div style="display:flex; flex-direction:column; gap:20px;">
                         <div class="card" style="border-top: 4px solid #34A853;">
                             <h3>Ingresos Netos del Mes</h3>
-                            <div class="value" id="res-ingresos-mes">$0,0</div>
+                            <div class="value" id="res-ingresos-mes">$0,00</div>
                         </div>
                         
                         <div class="card" style="border-top: 4px solid #9c27b0;">
@@ -218,18 +220,18 @@
 
                         <div class="card" style="border-top: 4px solid #174ea6;">
                             <h3>Gastos Totales (Propios)</h3>
-                            <div class="value" id="res-gastos-fijos">$0,0</div>
+                            <div class="value" id="res-gastos-fijos">$0,00</div>
                         </div>
 
                         <div class="card" style="border-top: 4px solid #e91e63;">
                             <h3>Deuda Futura (Tarjetas)</h3>
-                            <div class="value" id="res-deuda-futura" style="color: #e91e63;">$0,0</div>
+                            <div class="value" id="res-deuda-futura" style="color: #e91e63;">$0,00</div>
                             <p style="font-size:11px; color:var(--text-muted); margin-top:5px; margin-bottom:0;">Suma total de cuotas pendientes a futuro</p>
                         </div>
 
                         <div class="card" style="border-top: 4px solid #EA4335;">
                             <h3>Saldo a favor general</h3>
-                            <div class="value" id="res-balance">$0,0</div>
+                            <div class="value" id="res-balance">$0,00</div>
                             <div class="chart-container" style="height: 150px; margin-top: 15px;"><canvas id="chart-resumen"></canvas></div>
                         </div>
                     </div>
@@ -253,7 +255,7 @@
                             <div style="display:flex; align-items:center; gap:10px;">
                                 <div style="display:flex; flex-direction:column; text-align:right;">
                                     <span style="font-size: 11px; color:var(--text-muted);">Total Bruto: <span id="sum-ingresos-mes"></span></span>
-                                    <span class="value" id="sum-ingresos-disponible" style="font-size: 16px; margin: 0; color:#137333;">$0,0 Disp.</span>
+                                    <span class="value" id="sum-ingresos-disponible" style="font-size: 16px; margin: 0; color:#137333;">$0,00 Disp.</span>
                                 </div>
                                 <span class="toggle-icon">▼</span>
                             </div>
@@ -289,11 +291,11 @@
                         <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px;">
                             <div>
                                 <h3>Total Global Ahorrado (Histórico)</h3>
-                                <div class="value" id="sum-ahorros-total" style="display: flex; flex-direction: column; gap: 5px; font-size: 22px;">$0,0</div>
+                                <div class="value" id="sum-ahorros-total" style="display: flex; flex-direction: column; gap: 5px; font-size: 22px;">$0,00</div>
                             </div>
                             <div style="text-align: right;">
                                 <h3 style="color: #137333;">Total Depositado (Mes Actual)</h3>
-                                <div class="value" id="sum-ahorros-depositado" style="color: #137333; font-size: 22px; display: flex; flex-direction: column; gap: 5px;">$0,0</div>
+                                <div class="value" id="sum-ahorros-depositado" style="color: #137333; font-size: 22px; display: flex; flex-direction: column; gap: 5px;">$0,00</div>
                             </div>
                         </div>
                     </div>
@@ -312,9 +314,9 @@
                         <h2 style="margin: 0; font-size: 16px;">Configuración USD</h2><span class="toggle-icon">▼</span>
                     </div>
                     <div class="card-content" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                        <label>MEP (Ahorros): <input type="number" id="usd-mep-gastos" value="0" style="width: 100px; padding: 6px;" step="0.01"></label>
-                        <label>Débito (Gastos): <input type="number" id="usd-debito-gastos" value="0" style="width: 100px; padding: 6px;" step="0.01"></label>
-                        <label>Impuesto (Gastos): <input type="number" id="usd-impuesto-gastos" value="0" style="width: 100px; padding: 6px;" step="0.01"></label>
+                        <label>MEP (Ahorros): <input type="text" id="usd-mep-gastos" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
+                        <label>Débito (Gastos): <input type="text" id="usd-debito-gastos" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
+                        <label>Impuesto (Gastos): <input type="text" id="usd-impuesto-gastos" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
                         <button class="btn-black" style="padding: 6px 15px;" onclick="window.guardarConfiguracionDolar('gastos')">Guardar Rate</button>
                     </div>
                 </div>
@@ -322,18 +324,18 @@
                 <div class="cards-grid">
                     <div class="card" style="border-top: 4px solid var(--text-main);">
                         <h3>Gastos Totales (Propios)</h3>
-                        <div class="value" id="sum-gastos-total">$0,0</div>
+                        <div class="value" id="sum-gastos-total">$0,00</div>
                     </div>
                     <div class="card" style="border-top: 4px solid #5f6368;">
                         <h3>Gastos de Terceros</h3>
-                        <div class="value" id="sum-gastos-terceros">$0,0</div>
+                        <div class="value" id="sum-gastos-terceros">$0,00</div>
                     </div>
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
                     <h2 style="margin: 0;">Gestión de Gastos</h2>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button onclick="crearNuevoTipoGastoPanel()" class="btn-black">➕ Crear Tipo de Gasto</button>
+                        <button onclick="crearNuevoTipoGastoPanel()" class="btn-black">➕ Crear Panel</button>
                         <button onclick="abrirModalNuevoGasto()" class="btn-black" style="background-color: #202124;">➕ Nuevo Ítem Gasto</button>
                         <button onclick="abrirModalCargaMasiva()" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">Carga CSV</button>
                     </div>
@@ -377,8 +379,11 @@
                 </div>
                 <input type="text" id="gasto-nombre" placeholder="Nombre (ej. Internet)" required>
                 <div style="display: flex; gap: 10px;">
-                    <input type="number" id="gasto-monto" placeholder="Monto Total" required step="0.01" style="flex: 1;">
-                    <select id="gasto-moneda"><option value="ARS">ARS</option><option value="USD">USD</option></select>
+                    <input type="text" id="gasto-monto" class="money-input" placeholder="Monto Total" required style="flex: 1;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this)">
+                    <select id="gasto-moneda" onchange="window.onMoneyBlur(document.getElementById('gasto-monto'))">
+                        <option value="ARS">ARS</option>
+                        <option value="USD">USD</option>
+                    </select>
                 </div>
                 <div>
                     <label style="font-size: 12px; color: var(--text-muted);">Asignar a Panel de Gasto:</label>
@@ -386,7 +391,7 @@
                 </div>
                 
                 <div id="box-gasto-origen" style="display:none;">
-                    <label style="font-size: 12px; color: var(--text-muted);">Selecciona a qué ingreso descontar:</label>
+                    <label style="font-size: 12px; color: var(--text-muted);">Selecciona a qué ingreso descontar (Mío):</label>
                     <select id="gasto-origen-select" style="width: 100%; margin-top: 5px;"></select>
                 </div>
 
@@ -403,13 +408,16 @@
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;" id="box-compartir">
                     <input type="checkbox" id="gasto-compartir" style="width: 16px; height: 16px;" onchange="toggleDivisor('gasto')">
                     <label for="gasto-compartir" style="font-size: 14px; cursor: pointer;">Compartir / Dividir gasto</label>
+                    
+                    <input type="text" id="gasto-compartir-con" placeholder="Compartir con (Nombre)" style="display: none; flex: 1; padding: 6px; font-size:13px; border-radius: 6px; border: 1px solid #ccc;">
+
                     <select id="gasto-compartir-tipo" style="display: none; padding: 6px; font-size:13px;" onchange="toggleDivisor('gasto')">
-                        <option value="divisor">Dividir en partes</option><option value="fijo">Monto exacto</option>
+                        <option value="divisor">Dividir en partes</option><option value="fijo">Monto exacto (Mi parte)</option>
                     </select>
                     <select id="gasto-divisor" style="display: none; padding: 6px; font-size:13px;">
                         <option value="2">2</option><option value="3">3</option><option value="4">4</option>
                     </select>
-                    <input type="number" id="gasto-monto-fijo" style="display: none; width: 120px; padding: 6px; font-size:13px;" placeholder="ARS final" step="0.01">
+                    <input type="text" id="gasto-monto-fijo" class="money-input" style="display: none; width: 120px; padding: 6px; font-size:13px;" placeholder="ARS final" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')">
                 </div>
                 <div id="campos-tarjeta" style="display: none; gap: 10px; flex-wrap: wrap;">
                     <select id="gasto-tarjeta" style="flex: 1;"><option value="VISA">VISA</option><option value="MASTERCARD">MASTERCARD</option><option value="MP">MP</option></select>
@@ -430,7 +438,7 @@
             <form id="form-ingreso" style="display: flex; flex-direction: column; gap: 15px;">
                 <input type="hidden" id="ingreso-id">
                 <input type="text" id="ingreso-nombre" placeholder="Origen (ej. Mandala Ensambles)" required>
-                <input type="number" id="ingreso-monto" placeholder="Monto Total ARS" required step="0.01">
+                <input type="text" id="ingreso-monto" class="money-input" placeholder="Monto Total ARS" required onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')">
                 <div>
                     <label style="font-size: 13px; color: var(--text-muted);">Vincular a Grupo de Distribución:</label>
                     <select id="ingreso-grupo" style="width:100%; margin-top:5px;"></select>
@@ -493,7 +501,7 @@
         }
         anioSelector.value = currentYear;
 
-        let totalGastosGlobal = 0, subtotalTerceros = 0, totalIngresosGlobal = 0;
+        let totalGastosGlobal = 0, subtotalTerceros = 0, totalIngresosGlobal = 0, deudaFuturaTotal = 0;
         let listaGastos = [], listaIngresos = [], listaAhorros = [];
         let chartResumen = null, chartIngresos = null, chartEstadisticas = null;
         
@@ -506,12 +514,46 @@
         let debounceTimer;
         let sortablePaneles = null;
 
-        window.formatearDinero = function(num) {
+        // --- SISTEMA DE MONEDAS ---
+        window.parseMoney = function(val) {
+            if(!val) return 0;
+            let clean = String(val).replace(/[^0-9.,-]/g, '');
+            if(clean.indexOf('.') > -1 && clean.indexOf(',') > -1) {
+                clean = clean.replace(/\./g, '').replace(',', '.');
+            } else if (clean.indexOf(',') > -1) {
+                clean = clean.replace(',', '.');
+            }
+            let res = parseFloat(clean);
+            return isNaN(res) ? 0 : res;
+        };
+
+        window.formatearDinero = function(num, moneda = 'ARS') {
             if (isNaN(num) || num === null) num = 0;
-            let rounded = Math.ceil(num * 10) / 10;
-            let parts = rounded.toFixed(1).split('.');
+            let fixed = Number(num).toFixed(2);
+            let parts = fixed.split('.');
             let enteros = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-            return "$" + enteros + "," + (parts[1] || '0');
+            let decimales = parts[1] || '00';
+            let prefix = moneda === 'USD' ? 'U$D ' : '$ ';
+            return prefix + enteros + "," + decimales;
+        };
+
+        window.onMoneyBlur = function(el, monedaOverride) {
+            let moneda = monedaOverride || 'ARS';
+            if (el.id === 'gasto-monto') {
+                moneda = document.getElementById('gasto-moneda').value;
+            }
+            let val = window.parseMoney(el.value);
+            el.dataset.raw = val;
+            el.value = window.formatearDinero(val, moneda);
+        };
+
+        window.onMoneyFocus = function(el) {
+            let raw = el.dataset.raw;
+            if(raw !== undefined && raw !== "") {
+                el.value = String(raw).replace('.', ',');
+            } else {
+                el.value = "";
+            }
         };
 
         window.mostrarCargando = function(show) { document.getElementById('loading-screen').style.display = show ? 'flex' : 'none'; }
@@ -606,16 +648,21 @@
                 
                 await Promise.all([pGastos, pIngresos, pAhorros]);
                 
-                calcularSaldosOrigenes();
-                renderizacioDinamicaGastosPaneles();
-                renderTablaIngresos();
-                renderCuentasAhorro(); 
-                calcularBalance();
+                window.recargarDatosVisuales();
             } catch(error) {
                 console.error("Error cargando dashboard:", error);
             } finally {
                 mostrarCargando(false);
             }
+        }
+
+        window.recargarDatosVisuales = function() {
+            let gastosProc = procesarListaGastos();
+            calcularSaldosOrigenes(gastosProc);
+            renderizacioDinamicaGastosPaneles(gastosProc);
+            renderTablaIngresos();
+            renderCuentasAhorro(); 
+            calcularBalance();
         }
 
         async function cargarGastosFetch() {
@@ -648,13 +695,23 @@
                 if (docSnap.exists() && docSnap.data().configuracion) {
                     const config = docSnap.data().configuracion;
                     
-                    document.getElementById('usd-mep').value = config.dolar_mep || 0;
-                    document.getElementById('usd-debito').value = config.dolar_debito || 0;
-                    document.getElementById('usd-impuesto').value = config.dolar_impuesto || 0;
+                    document.getElementById('usd-mep').dataset.raw = config.dolar_mep || 0;
+                    document.getElementById('usd-mep').value = window.formatearDinero(config.dolar_mep || 0, 'ARS');
+                    
+                    document.getElementById('usd-debito').dataset.raw = config.dolar_debito || 0;
+                    document.getElementById('usd-debito').value = window.formatearDinero(config.dolar_debito || 0, 'ARS');
+                    
+                    document.getElementById('usd-impuesto').dataset.raw = config.dolar_impuesto || 0;
+                    document.getElementById('usd-impuesto').value = window.formatearDinero(config.dolar_impuesto || 0, 'ARS');
 
-                    document.getElementById('usd-mep-gastos').value = config.dolar_mep || 0;
-                    document.getElementById('usd-debito-gastos').value = config.dolar_debito || 0;
-                    document.getElementById('usd-impuesto-gastos').value = config.dolar_impuesto || 0;
+                    document.getElementById('usd-mep-gastos').dataset.raw = config.dolar_mep || 0;
+                    document.getElementById('usd-mep-gastos').value = window.formatearDinero(config.dolar_mep || 0, 'ARS');
+
+                    document.getElementById('usd-debito-gastos').dataset.raw = config.dolar_debito || 0;
+                    document.getElementById('usd-debito-gastos').value = window.formatearDinero(config.dolar_debito || 0, 'ARS');
+
+                    document.getElementById('usd-impuesto-gastos').dataset.raw = config.dolar_impuesto || 0;
+                    document.getElementById('usd-impuesto-gastos').value = window.formatearDinero(config.dolar_impuesto || 0, 'ARS');
                     
                     gruposDistribucion = config.grupos_distribucion || {};
                     for (let g in gruposDistribucion) {
@@ -678,12 +735,12 @@
                     ordenPanelesGasto = config.orden_paneles_gasto || [];
 
                 } else {
-                    document.getElementById('usd-mep').value = 0;
-                    document.getElementById('usd-debito').value = 0;
-                    document.getElementById('usd-impuesto').value = 0;
-                    document.getElementById('usd-mep-gastos').value = 0;
-                    document.getElementById('usd-debito-gastos').value = 0;
-                    document.getElementById('usd-impuesto-gastos').value = 0;
+                    document.getElementById('usd-mep').dataset.raw = 0; document.getElementById('usd-mep').value = window.formatearDinero(0);
+                    document.getElementById('usd-debito').dataset.raw = 0; document.getElementById('usd-debito').value = window.formatearDinero(0);
+                    document.getElementById('usd-impuesto').dataset.raw = 0; document.getElementById('usd-impuesto').value = window.formatearDinero(0);
+                    document.getElementById('usd-mep-gastos').dataset.raw = 0; document.getElementById('usd-mep-gastos').value = window.formatearDinero(0);
+                    document.getElementById('usd-debito-gastos').dataset.raw = 0; document.getElementById('usd-debito-gastos').value = window.formatearDinero(0);
+                    document.getElementById('usd-impuesto-gastos').dataset.raw = 0; document.getElementById('usd-impuesto-gastos').value = window.formatearDinero(0);
 
                     gruposDistribucion = {};
                     tiposGastoAsociaciones = { "Fijos": [], "Tarjeta": [], "Terceros": [] };
@@ -723,9 +780,9 @@
             } catch(e) {
                 const fullConfig = {
                     configuracion: {
-                        dolar_mep: parseFloat(document.getElementById('usd-mep').value) || 0,
-                        dolar_debito: parseFloat(document.getElementById('usd-debito').value) || 0,
-                        dolar_impuesto: parseFloat(document.getElementById('usd-impuesto').value) || 0,
+                        dolar_mep: parseFloat(document.getElementById('usd-mep').dataset.raw || 0),
+                        dolar_debito: parseFloat(document.getElementById('usd-debito').dataset.raw || 0),
+                        dolar_impuesto: parseFloat(document.getElementById('usd-impuesto').dataset.raw || 0),
                         grupos_distribucion: gruposDistribucion,
                         tipos_gasto: tiposGastoAsociaciones,
                         cuentas_ahorro: cuentasAhorro,
@@ -736,47 +793,103 @@
             }
         }
 
-        function getCostoCalculado(g, dDebito, dImpuesto) {
-            let costoArsBase = g.monto;
-            if (g.moneda === 'USD') {
-                let vImp = g.monto * dImpuesto;
-                costoArsBase = (vImp * 0.02) + (vImp * 0.21) + (vImp * 0.30) + (g.monto * dDebito);
-            }
-            let divisor = g.divisor || 1;
-            if (g.propietario !== 'Tercero' && g.compartir_tipo === 'fijo') {
-                return g.monto_fijo || 0;
-            } else {
-                let cuotaBase = g.tipo === 'Tarjeta' ? (costoArsBase / (g.cuotas_totales || 1)) : costoArsBase;
-                return cuotaBase / divisor;
-            }
-        }
+        function procesarListaGastos() {
+            const dDebito = parseFloat(document.getElementById('usd-debito').dataset.raw || 0);
+            const dImpuesto = parseFloat(document.getElementById('usd-impuesto').dataset.raw || 0);
+            
+            let arr = [];
+            totalGastosGlobal = 0; subtotalTerceros = 0; deudaFuturaTotal = 0;
 
-        function calcularSaldosOrigenes() {
-            sumatoriaGastosPorOrigen = {};
-            const dDebito = parseFloat(document.getElementById('usd-debito').value) || 0;
-            const dImpuesto = parseFloat(document.getElementById('usd-impuesto').value) || 0;
-
-            if(!listaGastos) return;
+            if(!listaGastos) return arr;
 
             listaGastos.forEach(g => {
-                if (g.propietario === 'Tercero') return;
+                let totalMesBase = g.monto;
+                if (g.moneda === 'USD') {
+                    let vImp = g.monto * dImpuesto;
+                    totalMesBase = (vImp * 0.02) + (vImp * 0.21) + (vImp * 0.30) + (g.monto * dDebito);
+                }
                 
-                let costoCalculado = getCostoCalculado(g, dDebito, dImpuesto);
+                let cuotaTotal = g.tipo === 'Tarjeta' ? (totalMesBase / (g.cuotas_totales || 1)) : totalMesBase;
+
+                if (g.compartir_con && g.compartir_tipo) {
+                    let miParte = 0, suParte = 0;
+                    if (g.compartir_tipo === 'divisor') {
+                        miParte = cuotaTotal / (g.divisor || 2);
+                    } else if (g.compartir_tipo === 'fijo') {
+                        miParte = g.monto_fijo || 0; 
+                    }
+                    suParte = cuotaTotal - miParte;
+
+                    arr.push({ ...g, costoCalculado: miParte, es_clon_origen: true });
+                    
+                    arr.push({ 
+                        ...g, 
+                        id: g.id + '_clon', 
+                        categoria: "Gastos de " + g.compartir_con.trim(), 
+                        propietario: "Tercero", 
+                        costoCalculado: suParte, 
+                        es_clon_destino: true 
+                    });
+
+                    if (g.tipo === 'Tarjeta') {
+                        let cTot = g.cuotas_totales || 1; let cPag = g.cuotas_pagadas || 1;
+                        if (cTot > cPag) deudaFuturaTotal += (miParte * (cTot - cPag));
+                    }
+                    
+                    if (g.propietario !== 'Tercero') totalGastosGlobal += miParte;
+                    else subtotalTerceros += miParte;
+                    
+                    subtotalTerceros += suParte; 
+                } else {
+                    arr.push({ ...g, costoCalculado: cuotaTotal });
+                    
+                    if (g.tipo === 'Tarjeta') {
+                        let cTot = g.cuotas_totales || 1; let cPag = g.cuotas_pagadas || 1;
+                        if (cTot > cPag) deudaFuturaTotal += (cuotaTotal * (cTot - cPag));
+                    }
+                    
+                    if (g.propietario !== 'Tercero') totalGastosGlobal += cuotaTotal;
+                    else subtotalTerceros += cuotaTotal;
+                }
+            });
+
+            document.getElementById('res-gastos-fijos').innerText = formatearDinero(totalGastosGlobal);
+            document.getElementById('sum-gastos-total').innerText = formatearDinero(totalGastosGlobal);
+            document.getElementById('sum-gastos-terceros').innerText = formatearDinero(subtotalTerceros);
+            document.getElementById('res-deuda-futura').innerText = formatearDinero(deudaFuturaTotal);
+
+            return arr;
+        }
+
+        function calcularSaldosOrigenes(gastosProc) {
+            sumatoriaGastosPorOrigen = {};
+            if(!gastosProc) return;
+
+            gastosProc.forEach(g => {
+                if (g.propietario === 'Tercero' && !g.es_clon_destino) return; 
+                
                 let catAsociada = g.categoria || "Fijos";
                 let origenesPanel = tiposGastoAsociaciones[catAsociada] || [];
-                let origenId = g.id_origen || (origenesPanel.length > 0 ? origenesPanel[0] : null);
+                origenesPanel = origenesPanel.filter(id => id && id.trim() !== "");
+                
+                let origenId = null;
+                if (origenesPanel.length === 1) {
+                    origenId = origenesPanel[0]; 
+                } else if (origenesPanel.length > 1) {
+                    origenId = origenesPanel.includes(g.id_origen) ? g.id_origen : origenesPanel[0];
+                }
                 
                 if (origenId) {
-                    sumatoriaGastosPorOrigen[origenId] = (sumatoriaGastosPorOrigen[origenId] || 0) + costoCalculado;
+                    sumatoriaGastosPorOrigen[origenId] = (sumatoriaGastosPorOrigen[origenId] || 0) + g.costoCalculado;
                 }
             });
         }
 
         window.crearNuevoTipoGastoPanel = function() {
-            const nombre = prompt("Ingresa el nombre para el nuevo tipo de gasto (Nuevo Panel):");
+            const nombre = prompt("Ingresa el nombre para el nuevo panel de gastos:");
             if (!nombre || nombre.trim() === "") return;
             const limpio = nombre.trim();
-            if (tiposGastoAsociaciones[limpio] !== undefined) return alert("Este tipo de panel ya existe.");
+            if (tiposGastoAsociaciones[limpio] !== undefined) return alert("Este panel ya existe.");
             
             tiposGastoAsociaciones[limpio] = [];
             ordenPanelesGasto.push(limpio);
@@ -787,7 +900,7 @@
             const nuevoNombre = prompt("Ingresa el nuevo nombre para este panel de gasto:", oldCategoria);
             if (!nuevoNombre || nuevoNombre.trim() === "" || nuevoNombre.trim() === oldCategoria) return;
             const limpio = nuevoNombre.trim();
-            if (tiposGastoAsociaciones[limpio] !== undefined) return alert("Este tipo de panel ya existe.");
+            if (tiposGastoAsociaciones[limpio] !== undefined) return alert("Este panel ya existe.");
             
             mostrarCargando(true);
             const origenesVinculados = tiposGastoAsociaciones[oldCategoria];
@@ -835,36 +948,26 @@
             }
             tiposGastoAsociaciones[categoria] = origenes;
             
-            calcularSaldosOrigenes();
-            renderizacioDinamicaGastosPaneles();
-            renderTablaIngresos();
-            renderDistribucionDirecta();
-
             guardarConfiguracionGlobalGlobal(false);
+            window.recargarDatosVisuales();
         }
 
         window.guardarConfiguracionDolar = async function(origenPanel) {
             let mep, debito, impuesto;
             if(origenPanel === 'gastos') {
-                mep = parseFloat(document.getElementById('usd-mep-gastos').value) || 0;
-                debito = parseFloat(document.getElementById('usd-debito-gastos').value) || 0;
-                impuesto = parseFloat(document.getElementById('usd-impuesto-gastos').value) || 0;
-                document.getElementById('usd-mep').value = mep;
-                document.getElementById('usd-debito').value = debito;
-                document.getElementById('usd-impuesto').value = impuesto;
+                mep = document.getElementById('usd-mep-gastos').dataset.raw || 0;
+                debito = document.getElementById('usd-debito-gastos').dataset.raw || 0;
+                impuesto = document.getElementById('usd-impuesto-gastos').dataset.raw || 0;
             } else {
-                mep = parseFloat(document.getElementById('usd-mep').value) || 0;
-                debito = parseFloat(document.getElementById('usd-debito').value) || 0;
-                impuesto = parseFloat(document.getElementById('usd-impuesto').value) || 0;
-                document.getElementById('usd-mep-gastos').value = mep;
-                document.getElementById('usd-debito-gastos').value = debito;
-                document.getElementById('usd-impuesto-gastos').value = impuesto;
+                mep = document.getElementById('usd-mep').dataset.raw || 0;
+                debito = document.getElementById('usd-debito').dataset.raw || 0;
+                impuesto = document.getElementById('usd-impuesto').dataset.raw || 0;
             }
             mostrarCargando(true);
             await actualizarConfiguracionDB({
-                "configuracion.dolar_mep": mep,
-                "configuracion.dolar_debito": debito,
-                "configuracion.dolar_impuesto": impuesto
+                "configuracion.dolar_mep": parseFloat(mep),
+                "configuracion.dolar_debito": parseFloat(debito),
+                "configuracion.dolar_impuesto": parseFloat(impuesto)
             });
             await actualizarDashboard();
         }
@@ -894,15 +997,12 @@
                 gasto.id_origen = idOrigen;
                 try {
                     await updateDoc(doc(db, "finanzas", obtenerMesId(), "gastos", idGasto), { id_origen: idOrigen });
-                    calcularSaldosOrigenes();
-                    renderizacioDinamicaGastosPaneles();
-                    renderTablaIngresos();
-                    renderDistribucionDirecta();
+                    window.recargarDatosVisuales();
                 } catch(e) { console.error("Error al actualizar origen del gasto:", e); }
             }
         };
 
-        function renderizacioDinamicaGastosPaneles() {
+        function renderizacioDinamicaGastosPaneles(gastosProcesados) {
             let panelesAbiertos = [];
             document.querySelectorAll('.panel-gasto-item').forEach(panel => {
                 const content = panel.querySelector('.card-content');
@@ -914,31 +1014,10 @@
             const contenedor = document.getElementById('contenedor-dinamico-gastos');
             contenedor.innerHTML = '';
             if (sortablePaneles) sortablePaneles.destroy();
-            
-            totalGastosGlobal = 0; subtotalTerceros = 0;
-            let deudaFuturaTotal = 0;
 
-            const dDebito = parseFloat(document.getElementById('usd-debito').value) || 0;
-            const dImpuesto = parseFloat(document.getElementById('usd-impuesto').value) || 0;
+            const dDebito = parseFloat(document.getElementById('usd-debito').dataset.raw || 0);
+            const dImpuesto = parseFloat(document.getElementById('usd-impuesto').dataset.raw || 0);
             const buscador = document.getElementById('filtro-texto-gastos').value.toLowerCase();
-
-            let gastosProcesados = [];
-            if(listaGastos) {
-                gastosProcesados = listaGastos.map(g => ({ ...g, costoCalculado: getCostoCalculado(g, dDebito, dImpuesto) }));
-            }
-
-            gastosProcesados.forEach(g => {
-                if (g.propietario === 'Tercero') { subtotalTerceros += g.costoCalculado; return; }
-                totalGastosGlobal += g.costoCalculado;
-
-                if (g.tipo === 'Tarjeta') {
-                    let cTot = g.cuotas_totales || 1;
-                    let cPag = g.cuotas_pagadas || 1;
-                    if (cTot > cPag) {
-                        deudaFuturaTotal += (g.costoCalculado * (cTot - cPag));
-                    }
-                }
-            });
 
             let panelesData = [];
 
@@ -1048,15 +1127,22 @@
                         `;
                     }
 
+                    let actionsHtml = '';
+                    if (g.es_clon_destino) {
+                        actionsHtml = `<span style="font-size:10px; color:#c5221f; font-weight:600;">🔒 Compartido (Edite el original)</span>`;
+                    } else {
+                        actionsHtml = `
+                            <button class="btn-icon" onclick='abrirModalEditarGasto(${JSON.stringify(g)})'>✏️</button>
+                            <button class="btn-icon" onclick="borrarGasto('${g.id}')">🗑️</button>
+                        `;
+                    }
+
                     return `
                         <tr style="${bgRowStyle}">
                             <td><strong>${g.nombre}</strong>${cuotasDetalle}${originHtml}${usdBtn}</td>
                             <td style="font-weight:600;">${formatearDinero(g.costoCalculado)}</td>
                             <td style="text-align:center;">${recCheckbox}</td>
-                            <td style="white-space:nowrap;">
-                                <button class="btn-icon" onclick='abrirModalEditarGasto(${JSON.stringify(g)})'>✏️</button>
-                                <button class="btn-icon" onclick="borrarGasto('${g.id}')">🗑️</button>
-                            </td>
+                            <td style="white-space:nowrap;">${actionsHtml}</td>
                         </tr>
                         ${breakdownHtml}
                     `;
@@ -1114,11 +1200,6 @@
                 `;
             });
 
-            document.getElementById('res-gastos-fijos').innerText = formatearDinero(totalGastosGlobal);
-            document.getElementById('sum-gastos-total').innerText = formatearDinero(totalGastosGlobal);
-            document.getElementById('sum-gastos-terceros').innerText = formatearDinero(subtotalTerceros);
-            document.getElementById('res-deuda-futura').innerText = formatearDinero(deudaFuturaTotal);
-
             sortablePaneles = Sortable.create(contenedor, {
                 handle: '.drag-handle',
                 animation: 150,
@@ -1142,6 +1223,9 @@
             document.getElementById('gasto-compartir').checked = false;
             toggleDivisor('gasto');
             document.getElementById('gasto-recurrente').checked = true; 
+
+            document.getElementById('gasto-monto').dataset.raw = "";
+            document.getElementById('gasto-monto-fijo').dataset.raw = "";
             
             if (categoriaPredefinida && tiposGastoAsociaciones.hasOwnProperty(categoriaPredefinida)) {
                 document.getElementById('gasto-categoria-select').value = categoriaPredefinida;
@@ -1158,8 +1242,10 @@
             document.getElementById('gasto-propietario').value = data.propietario || 'Propio';
             document.getElementById('gasto-tercero-nombre').value = data.tercero_nombre || '';
             document.getElementById('gasto-nombre').value = data.nombre;
-            document.getElementById('gasto-monto').value = data.monto;
-            document.getElementById('gasto-moneda').value = data.moneda;
+            
+            document.getElementById('gasto-monto').dataset.raw = data.monto;
+            document.getElementById('gasto-moneda').value = data.moneda || "ARS";
+            document.getElementById('gasto-monto').value = window.formatearDinero(data.monto, data.moneda);
             
             document.getElementById('gasto-recurrente').checked = data.recurrente !== false; 
 
@@ -1172,17 +1258,23 @@
             document.getElementById('titulo-modal-gasto').innerText = "Editar Gasto";
 
             toggleTercero('gasto');
+            
             if (data.propietario !== 'Tercero') {
-                if ((data.divisor && data.divisor > 1) || (data.compartir_tipo === 'fijo' && data.monto_fijo)) {
+                if (data.compartir_con && data.compartir_con.trim() !== '') {
                     document.getElementById('gasto-compartir').checked = true;
+                    document.getElementById('gasto-compartir-con').value = data.compartir_con;
                     document.getElementById('gasto-compartir-tipo').value = data.compartir_tipo || 'divisor';
                     document.getElementById('gasto-divisor').value = data.divisor || 2;
-                    document.getElementById('gasto-monto-fijo').value = data.monto_fijo || '';
+                    
+                    document.getElementById('gasto-monto-fijo').dataset.raw = data.monto_fijo || 0;
+                    document.getElementById('gasto-monto-fijo').value = window.formatearDinero(data.monto_fijo || 0, 'ARS');
                 } else {
                     document.getElementById('gasto-compartir').checked = false;
+                    document.getElementById('gasto-compartir-con').value = '';
                 }
                 toggleDivisor('gasto');
             }
+
             toggleCamposTarjeta('gasto');
             if (data.tipo === 'Tarjeta') {
                 document.getElementById('gasto-tarjeta').value = data.tarjeta || 'VISA';
@@ -1225,10 +1317,26 @@
             const prop = document.getElementById('gasto-propietario').value;
             const tipo = document.getElementById('gasto-tipo').value;
             const cat = document.getElementById('gasto-categoria-select').value;
-            const checkboxCompartir = document.getElementById('gasto-compartir').checked;
-            const compTipo = document.getElementById('gasto-compartir-tipo').value;
             const isRecurrente = document.getElementById('gasto-recurrente').checked;
             
+            const checkboxCompartir = document.getElementById('gasto-compartir').checked;
+            const compCon = document.getElementById('gasto-compartir-con').value.trim();
+            const compTipo = document.getElementById('gasto-compartir-tipo').value;
+            const montoGasto = parseFloat(document.getElementById('gasto-monto').dataset.raw || window.parseMoney(document.getElementById('gasto-monto').value));
+            const montoFijo = parseFloat(document.getElementById('gasto-monto-fijo').dataset.raw || window.parseMoney(document.getElementById('gasto-monto-fijo').value));
+
+            if (prop === 'Propio' && checkboxCompartir && compCon !== '') {
+                let catCompartida = "Gastos de " + compCon;
+                if (tiposGastoAsociaciones[catCompartida] === undefined) {
+                    tiposGastoAsociaciones[catCompartida] = [];
+                    ordenPanelesGasto.push(catCompartida);
+                    await actualizarConfiguracionDB({
+                        "configuracion.tipos_gasto": tiposGastoAsociaciones,
+                        "configuracion.orden_paneles_gasto": ordenPanelesGasto
+                    });
+                }
+            }
+
             let origenesPanel = tiposGastoAsociaciones[cat] || [];
             origenesPanel = origenesPanel.filter(id => id && id.trim() !== "");
 
@@ -1240,13 +1348,19 @@
             }
 
             let datosGasto = {
-                propietario: prop, tercero_nombre: prop === 'Tercero' ? document.getElementById('gasto-tercero-nombre').value : '',
-                nombre: document.getElementById('gasto-nombre').value, monto: parseFloat(document.getElementById('gasto-monto').value),
-                moneda: document.getElementById('gasto-moneda').value, tipo: tipo,
-                categoria: cat, id_origen: id_origen, recurrente: isRecurrente,
+                propietario: prop, 
+                tercero_nombre: prop === 'Tercero' ? document.getElementById('gasto-tercero-nombre').value : '',
+                nombre: document.getElementById('gasto-nombre').value, 
+                monto: montoGasto,
+                moneda: document.getElementById('gasto-moneda').value, 
+                tipo: tipo,
+                categoria: cat, 
+                id_origen: id_origen, 
+                recurrente: isRecurrente,
+                compartir_con: (prop === 'Propio' && checkboxCompartir) ? compCon : '',
                 compartir_tipo: (prop === 'Propio' && checkboxCompartir) ? compTipo : 'divisor',
                 divisor: (prop === 'Propio' && checkboxCompartir && compTipo === 'divisor') ? parseInt(document.getElementById('gasto-divisor').value) || 1 : 1,
-                monto_fijo: (prop === 'Propio' && checkboxCompartir && compTipo === 'fijo') ? parseFloat(document.getElementById('gasto-monto-fijo').value) || 0 : null
+                monto_fijo: (prop === 'Propio' && checkboxCompartir && compTipo === 'fijo') ? montoFijo : null
             };
 
             if (tipo === 'Tarjeta') {
@@ -1284,8 +1398,12 @@
             prefix = prefix || 'gasto';
             const checked = document.getElementById(`${prefix}-compartir`).checked;
             const tComp = document.getElementById(`${prefix}-compartir-tipo`).value;
+            
+            document.getElementById(`${prefix}-compartir-con`).style.display = checked ? 'inline-block' : 'none';
             document.getElementById(`${prefix}-compartir-tipo`).style.display = checked ? 'inline-block' : 'none';
+
             if (checked) {
+                document.getElementById(`${prefix}-compartir-con`).required = true;
                 if (tComp === 'divisor') {
                     document.getElementById(`${prefix}-divisor`).style.display = 'inline-block';
                     document.getElementById(`${prefix}-monto-fijo`).style.display = 'none';
@@ -1294,6 +1412,7 @@
                     document.getElementById(`${prefix}-monto-fijo`).style.display = 'inline-block';
                 }
             } else {
+                document.getElementById(`${prefix}-compartir-con`).required = false;
                 document.getElementById(`${prefix}-divisor`).style.display = 'none';
                 document.getElementById(`${prefix}-monto-fijo`).style.display = 'none';
             }
@@ -1352,7 +1471,7 @@
             if(!acc) return;
             let val = prompt(`¿Cuánto dinero quieres rescatar (retirar) de '${acc.nombre}'?\nUsa números negativos si quieres deshacer un rescate.`);
             if(val !== null && val.trim() !== "") {
-                let monto = parseFloat(val);
+                let monto = window.parseMoney(val);
                 if(!isNaN(monto)) {
                     acc.retiros = (acc.retiros || 0) + monto;
                     guardarConfiguracionAhorros();
@@ -1377,7 +1496,7 @@
             let totalDepositadoMes = 0;
             let ahorrosSumaMesActual = {};
             cuentasAhorro.forEach(c => ahorrosSumaMesActual[c.id] = 0);
-            const dMep = parseFloat(document.getElementById('usd-mep').value) || 0;
+            const dMep = parseFloat(document.getElementById('usd-mep').dataset.raw || 0);
 
             for(let grupoName in gruposDistribucion) {
                 let totalGrupo = sumPorGrupo[grupoName] || 0;
@@ -1437,7 +1556,7 @@
             });
 
             if(cuentasAhorro.length === 0) {
-                cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro. Haz click en "Nueva Cuenta" para empezar.</p>`;
+                cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro.</p>`;
             }
 
             if(htmlResumen === '') htmlResumen = '<p style="color:var(--text-muted); font-size:13px;">No hay ahorros planificados este mes.</p>';
@@ -1503,7 +1622,7 @@
         };
 
         window.actualizarDatoObjetivoMemory = function(grupoName, index, campo, valor) {
-            gruposDistribucion[grupoName][index][campo] = campo === 'porc' ? (parseFloat(valor) || 0) : valor;
+            gruposDistribucion[grupoName][index][campo] = campo === 'porc' ? (parseFloat(window.parseMoney(valor)) || 0) : valor;
             dispararDebounceAutoguardado();
         };
 
@@ -1519,20 +1638,23 @@
             const inpPesos = document.getElementById(`pesos-${grupoName}-${index}`);
 
             if (disparadoPor === 'pct') {
-                let pct = parseFloat(inpPct.value) || 0;
-                let pesosCalculados = (totalDineroGrupo * (pct / 100)).toFixed(2);
-                inpPesos.value = pesosCalculados;
+                let pct = parseFloat(window.parseMoney(inpPct.value)) || 0;
+                let pesosCalculados = (totalDineroGrupo * (pct / 100));
+                inpPesos.dataset.raw = pesosCalculados;
+                inpPesos.value = window.formatearDinero(pesosCalculados);
                 gruposDistribucion[grupoName][index].porc = pct;
             } else {
-                let pesos = parseFloat(inpPesos.value) || 0;
-                let pctCalculado = totalDineroGrupo > 0 ? ((pesos / totalDineroGrupo) * 100).toFixed(2) : 0;
-                inpPct.value = pctCalculado;
+                let pesos = parseFloat(window.parseMoney(inpPesos.value)) || 0;
+                let pctCalculado = totalDineroGrupo > 0 ? ((pesos / totalDineroGrupo) * 100) : 0;
+                inpPct.dataset.raw = pctCalculado;
+                inpPct.value = pctCalculado.toFixed(2);
                 gruposDistribucion[grupoName][index].porc = parseFloat(pctCalculado);
             }
             
             let sumTotalPctCard = 0;
             gruposDistribucion[grupoName].forEach((_, idx) => {
-                sumTotalPctCard += parseFloat(document.getElementById(`pct-${grupoName}-${idx}`).value) || 0;
+                let pVal = parseFloat(window.parseMoney(document.getElementById(`pct-${grupoName}-${idx}`).value)) || 0;
+                sumTotalPctCard += pVal;
             });
             const lblSum = document.getElementById(`sum-card-pct-${grupoName}`);
             if (lblSum) {
@@ -1596,7 +1718,7 @@
                                 <button class="btn-icon" onclick="window.editarNombreGrupoDistribucion('${grupoName}')" style="font-size:12px;">✏️</button>
                             </div>
                             <div style="display:flex; align-items:center; gap:10px;">
-                                <span id="sum-card-pct-${grupoName}" style="font-size:12px; font-weight:bold; color:${colorValidacion};">Total: ${sumPorcentajesGrupo}%</span>
+                                <span id="sum-card-pct-${grupoName}" style="font-size:12px; font-weight:bold; color:${colorValidacion};">Total: ${sumPorcentajesGrupo.toFixed(1)}%</span>
                                 <span style="font-weight:600; font-size:13px;">Disponible: ${formatearDinero(totalGrupo)}</span>
                                 <button class="btn-icon" onclick="window.eliminarGrupoDistribucion('${grupoName}')" title="Eliminar Grupo Completo">❌</button>
                             </div>
@@ -1614,9 +1736,9 @@
                     htmlBlock += `
                         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                             <input type="text" value="${it.nombre}" style="flex:2; padding:5px; font-size:12px;" oninput="window.actualizarDatoObjetivoMemory('${grupoName}', ${idx}, 'nombre', this.value)" placeholder="Objetivo">
-                            <input type="number" id="pct-${grupoName}-${idx}" value="${it.porc}" style="width:60px; padding:5px; font-size:12px; text-align:center;" oninput="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pct')" placeholder="%" step="0.1">
+                            <input type="text" id="pct-${grupoName}-${idx}" value="${it.porc}" style="width:60px; padding:5px; font-size:12px; text-align:center;" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pct')" placeholder="%">
                             <span style="font-size:11px;">%</span>
-                            <input type="number" id="pesos-${grupoName}-${idx}" value="${dineroCalculado.toFixed(1)}" style="width:85px; padding:5px; font-size:12px;" oninput="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pesos')" placeholder="$">
+                            <input type="text" id="pesos-${grupoName}-${idx}" value="${formatearDinero(dineroCalculado)}" class="money-input" style="width:105px; padding:5px; font-size:12px;" data-raw="${dineroCalculado}" onfocus="window.onMoneyFocus(this)" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pesos'); window.onMoneyBlur(this, 'ARS')" placeholder="$">
                             
                             <select onchange="window.asignarAhorroObjetivo('${grupoName}', ${idx}, this.value)" style="width:110px; padding:4px; font-size:11px; background:#f1f3f4; border:1px solid #ccc; border-radius:4px;">
                                 <option value="">-- Cuenta Ahorro --</option>
@@ -1645,12 +1767,17 @@
             document.getElementById('form-ingreso').reset(); document.getElementById('ingreso-id').value = "";
             document.getElementById('titulo-modal-ingreso').innerText = "Nuevo Ingreso";
             document.getElementById('ingreso-grupo').value = "";
+            document.getElementById('ingreso-monto').dataset.raw = "";
             document.getElementById('modal-ingreso').style.display = 'flex';
         }
 
         window.abrirModalEditarIngreso = function(data) {
             document.getElementById('ingreso-id').value = data.id; document.getElementById('ingreso-nombre').value = data.nombre;
-            document.getElementById('ingreso-monto').value = data.monto; document.getElementById('ingreso-grupo').value = data.grupo || "";
+            
+            document.getElementById('ingreso-monto').dataset.raw = data.monto;
+            document.getElementById('ingreso-monto').value = window.formatearDinero(data.monto, 'ARS');
+
+            document.getElementById('ingreso-grupo').value = data.grupo || "";
             document.getElementById('titulo-modal-ingreso').innerText = "Editar Ingreso";
             document.getElementById('modal-ingreso').style.display = 'flex';
         }
@@ -1658,7 +1785,11 @@
         document.getElementById('form-ingreso').addEventListener('submit', async (e) => {
             e.preventDefault(); mostrarCargando(true);
             const id = document.getElementById('ingreso-id').value;
-            const data = { nombre: document.getElementById('ingreso-nombre').value, monto: parseFloat(document.getElementById('ingreso-monto').value), grupo: document.getElementById('ingreso-grupo').value };
+            const data = { 
+                nombre: document.getElementById('ingreso-nombre').value, 
+                monto: parseFloat(document.getElementById('ingreso-monto').dataset.raw || window.parseMoney(document.getElementById('ingreso-monto').value)), 
+                grupo: document.getElementById('ingreso-grupo').value 
+            };
             if(id) await updateDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", id), data);
             else await addDoc(collection(db, "finanzas", obtenerMesId(), "ingresos"), data);
             cerrarModal('modal-ingreso'); await actualizarDashboard();
@@ -1781,6 +1912,17 @@
                     let g = d.data();
                     if (g.propietario === 'Tercero') return;
                     let costoCalculado = getCostoCalculado(g, dDebito, dImpuesto);
+                    
+                    // Si el gasto era compartido localmente sumamos miParte
+                    if (g.compartir_con && g.compartir_tipo) {
+                        let cuotaTotal = g.tipo === 'Tarjeta' ? (costoCalculado / (g.cuotas_totales || 1)) : costoCalculado;
+                        if (g.compartir_tipo === 'divisor') {
+                            costoCalculado = cuotaTotal / (g.divisor || 2);
+                        } else if (g.compartir_tipo === 'fijo') {
+                            costoCalculado = g.monto_fijo || 0;
+                        }
+                    }
+
                     totalGas += costoCalculado;
                     
                     let catAsociada = g.categoria || "Fijos";
@@ -1836,7 +1978,8 @@
                 options: { 
                     responsive: true, maintainAspectRatio: false,
                     plugins: { legend: { position: 'bottom' } },
-                    scales: { y: { beginAtZero: true } }
+                    scales: { y: { beginAtZero: true } },
+                    tooltips: { callbacks: { label: function(t, d) { return formatearDinero(t.yLabel); } } }
                 }
             });
             mostrarCargando(false);
@@ -1862,7 +2005,9 @@
                             let tipo = (col[3]||'').toLowerCase().includes('tarjeta') ? 'Tarjeta' : 'Fijo';
                             batch.set(doc(ref), {
                                 propietario: 'Propio', tercero_nombre: '', nombre: col[0], monto: monto, moneda: col[2].toUpperCase() === 'USD' ? 'USD' : 'ARS',
-                                tipo: tipo, categoria: "Fijos", id_origen: "", recurrente: true, compartir_tipo: 'divisor', divisor: parseInt(col[4]) || 1, tarjeta: tipo === 'Tarjeta' ? (col[5]||'VISA') : null,
+                                tipo: tipo, categoria: "Fijos", id_origen: "", recurrente: true, 
+                                compartir_con: '', compartir_tipo: 'divisor', divisor: parseInt(col[4]) || 1, monto_fijo: null,
+                                tarjeta: tipo === 'Tarjeta' ? (col[5]||'VISA') : null,
                                 cuotas_totales: tipo === 'Tarjeta' ? (parseInt(col[6])||1) : null, cuotas_pagadas: tipo === 'Tarjeta' ? (parseInt(col[7])||1) : null
                             });
                             count++;
@@ -1911,6 +2056,12 @@
 
                     if(g.propietario !== 'Tercero') {
                         let costo = getCostoCalculado(g, dDebito, dImpuesto);
+                        if (g.compartir_con && g.compartir_tipo) {
+                            let cuotaTotal = g.tipo === 'Tarjeta' ? (costo / (g.cuotas_totales || 1)) : costo;
+                            if (g.compartir_tipo === 'divisor') costo = cuotaTotal / (g.divisor || 2);
+                            else costo = g.monto_fijo || 0;
+                        }
+
                         let catAsociada = g.categoria || "Fijos";
                         let origenesPanel = prevTipos[catAsociada] || [];
                         let origenId = g.id_origen || (origenesPanel.length > 0 ? origenesPanel[0] : null);
