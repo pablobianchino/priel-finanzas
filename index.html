@@ -112,7 +112,6 @@
         .saldo-ok { background-color: #e6f4ea; color: #137333; }
         .saldo-danger { background-color: #fce8e6; color: #c5221f; }
 
-        /* Meta tags for Cache Busting (optional override if index.html is loaded directly) */
         <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
         <meta http-equiv="Pragma" content="no-cache">
         <meta http-equiv="Expires" content="0">
@@ -666,6 +665,7 @@
             calcularSaldosOrigenes(gastosProc);
             renderizacioDinamicaGastosPaneles(gastosProc);
             renderTablaIngresos();
+            renderDistribucionDirecta(); 
             renderCuentasAhorro(); 
             calcularBalance();
         }
@@ -795,6 +795,21 @@
                     }
                 };
                 await setDoc(docRef, fullConfig);
+            }
+        }
+
+        function getCostoCalculado(g, dDebito, dImpuesto) {
+            let costoArsBase = g.monto;
+            if (g.moneda === 'USD') {
+                let vImp = g.monto * dImpuesto;
+                costoArsBase = (vImp * 0.02) + (vImp * 0.21) + (vImp * 0.30) + (g.monto * dDebito);
+            }
+            let divisor = g.divisor || 1;
+            if (g.propietario !== 'Tercero' && g.compartir_tipo === 'fijo') {
+                return g.monto_fijo || 0;
+            } else {
+                let cuotaBase = g.tipo === 'Tarjeta' ? (costoArsBase / (g.cuotas_totales || 1)) : costoArsBase;
+                return cuotaBase / divisor;
             }
         }
 
@@ -1043,23 +1058,24 @@
 
                 let totalPanel = itemsPanel.reduce((sum, g) => sum + g.costoCalculado, 0);
 
-                let origenAsignadoId = origenesDelPanel.length > 0 ? origenesDelPanel[0] : "";
-                let origenDoc = listaIngresos ? listaIngresos.find(i => i.id === origenAsignadoId) : null;
-                
-                let saldoTexto = "Sin origen vinculado";
-                let saldoClass = "saldo-ok";
-                if (origenDoc && origenesDelPanel.length === 1) {
-                    let consumido = sumatoriaGastosPorOrigen[origenAsignadoId] || 0;
-                    let restante = origenDoc.monto - consumido;
-                    saldoTexto = `Restante de ${origenDoc.nombre}: ${formatearDinero(restante)}`;
-                    saldoClass = restante < 0 ? "saldo-danger" : "saldo-ok";
-                } else if (origenesDelPanel.length > 1) {
-                    saldoTexto = "Múltiples orígenes vinculados";
-                    saldoClass = "saldo-ok";
+                let saldoHtml = '';
+                if (origenesDelPanel.length === 0) {
+                    saldoHtml = `<div class="saldo-ok" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; margin-bottom: 10px; display: inline-block;">Sin origen vinculado</div>`;
+                } else {
+                    let saldosPills = origenesDelPanel.map(idInc => {
+                        let io = listaIngresos.find(i => i.id === idInc);
+                        if (!io) return '';
+                        let consumido = sumatoriaGastosPorOrigen[idInc] || 0;
+                        let restante = io.monto - consumido;
+                        let bg = restante < 0 ? '#fce8e6' : '#e6f4ea';
+                        let color = restante < 0 ? '#c5221f' : '#137333';
+                        return `<div style="background-color: ${bg}; color: ${color}; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; display: inline-block; margin-right: 8px; margin-bottom: 8px;">Restante de ${io.nombre}: ${formatearDinero(restante)}</div>`;
+                    }).join('');
+                    saldoHtml = `<div style="display: flex; flex-wrap: wrap; margin-bottom: 5px;">${saldosPills}</div>`;
                 }
 
                 panelesData.push({
-                    categoria, totalPanel, itemsPanel, origenesDelPanel, saldoTexto, saldoClass
+                    categoria, totalPanel, itemsPanel, origenesDelPanel, saldoHtml
                 });
             }
 
