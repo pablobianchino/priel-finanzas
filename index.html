@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Finanzas Priel</title>
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
+    
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffffff">
     <meta name="mobile-web-app-capable" content="yes">
@@ -113,6 +111,11 @@
 
         .saldo-ok { background-color: #e6f4ea; color: #137333; }
         .saldo-danger { background-color: #fce8e6; color: #c5221f; }
+
+        /* Meta tags for Cache Busting (optional override if index.html is loaded directly) */
+        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+        <meta http-equiv="Pragma" content="no-cache">
+        <meta http-equiv="Expires" content="0">
 
         @media (max-width: 768px) {
             .sidebar { position: fixed; height: 100vh; transform: translateX(-100%); z-index: 2001; box-shadow: 2px 0 10px rgba(0,0,0,0.1); }
@@ -1040,24 +1043,23 @@
 
                 let totalPanel = itemsPanel.reduce((sum, g) => sum + g.costoCalculado, 0);
 
-                let saldoHtml = '';
-                if (origenesDelPanel.length === 0) {
-                    saldoHtml = `<div class="saldo-ok" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; margin-bottom: 10px; display: inline-block;">Sin origen vinculado</div>`;
-                } else {
-                    let saldosPills = origenesDelPanel.map(idInc => {
-                        let io = listaIngresos.find(i => i.id === idInc);
-                        if (!io) return '';
-                        let consumido = sumatoriaGastosPorOrigen[idInc] || 0;
-                        let restante = io.monto - consumido;
-                        let bg = restante < 0 ? '#fce8e6' : '#e6f4ea';
-                        let color = restante < 0 ? '#c5221f' : '#137333';
-                        return `<div style="background-color: ${bg}; color: ${color}; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; display: inline-block; margin-right: 8px; margin-bottom: 8px;">Restante de ${io.nombre}: ${formatearDinero(restante)}</div>`;
-                    }).join('');
-                    saldoHtml = `<div style="display: flex; flex-wrap: wrap; margin-bottom: 5px;">${saldosPills}</div>`;
+                let origenAsignadoId = origenesDelPanel.length > 0 ? origenesDelPanel[0] : "";
+                let origenDoc = listaIngresos ? listaIngresos.find(i => i.id === origenAsignadoId) : null;
+                
+                let saldoTexto = "Sin origen vinculado";
+                let saldoClass = "saldo-ok";
+                if (origenDoc && origenesDelPanel.length === 1) {
+                    let consumido = sumatoriaGastosPorOrigen[origenAsignadoId] || 0;
+                    let restante = origenDoc.monto - consumido;
+                    saldoTexto = `Restante de ${origenDoc.nombre}: ${formatearDinero(restante)}`;
+                    saldoClass = restante < 0 ? "saldo-danger" : "saldo-ok";
+                } else if (origenesDelPanel.length > 1) {
+                    saldoTexto = "Múltiples orígenes vinculados";
+                    saldoClass = "saldo-ok";
                 }
 
                 panelesData.push({
-                    categoria, totalPanel, itemsPanel, origenesDelPanel, saldoHtml
+                    categoria, totalPanel, itemsPanel, origenesDelPanel, saldoTexto, saldoClass
                 });
             }
 
@@ -1102,10 +1104,11 @@
                     if (g.tipo === 'Tarjeta') {
                         cuotasDetalle = `<br><span style="font-size:11px; color:#174ea6;">${g.tarjeta || 'Tarjeta'} (${g.cuotas_pagadas}/${g.cuotas_totales})</span>`;
                         if (parseInt(g.cuotas_pagadas) >= parseInt(g.cuotas_totales)) {
-                            bgRowStyle = 'background-color: #e6f4ea;';
+                            bgRowStyle = 'background-color: #e6f4ea;'; // Verde claro para última cuota
                         }
                     }
 
+                    // Boton Desglose USD
                     let usdBtn = '';
                     let breakdownHtml = '';
                     if (g.moneda === 'USD') {
@@ -1639,20 +1642,28 @@
             const inpPct = document.getElementById(`pct-${grupoName}-${index}`);
             const inpPesos = document.getElementById(`pesos-${grupoName}-${index}`);
 
+            let pesosCalculados = 0;
+
             if (disparadoPor === 'pct') {
                 let pct = parseFloat(window.parseMoney(inpPct.value)) || 0;
-                let pesosCalculados = (totalDineroGrupo * (pct / 100));
+                pesosCalculados = (totalDineroGrupo * (pct / 100));
                 inpPesos.dataset.raw = pesosCalculados;
                 inpPesos.value = window.formatearDinero(pesosCalculados);
                 gruposDistribucion[grupoName][index].porc = pct;
             } else {
-                let pesos = parseFloat(window.parseMoney(inpPesos.value)) || 0;
-                let pctCalculado = totalDineroGrupo > 0 ? ((pesos / totalDineroGrupo) * 100) : 0;
+                pesosCalculados = parseFloat(window.parseMoney(inpPesos.value)) || 0;
+                let pctCalculado = totalDineroGrupo > 0 ? ((pesosCalculados / totalDineroGrupo) * 100) : 0;
                 inpPct.dataset.raw = pctCalculado;
                 inpPct.value = pctCalculado.toFixed(2);
                 gruposDistribucion[grupoName][index].porc = parseFloat(pctCalculado);
             }
             
+            const dMep = parseFloat(document.getElementById('usd-mep').dataset.raw || 0);
+            const lblUsd = document.getElementById(`usd-calc-${grupoName}-${index}`);
+            if (lblUsd && dMep > 0) {
+                lblUsd.innerText = `U$D ${(pesosCalculados / dMep).toFixed(2)}`;
+            }
+
             let sumTotalPctCard = 0;
             gruposDistribucion[grupoName].forEach((_, idx) => {
                 let pVal = parseFloat(window.parseMoney(document.getElementById(`pct-${grupoName}-${idx}`).value)) || 0;
@@ -1687,6 +1698,8 @@
             const resDist = document.getElementById('res-ingresos-dist');
             divDist.innerHTML = '';
             
+            const dMep = parseFloat(document.getElementById('usd-mep').dataset.raw || 0);
+
             let totalDistribuibleGlobal = 0;
             sumPorGrupo = {};
             
@@ -1735,12 +1748,17 @@
                     let dineroCalculado = totalGrupo * ((it.porc || 0) / 100);
                     let opcionesAhorroHTML = cuentasAhorro.map(c => `<option value="${c.id}" ${it.ahorro_id === c.id ? 'selected':''}>${c.nombre}</option>`).join('');
 
+                    let usdText = dMep > 0 ? `<div id="usd-calc-${grupoName}-${idx}" style="font-size:10px; color:var(--text-muted); text-align:center; margin-top:2px;">U$D ${(dineroCalculado / dMep).toFixed(2)}</div>` : `<div id="usd-calc-${grupoName}-${idx}" style="font-size:10px; color:var(--text-muted); text-align:center; margin-top:2px;"></div>`;
+
                     htmlBlock += `
                         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                             <input type="text" value="${it.nombre}" style="flex:2; padding:5px; font-size:12px;" oninput="window.actualizarDatoObjetivoMemory('${grupoName}', ${idx}, 'nombre', this.value)" placeholder="Objetivo">
                             <input type="text" id="pct-${grupoName}-${idx}" value="${it.porc}" style="width:60px; padding:5px; font-size:12px; text-align:center;" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pct')" placeholder="%">
                             <span style="font-size:11px;">%</span>
-                            <input type="text" id="pesos-${grupoName}-${idx}" value="${formatearDinero(dineroCalculado)}" class="money-input" style="width:105px; padding:5px; font-size:12px;" data-raw="${dineroCalculado}" onfocus="window.onMoneyFocus(this)" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pesos'); window.onMoneyBlur(this, 'ARS')" placeholder="$">
+                            <div style="display:flex; flex-direction:column;">
+                                <input type="text" id="pesos-${grupoName}-${idx}" value="${formatearDinero(dineroCalculado)}" class="money-input" style="width:105px; padding:5px; font-size:12px;" data-raw="${dineroCalculado}" onfocus="window.onMoneyFocus(this)" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pesos'); window.onMoneyBlur(this, 'ARS')" placeholder="$">
+                                ${usdText}
+                            </div>
                             
                             <select onchange="window.asignarAhorroObjetivo('${grupoName}', ${idx}, this.value)" style="width:110px; padding:4px; font-size:11px; background:#f1f3f4; border:1px solid #ccc; border-radius:4px;">
                                 <option value="">-- Cuenta Ahorro --</option>
@@ -1750,7 +1768,8 @@
                             <button class="btn-icon" onclick="window.eliminarObjetivoLinea('${grupoName}', ${idx})">🗑️</button>
                         </div>
                     `;
-                    resHtml += `<span style="color: var(--text-main);">${it.nombre} (${it.porc}%):</span> ${formatearDinero(dineroCalculado)}<br>`;
+                    let usdSummary = dMep > 0 ? ` <span style="font-size:11px; color:var(--text-muted);">(U$D ${(dineroCalculado/dMep).toFixed(2)})</span>` : '';
+                    resHtml += `<span style="color: var(--text-main);">${it.nombre} (${it.porc}%):</span> ${formatearDinero(dineroCalculado)}${usdSummary}<br>`;
                 });
 
                 htmlBlock += `
