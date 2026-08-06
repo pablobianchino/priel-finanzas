@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Finanzas Priel</title>
     
-    <!-- Etiquetas PWA actualizadas -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffffff">
     <meta name="mobile-web-app-capable" content="yes">
@@ -588,6 +587,33 @@
             }
         };
 
+        window.toggleIngresoDetalle = function(id) {
+            const tr = document.getElementById(`detalle-ingreso-${id}`);
+            const icon = document.getElementById(`icon-ingreso-${id}`);
+            if (tr.style.display === 'none') {
+                tr.style.display = 'table-row';
+                if (icon) icon.innerText = '▼';
+            } else {
+                tr.style.display = 'none';
+                if (icon) icon.innerText = '▶';
+            }
+        }
+
+        window.filtrarGastosIngreso = function(id, text) {
+            const filter = text.toLowerCase();
+            const list = document.getElementById(`lista-gastos-ingreso-${id}`);
+            if (!list) return;
+            const items = list.querySelectorAll('.gasto-item-origen');
+            items.forEach(item => {
+                const name = item.getAttribute('data-nombre');
+                if (name.includes(filter)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
         window.toggleSidebar = function() { document.getElementById('sidebar').classList.toggle('open'); };
         
         window.switchView = async function(viewId, element) {
@@ -669,13 +695,15 @@
             calcularSaldosOrigenes(gastosProc);
             
             renderizacioDinamicaGastosPaneles(gastosProc, dDebito, dImpuesto);
-            renderTablaIngresos();
+            renderTablaIngresos(gastosProc); 
             renderDistribucionDirecta(); 
             renderCuentasAhorro(); 
             calcularBalance();
         }
 
         document.getElementById('filtro-texto-gastos').addEventListener('input', window.recargarDatosVisuales);
+        // Desactivamos este event listener en favor de hacer todo por recargarDatosVisuales
+        document.getElementById('filtro-texto-ingresos').addEventListener('input', window.recargarDatosVisuales);
 
         async function cargarGastosFetch() {
             try {
@@ -805,6 +833,21 @@
             }
         }
 
+        function getCostoCalculado(g, dDebito, dImpuesto) {
+            let costoArsBase = g.monto;
+            if (g.moneda === 'USD') {
+                let vImp = g.monto * dImpuesto;
+                costoArsBase = (vImp * 0.02) + (vImp * 0.21) + (vImp * 0.30) + (g.monto * dDebito);
+            }
+            let divisor = g.divisor || 1;
+            if (g.propietario !== 'Tercero' && g.compartir_tipo === 'fijo') {
+                return g.monto_fijo || 0;
+            } else {
+                let cuotaBase = g.tipo === 'Tarjeta' ? (costoArsBase / (g.cuotas_totales || 1)) : costoArsBase;
+                return cuotaBase / divisor;
+            }
+        }
+
         function procesarListaGastos(dDebito, dImpuesto) {
             let arr = [];
             totalGastosGlobal = 0; subtotalTerceros = 0; deudaFuturaTotal = 0;
@@ -868,24 +911,24 @@
             return arr;
         }
 
+        // Metodo helper para obtener a qué origen está forzado un gasto
+        function getOrigenIdDeGasto(g) {
+            let catAsociada = g.categoria || "Fijos";
+            let origenesPanel = tiposGastoAsociaciones[catAsociada] || [];
+            origenesPanel = origenesPanel.filter(id => id && id.trim() !== "");
+            if (origenesPanel.length === 1) return origenesPanel[0];
+            if (origenesPanel.length > 1) return origenesPanel.includes(g.id_origen) ? g.id_origen : origenesPanel[0];
+            return null;
+        }
+
         function calcularSaldosOrigenes(gastosProc) {
             sumatoriaGastosPorOrigen = {};
             if(!gastosProc) return;
 
             gastosProc.forEach(g => {
-                if (g.propietario === 'Tercero') return; 
+                if (g.propietario === 'Tercero' && !g.es_clon_destino) return; 
                 
-                let catAsociada = g.categoria || "Fijos";
-                let origenesPanel = tiposGastoAsociaciones[catAsociada] || [];
-                origenesPanel = origenesPanel.filter(id => id && id.trim() !== "");
-                
-                let origenId = null;
-                if (origenesPanel.length === 1) {
-                    origenId = origenesPanel[0]; 
-                } else if (origenesPanel.length > 1) {
-                    origenId = origenesPanel.includes(g.id_origen) ? g.id_origen : origenesPanel[0];
-                }
-                
+                let origenId = getOrigenIdDeGasto(g);
                 if (origenId) {
                     sumatoriaGastosPorOrigen[origenId] = (sumatoriaGastosPorOrigen[origenId] || 0) + g.costoCalculado;
                 }
@@ -1009,6 +1052,17 @@
             }
         };
 
+        window.toggleIgnorarOrigenGasto = async function(idGasto, isIgnored) {
+            let gasto = listaGastos.find(g => g.id === idGasto);
+            if(gasto) {
+                gasto.ignorar_origen = isIgnored;
+                try {
+                    await updateDoc(doc(db, "finanzas", obtenerMesId(), "gastos", idGasto), { ignorar_origen: isIgnored });
+                    window.recargarDatosVisuales();
+                } catch(e) { console.error("Error al actualizar ignorar origen:", e); }
+            }
+        };
+
         function renderizacioDinamicaGastosPaneles(gastosProcesados, dDebito, dImpuesto) {
             let panelesAbiertos = [];
             document.querySelectorAll('.panel-gasto-item').forEach(panel => {
@@ -1077,25 +1131,56 @@
                 let displayStyle = isOpen ? 'block' : 'none';
                 let iconText = isOpen ? '▼' : '▶';
 
+                let hasUnassociated = p.itemsPanel.some(g => {
+                    if (g.es_clon_destino) return false;
+                    let isUnassoc = false;
+                    if (p.origenesDelPanel.length > 1) {
+                        if (!g.id_origen || !p.origenesDelPanel.includes(g.id_origen)) isUnassoc = true;
+                    } else if (p.origenesDelPanel.length === 0) {
+                        isUnassoc = true;
+                    }
+                    return isUnassoc && !g.ignorar_origen;
+                });
+                
+                let alertBadge = hasUnassociated ? `<span style="background-color: #fce8e6; color: #c5221f; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 10px; vertical-align: text-bottom;">⚠️ Falta origen</span>` : '';
+
                 let itemsHTML = p.itemsPanel.map(g => {
                     let originHtml = '';
-                    if (p.origenesDelPanel.length > 1) {
-                        let options = p.origenesDelPanel.map(idInc => {
-                            let io = listaIngresos.find(i => i.id === idInc);
-                            let isSelected = (g.id_origen === idInc) ? 'selected' : '';
-                            return io ? `<option value="${io.id}" ${isSelected}>${io.nombre}</option>` : '';
-                        }).join('');
-                        
-                        originHtml = `
-                            <br>
-                            <select onchange="window.cambiarOrigenGastoDirecto('${g.id}', this.value)" style="font-size:10px; padding:2px; margin-top:4px; max-width: 140px; border-radius:4px; border:1px solid #ccc; background:#fff;">
-                                <option value="" ${!g.id_origen ? 'selected' : ''}>- Seleccionar Origen -</option>
-                                ${options}
-                            </select>
+                    let isUnassociated = false; 
+
+                    if (!g.es_clon_destino) {
+                        if (p.origenesDelPanel.length > 1) {
+                            let options = p.origenesDelPanel.map(idInc => {
+                                let io = listaIngresos.find(i => i.id === idInc);
+                                let isSelected = (g.id_origen === idInc) ? 'selected' : '';
+                                return io ? `<option value="${io.id}" ${isSelected}>${io.nombre}</option>` : '';
+                            }).join('');
+                            
+                            originHtml = `
+                                <br>
+                                <select onchange="window.cambiarOrigenGastoDirecto('${g.id}', this.value)" style="font-size:10px; padding:2px; margin-top:4px; max-width: 140px; border-radius:4px; border:1px solid #ccc; background:#fff;">
+                                    <option value="" ${!g.id_origen ? 'selected' : ''}>- Seleccionar Origen -</option>
+                                    ${options}
+                                </select>
+                            `;
+                            if (!g.id_origen || !p.origenesDelPanel.includes(g.id_origen)) isUnassociated = true; 
+                        } else if (p.origenesDelPanel.length === 1) {
+                            let io = listaIngresos.find(i=>i.id === p.origenesDelPanel[0]);
+                            if(io) originHtml = `<br><span style="font-size:10px; color:var(--text-muted);">De: ${io.nombre}</span>`;
+                        } else {
+                            isUnassociated = true; 
+                        }
+                    }
+
+                    if (!g.es_clon_destino && isUnassociated) {
+                        originHtml += `
+                            <div style="margin-top: 4px; padding: 2px 4px; background: ${g.ignorar_origen ? '#f1f3f4' : '#fce8e6'}; border-radius: 4px; display: inline-block;">
+                                <label style="font-size:10px; color:${g.ignorar_origen ? '#5f6368' : '#c5221f'}; display:flex; align-items:center; gap:4px; cursor:pointer; margin:0;">
+                                    <input type="checkbox" onchange="window.toggleIgnorarOrigenGasto('${g.id}', this.checked)" ${g.ignorar_origen ? 'checked' : ''} style="width:12px; height:12px; margin:0; cursor:pointer;"> 
+                                    ${g.ignorar_origen ? 'Aviso ignorado' : 'Ignorar falta de origen'}
+                                </label>
+                            </div>
                         `;
-                    } else if (p.origenesDelPanel.length === 1) {
-                        let io = listaIngresos.find(i=>i.id === p.origenesDelPanel[0]);
-                        if(io) originHtml = `<br><span style="font-size:10px; color:var(--text-muted);">De: ${io.nombre}</span>`;
                     }
                     
                     let recCheckbox = g.tipo === 'Tarjeta' ? '<span style="color:#ccc; font-size:10px;">N/A</span>' : `<input type="checkbox" style="cursor:pointer;" onchange="window.toggleRecurrenciaGasto('${g.id}', this.checked)" ${g.recurrente !== false ? 'checked' : ''}>`;
@@ -1105,10 +1190,11 @@
                     if (g.tipo === 'Tarjeta') {
                         cuotasDetalle = `<br><span style="font-size:11px; color:#174ea6;">${g.tarjeta || 'Tarjeta'} (${g.cuotas_pagadas}/${g.cuotas_totales})</span>`;
                         if (parseInt(g.cuotas_pagadas) >= parseInt(g.cuotas_totales)) {
-                            bgRowStyle = 'background-color: #e6f4ea;';
+                            bgRowStyle = 'background-color: #e6f4ea;'; // Verde claro para última cuota
                         }
                     }
 
+                    // Boton Desglose USD
                     let usdBtn = '';
                     let breakdownHtml = '';
                     if (g.moneda === 'USD') {
@@ -1137,7 +1223,7 @@
                         actionsHtml = `<span style="font-size:10px; color:#c5221f; font-weight:600;">🔒 Compartido (Edite el original)</span>`;
                     } else {
                         actionsHtml = `
-                            <button class="btn-icon" onclick='abrirModalEditarGasto(${JSON.stringify(g)})'>✏️</button>
+                            <button class="btn-icon" onclick='abrirModalEditarGasto(${JSON.stringify(g).replace(/'/g, "&apos;")})'>✏️</button>
                             <button class="btn-icon" onclick="borrarGasto('${g.id}')">🗑️</button>
                         `;
                     }
@@ -1159,7 +1245,7 @@
                             <span class="drag-handle" style="cursor:grab; margin-right:10px; font-size:20px; color:#ccc;">⠿</span>
                             <div class="card-header-toggle" onclick="window.togglePanelGasto(this)" style="margin-bottom:0; flex:1; display:flex; justify-content:space-between; align-items:center;">
                                 <h2 style="margin:0; font-size:15px; flex:1;">
-                                    ${p.categoria} 
+                                    ${p.categoria} ${alertBadge}
                                     <span style="font-weight:normal; font-size:13px; color:var(--text-muted);">
                                         | Total: <b style="color:var(--text-main);">${formatearDinero(p.totalPanel)}</b>
                                     </span>
@@ -1368,6 +1454,12 @@
                 monto_fijo: (prop === 'Propio' && checkboxCompartir && compTipo === 'fijo') ? montoFijo : null
             };
 
+            // Maintain the ignore flag if it was already set
+            let oldGasto = listaGastos.find(g => g.id === idGasto);
+            if(oldGasto && oldGasto.ignorar_origen !== undefined) {
+                datosGasto.ignorar_origen = oldGasto.ignorar_origen;
+            }
+
             if (tipo === 'Tarjeta') {
                 datosGasto.tarjeta = document.getElementById('gasto-tarjeta').value;
                 datosGasto.cuotas_totales = parseInt(document.getElementById('gasto-cuotas-totales').value) || 1;
@@ -1561,7 +1653,7 @@
             });
 
             if(cuentasAhorro.length === 0) {
-                cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro. Haz click en "Nueva Cuenta" para empezar.</p>`;
+                cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro.</p>`;
             }
 
             if(htmlResumen === '') htmlResumen = '<p style="color:var(--text-muted); font-size:13px;">No hay ahorros planificados este mes.</p>';
@@ -1822,13 +1914,19 @@
             await actualizarDashboard(); 
         };
 
-        function renderTablaIngresos() {
+        function renderTablaIngresos(gastosProc) {
             const tabla = document.getElementById('tabla-ingresos');
             tabla.innerHTML = ''; 
             totalIngresosGlobal = 0;
             let totalDisponibleGlobalIngresos = 0;
             
             let chartLabels = []; let chartData = []; let chartColors = [];
+
+            if (!Array.isArray(gastosProc)) {
+                const dDebito = parseFloat(document.getElementById('usd-debito').dataset.raw || 0);
+                const dImpuesto = parseFloat(document.getElementById('usd-impuesto').dataset.raw || 0);
+                gastosProc = procesarListaGastos(dDebito, dImpuesto);
+            }
 
             const filter = document.getElementById('filtro-texto-ingresos').value.toLowerCase();
 
@@ -1847,10 +1945,16 @@
                     chartData.push(data.monto); 
                     chartColors.push(assignedColor);
 
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
+                    let gastosAsociados = gastosProc.filter(g => g.propietario !== 'Tercero' && getOrigenIdDeGasto(g) === data.id);
+
+                    const trMain = document.createElement('tr');
+                    trMain.className = "tr-clickable";
+                    trMain.onclick = function() { window.toggleIngresoDetalle(data.id); };
+                    
+                    trMain.innerHTML = `
                         <td>
                             <div style="display:flex; align-items:center; gap:8px;">
+                                <span id="icon-ingreso-${data.id}" style="font-size:10px; color:var(--text-muted);">▶</span>
                                 <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${assignedColor};"></span>
                                 ${data.nombre}
                             </div>
@@ -1859,11 +1963,33 @@
                         <td style="color:var(--text-muted);">${formatearDinero(data.monto)}</td>
                         <td style="font-weight:600; color:${disponibleReal < 0 ? '#d93025' : '#137333'}">${formatearDinero(disponibleReal)}</td>
                         <td style="white-space: nowrap;">
-                            <button class="btn-icon" onclick='abrirModalEditarIngreso(${JSON.stringify(data)})'>✏️</button>
-                            <button class="btn-icon" onclick="borrarIngreso('${data.id}')">🗑️</button>
+                            <button class="btn-icon" onclick='event.stopPropagation(); abrirModalEditarIngreso(${JSON.stringify(data).replace(/"/g, '&quot;')})'>✏️</button>
+                            <button class="btn-icon" onclick="event.stopPropagation(); borrarIngreso('${data.id}')">🗑️</button>
                         </td>
                     `;
-                    tabla.appendChild(tr);
+                    tabla.appendChild(trMain);
+
+                    const trDetail = document.createElement('tr');
+                    trDetail.id = `detalle-ingreso-${data.id}`;
+                    trDetail.className = "details-row";
+                    trDetail.style.display = "none";
+                    trDetail.innerHTML = `
+                        <td colspan="5" style="padding: 10px 15px; background-color: #fcfcfc; border-bottom: 2px solid var(--card-border);">
+                            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                                <span style="font-size: 13px; font-weight: 600;">Gastos de este origen</span>
+                                <input type="text" placeholder="Buscar gasto..." style="padding: 4px 8px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px; width: 150px;" onkeyup="window.filtrarGastosIngreso('${data.id}', this.value)">
+                            </div>
+                            <ul id="lista-gastos-ingreso-${data.id}" style="list-style: none; padding: 0; margin: 0; font-size: 12px; color: var(--text-muted); display:flex; flex-direction:column; gap:4px; max-height: 200px; overflow-y: auto;">
+                                ${gastosAsociados.length > 0 ? gastosAsociados.map(g => `
+                                    <li class="gasto-item-origen" data-nombre="${g.nombre.toLowerCase()}">
+                                        <span style="display:inline-block; width:90px; font-weight:600; color:var(--text-main);">${formatearDinero(g.costoCalculado)}</span> - 
+                                        <span>${g.nombre} <i style="color:#aaa; font-size:10px;">(${g.categoria})</i></span>
+                                    </li>
+                                `).join('') : '<li style="color:#999; font-style:italic;">No hay gastos descontados de este origen</li>'}
+                            </ul>
+                        </td>
+                    `;
+                    tabla.appendChild(trDetail);
                 });
             }
 
@@ -1876,8 +2002,6 @@
                 type: 'pie', data: { labels: chartLabels, datasets: [{ data: chartData, backgroundColor: chartColors }] }, 
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
             });
-
-            renderDistribucionDirecta();
         }
 
         function calcularBalance() {
