@@ -151,14 +151,15 @@
     <div id="app-container" style="display: none; width: 100%; height: 100%;">
         <nav class="sidebar" id="sidebar">
             <div class="logo">Finanzas Priel</div>
-            <button class="nav-btn active" onclick="switchView('resumen', this)">㗊 Resumen</button>
-            <button class="nav-btn" onclick="switchView('ingresos', this)">💲 Ingresos / Objetivos</button>
-            <button class="nav-btn" onclick="switchView('ahorros', this)">🐷 Ahorros</button>
-            <button class="nav-btn" onclick="switchView('gastos', this)">🧾 Gastos</button>
-            <button class="nav-btn" onclick="switchView('estadisticas', this)">📊 Estadísticas</button>
+            <button class="nav-btn active" onclick="switchView('resumen', this)">⊞ Resumen</button>
+            <button class="nav-btn" onclick="switchView('gastos', this)">▼ Gastos</button>
+            <button class="nav-btn" onclick="switchView('ingresos', this)">▲ Ingresos / Objetivos</button>
+            <button class="nav-btn" onclick="switchView('ahorros', this)">◆ Ahorros</button>
+            <button class="nav-btn" onclick="switchView('estadisticas', this)">▤ Estadísticas</button>
             
             <div class="user-info">
                 <span id="user-email">No autenticado</span><br>
+                <div style="font-size: 10px; margin-top: 4px; color: #9aa0a6;">v1.5.0</div>
                 <a href="#" id="logout-btn" style="color: #d93025; text-decoration: none; margin-top: 10px; display: none; font-weight: 500;">Salir</a>
             </div>
         </nav>
@@ -702,7 +703,7 @@
         }
 
         document.getElementById('filtro-texto-gastos').addEventListener('input', window.recargarDatosVisuales);
-        // Desactivamos este event listener en favor de hacer todo por recargarDatosVisuales
+        
         document.getElementById('filtro-texto-ingresos').addEventListener('input', window.recargarDatosVisuales);
 
         async function cargarGastosFetch() {
@@ -911,7 +912,6 @@
             return arr;
         }
 
-        // Metodo helper para obtener a qué origen está forzado un gasto
         function getOrigenIdDeGasto(g) {
             let catAsociada = g.categoria || "Fijos";
             let origenesPanel = tiposGastoAsociaciones[catAsociada] || [];
@@ -1763,7 +1763,7 @@
             });
             const lblSum = document.getElementById(`sum-card-pct-${grupoName}`);
             if (lblSum) {
-                lblSum.innerText = `Total: ${sumTotalPctCard.toFixed(1)}%`;
+                lblSum.innerText = `Total: ${sumTotalPctCard.toFixed(2)}%`;
                 lblSum.style.color = Math.abs(sumTotalPctCard - 100) < 0.1 ? 'green' : 'red';
             }
 
@@ -1825,7 +1825,7 @@
                                 <button class="btn-icon" onclick="window.editarNombreGrupoDistribucion('${grupoName}')" style="font-size:12px;">✏️</button>
                             </div>
                             <div style="display:flex; align-items:center; gap:10px;">
-                                <span id="sum-card-pct-${grupoName}" style="font-size:12px; font-weight:bold; color:${colorValidacion};">Total: ${sumPorcentajesGrupo.toFixed(1)}%</span>
+                                <span id="sum-card-pct-${grupoName}" style="font-size:12px; font-weight:bold; color:${colorValidacion};">Total: ${sumPorcentajesGrupo.toFixed(2)}%</span>
                                 <span style="font-weight:600; font-size:13px;">Disponible: ${formatearDinero(totalGrupo)}</span>
                                 <button class="btn-icon" onclick="window.eliminarGrupoDistribucion('${grupoName}')" title="Eliminar Grupo Completo">❌</button>
                             </div>
@@ -1845,7 +1845,7 @@
                     htmlBlock += `
                         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                             <input type="text" value="${it.nombre}" style="flex:2; padding:5px; font-size:12px;" oninput="window.actualizarDatoObjetivoMemory('${grupoName}', ${idx}, 'nombre', this.value)" placeholder="Objetivo">
-                            <input type="text" id="pct-${grupoName}-${idx}" value="${it.porc}" style="width:60px; padding:5px; font-size:12px; text-align:center;" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pct')" placeholder="%">
+                            <input type="text" id="pct-${grupoName}-${idx}" value="${Number(it.porc).toFixed(2)}" style="width:60px; padding:5px; font-size:12px; text-align:center;" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pct')" placeholder="%">
                             <span style="font-size:11px;">%</span>
                             <div style="display:flex; flex-direction:column;">
                                 <input type="text" id="pesos-${grupoName}-${idx}" value="${formatearDinero(dineroCalculado)}" class="money-input" style="width:105px; padding:5px; font-size:12px;" data-raw="${dineroCalculado}" onfocus="window.onMoneyFocus(this)" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pesos'); window.onMoneyBlur(this, 'ARS')" placeholder="$">
@@ -1861,7 +1861,7 @@
                         </div>
                     `;
                     let usdSummary = dMep > 0 ? ` <span style="font-size:11px; color:var(--text-muted);">(U$D ${(dineroCalculado/dMep).toFixed(2)})</span>` : '';
-                    resHtml += `<span style="color: var(--text-main);">${it.nombre} (${it.porc}%):</span> ${formatearDinero(dineroCalculado)}${usdSummary}<br>`;
+                    resHtml += `<span style="color: var(--text-main);">${it.nombre} (${Number(it.porc).toFixed(2)}%):</span> ${formatearDinero(dineroCalculado)}${usdSummary}<br>`;
                 });
 
                 htmlBlock += `
