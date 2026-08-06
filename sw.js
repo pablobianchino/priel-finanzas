@@ -1,4 +1,4 @@
-const CACHE_NAME = 'finanzas-priel-v2'; // Cuando hagas un cambio MUY grande, cambias a v3, v4, etc.
+const CACHE_NAME = 'finanzas-priel-v3'; // Cuando hagas un cambio MUY grande, cambias a v3, v4, etc.
 const urlsToCache = [
   '/',
   '/index.html',
