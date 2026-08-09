@@ -41,10 +41,19 @@
             background: rgba(255,255,255,0.9); z-index: 4000; justify-content: center; align-items: center; flex-direction: column;
         }
 
+        /* SIDEBAR OVERLAY */
+        .sidebar-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.5); z-index: 2000;
+        }
+        .sidebar-overlay.open { display: block; }
+        
         .sidebar {
             width: 250px; background-color: var(--sidebar-bg); border-right: 1px solid var(--card-border);
-            display: flex; flex-direction: column; padding: 20px 0; transition: transform 0.3s ease;
+            display: flex; flex-direction: column; padding: 20px 0; transition: transform 0.3s ease; z-index: 2001;
         }
+
+        .close-sidebar-btn { display: none; }
 
         .logo { text-align: center; font-size: 22px; font-weight: 600; color: var(--text-main); margin-bottom: 30px; }
 
@@ -117,6 +126,7 @@
         <meta http-equiv="Expires" content="0">
 
         @media (max-width: 768px) {
+            .close-sidebar-btn { display: block; background: none; border: none; font-size: 20px; color: var(--text-main); cursor: pointer; align-self: flex-end; padding: 0 20px; margin-bottom: -15px; margin-top: 5px; }
             .sidebar { position: fixed; height: 100vh; transform: translateX(-100%); z-index: 2001; box-shadow: 2px 0 10px rgba(0,0,0,0.1); }
             .sidebar.open { transform: translateX(0); }
             .mobile-menu-btn { display: block; }
@@ -149,7 +159,12 @@
     </div>
 
     <div id="app-container" style="display: none; width: 100%; height: 100%;">
+        
+        <!-- Overlay para movil -->
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+        
         <nav class="sidebar" id="sidebar">
+            <button class="close-sidebar-btn" onclick="toggleSidebar()">✖</button>
             <div class="logo">Finanzas Priel</div>
             <button class="nav-btn active" onclick="switchView('resumen', this)">⊞ Resumen</button>
             <button class="nav-btn" onclick="switchView('gastos', this)">▼ Gastos</button>
@@ -159,7 +174,7 @@
             
             <div class="user-info">
                 <span id="user-email">No autenticado</span><br>
-                <div style="font-size: 10px; margin-top: 4px; color: #9aa0a6;">v1.5.0</div>
+                <div style="font-size: 10px; margin-top: 4px; color: #9aa0a6;">v1.6.0</div>
                 <a href="#" id="logout-btn" style="color: #d93025; text-decoration: none; margin-top: 10px; display: none; font-weight: 500;">Salir</a>
             </div>
         </nav>
@@ -243,74 +258,6 @@
                 </div>
             </div>
 
-            <!-- Ingresos y Distribución Directa -->
-            <div id="ingresos" class="view">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
-                    <h2 style="margin: 0;">Gestión de Ingresos</h2>
-                    <div style="display: flex; gap: 10px;">
-                        <button onclick="abrirModalNuevoIngreso()" class="btn-black">➕ Nuevo Ingreso</button>
-                        <button onclick="crearNuevoGrupoDistribucion()" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">➕ Nuevo Grupo Dist.</button>
-                    </div>
-                </div>
-                <div class="filter-bar"><input type="text" id="filtro-texto-ingresos" placeholder="Buscar ingreso..." style="flex: 1;"></div>
-                <div class="grid-2">
-                    <div class="card" style="border-top: 4px solid #34A853;">
-                        <div class="card-header-toggle" onclick="toggleCard(this)">
-                            <h3 style="font-size:15px;">Ingresos del Mes</h3>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <div style="display:flex; flex-direction:column; text-align:right;">
-                                    <span style="font-size: 11px; color:var(--text-muted);">Total Bruto: <span id="sum-ingresos-mes"></span></span>
-                                    <span class="value" id="sum-ingresos-disponible" style="font-size: 16px; margin: 0; color:#137333;">$0,00 Disp.</span>
-                                </div>
-                                <span class="toggle-icon">▼</span>
-                            </div>
-                        </div>
-                        <div class="card-content">
-                            <table>
-                                <thead><tr><th>Origen</th><th>Grupo Vinculado</th><th>Bruto</th><th>Disponible</th><th>⚙️</th></tr></thead>
-                                <tbody id="tabla-ingresos"></tbody>
-                            </table>
-                            <div class="chart-container" style="height: 250px; margin-top:20px;"><canvas id="chart-ingresos-mes"></canvas></div>
-                        </div>
-                    </div>
-                    <div class="card" style="border-top: 4px solid #f29900;">
-                        <div class="card-header-toggle" onclick="toggleCard(this)">
-                            <h3 style="font-size: 15px;">Distribución Directa de Objetivos</h3><span class="toggle-icon">▼</span>
-                        </div>
-                        <div class="card-content" id="tabla-distribucion"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Módulo de Ahorros Acumulados -->
-            <div id="ahorros" class="view">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
-                    <h2 style="margin: 0;">Cuentas de Ahorro Histórico</h2>
-                    <div style="display: flex; gap: 10px;">
-                        <button onclick="crearCuentaAhorro()" class="btn-black">➕ Nueva Cuenta</button>
-                    </div>
-                </div>
-                
-                <div class="cards-grid">
-                    <div class="card" style="border-top: 4px solid #9c27b0;">
-                        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px;">
-                            <div>
-                                <h3>Total Global Ahorrado (Histórico)</h3>
-                                <div class="value" id="sum-ahorros-total" style="display: flex; flex-direction: column; gap: 5px; font-size: 22px;">$0,00</div>
-                            </div>
-                            <div style="text-align: right;">
-                                <h3 style="color: #137333;">Total Depositado (Mes Actual)</h3>
-                                <div class="value" id="sum-ahorros-depositado" style="color: #137333; font-size: 22px; display: flex; flex-direction: column; gap: 5px;">$0,00</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div id="contenedor-cuentas-ahorro" class="cards-grid">
-                    <!-- Dinámico Cuentas -->
-                </div>
-            </div>
-
             <!-- Gastos con Paneles Dinámicos -->
             <div id="gastos" class="view">
                 
@@ -352,6 +299,76 @@
                 <div id="contenedor-dinamico-gastos" style="display: flex; flex-direction: column; gap: 15px;"></div>
             </div>
 
+            <!-- Ingresos y Distribución Directa -->
+            <div id="ingresos" class="view">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
+                    <h2 style="margin: 0;">Gestión de Ingresos</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="window.abrirModalHistorial()" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">🧾 Historial Ahorros</button>
+                        <button onclick="abrirModalNuevoIngreso()" class="btn-black">➕ Nuevo Ingreso</button>
+                        <button onclick="crearNuevoGrupoDistribucion()" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">➕ Nuevo Grupo Dist.</button>
+                    </div>
+                </div>
+                <div class="filter-bar"><input type="text" id="filtro-texto-ingresos" placeholder="Buscar ingreso..." style="flex: 1;"></div>
+                <div class="grid-2">
+                    <div class="card" style="border-top: 4px solid #34A853;">
+                        <div class="card-header-toggle" onclick="toggleCard(this)">
+                            <h3 style="font-size:15px;">Ingresos del Mes</h3>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <div style="display:flex; flex-direction:column; text-align:right;">
+                                    <span style="font-size: 11px; color:var(--text-muted);">Total Bruto: <span id="sum-ingresos-mes"></span></span>
+                                    <span class="value" id="sum-ingresos-disponible" style="font-size: 16px; margin: 0; color:#137333;">$0,00 Disp.</span>
+                                </div>
+                                <span class="toggle-icon">▼</span>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <table>
+                                <thead><tr><th>Origen</th><th>Grupo Vinculado</th><th>Bruto</th><th>Disponible</th><th>⚙️</th></tr></thead>
+                                <tbody id="tabla-ingresos"></tbody>
+                            </table>
+                            <div class="chart-container" style="height: 250px; margin-top:20px;"><canvas id="chart-ingresos-mes"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="card" style="border-top: 4px solid #f29900;">
+                        <div class="card-header-toggle" onclick="toggleCard(this)">
+                            <h3 style="font-size: 15px;">Distribución Directa de Objetivos</h3><span class="toggle-icon">▼</span>
+                        </div>
+                        <div class="card-content" id="tabla-distribucion"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Módulo de Ahorros Acumulados -->
+            <div id="ahorros" class="view">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
+                    <h2 style="margin: 0;">Cuentas de Ahorro Histórico</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="window.abrirModalHistorial()" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">🧾 Ver Historial</button>
+                        <button onclick="crearCuentaAhorro()" class="btn-black">➕ Nueva Cuenta</button>
+                    </div>
+                </div>
+                
+                <div class="cards-grid">
+                    <div class="card" style="border-top: 4px solid #9c27b0;">
+                        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px;">
+                            <div>
+                                <h3>Total Global Ahorrado (Histórico)</h3>
+                                <div class="value" id="sum-ahorros-total" style="display: flex; flex-direction: column; gap: 5px; font-size: 22px;">$0,00</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <h3 style="color: #137333;">Total Depositado (Mes Actual)</h3>
+                                <div class="value" id="sum-ahorros-depositado" style="color: #137333; font-size: 22px; display: flex; flex-direction: column; gap: 5px;">$0,00</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="contenedor-cuentas-ahorro" class="cards-grid">
+                    <!-- Dinámico Cuentas -->
+                </div>
+            </div>
+
             <!-- Estadísticas Anuales -->
             <div id="estadisticas" class="view">
                 <div class="card" style="border-top: 4px solid var(--text-main);">
@@ -364,6 +381,17 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Modal Historial Ahorros -->
+    <div id="modal-historial" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2 style="margin: 0; font-size: 18px;">Historial de Ahorros y Retiros</h2>
+                <button class="modal-close" onclick="cerrarModal('modal-historial')">✖</button>
+            </div>
+            <div id="historial-lista" style="max-height: 400px; overflow-y: auto; font-size: 13px;"></div>
+        </div>
     </div>
 
     <!-- Modales -->
@@ -490,7 +518,6 @@
         const anioSelector = document.getElementById('anio-selector');
         const colorPalette = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#9C27B0', '#00BCD4', '#FF9800', '#795548', '#8BC34A', '#E91E63', '#3F51B5'];
 
-        // Seteo de fecha actual automatica al cargar scripts
         const today = new Date();
         const currentMonth = String(today.getMonth() + 1).padStart(2, '0');
         const currentYear = String(today.getFullYear());
@@ -507,6 +534,7 @@
         anioSelector.value = currentYear;
 
         let totalGastosGlobal = 0, subtotalTerceros = 0, totalIngresosGlobal = 0, deudaFuturaTotal = 0;
+        let totalAhorrosEfectivizados = 0;
         let listaGastos = [], listaIngresos = [], listaAhorros = [];
         let chartResumen = null, chartIngresos = null, chartEstadisticas = null;
         
@@ -514,12 +542,12 @@
         let tiposGastoAsociaciones = {}; 
         let ordenPanelesGasto = [];
         let cuentasAhorro = []; 
+        let historialAhorros = [];
         let sumPorGrupo = {};
         let sumatoriaGastosPorOrigen = {};
         let debounceTimer;
         let sortablePaneles = null;
 
-        // --- SISTEMA DE MONEDAS ---
         window.parseMoney = function(val) {
             if(!val) return 0;
             let clean = String(val).replace(/[^0-9.,-]/g, '');
@@ -615,7 +643,10 @@
             });
         }
 
-        window.toggleSidebar = function() { document.getElementById('sidebar').classList.toggle('open'); };
+        window.toggleSidebar = function() { 
+            document.getElementById('sidebar').classList.toggle('open'); 
+            document.getElementById('sidebar-overlay').classList.toggle('open');
+        };
         
         window.switchView = async function(viewId, element) {
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -623,7 +654,7 @@
             document.getElementById(viewId).classList.add('active');
             element.classList.add('active');
             document.getElementById('view-title').innerText = element.innerText.replace(/[^\w\s]/gi, '').trim();
-            if(window.innerWidth <= 768) toggleSidebar();
+            if(window.innerWidth <= 768) window.toggleSidebar();
             if (viewId === 'estadisticas') await cargarEstadisticasAnuales();
         };
 
@@ -695,6 +726,13 @@
             let gastosProc = procesarListaGastos(dDebito, dImpuesto);
             calcularSaldosOrigenes(gastosProc);
             
+            totalAhorrosEfectivizados = 0;
+            for(let g in gruposDistribucion) {
+                gruposDistribucion[g].forEach(it => {
+                    if (it.ahorrado) totalAhorrosEfectivizados += (it.monto_ahorrado || 0);
+                });
+            }
+
             renderizacioDinamicaGastosPaneles(gastosProc, dDebito, dImpuesto);
             renderTablaIngresos(gastosProc); 
             renderDistribucionDirecta(); 
@@ -703,7 +741,6 @@
         }
 
         document.getElementById('filtro-texto-gastos').addEventListener('input', window.recargarDatosVisuales);
-        
         document.getElementById('filtro-texto-ingresos').addEventListener('input', window.recargarDatosVisuales);
 
         async function cargarGastosFetch() {
@@ -774,6 +811,7 @@
                     tiposGastoAsociaciones = oldTipos;
                     cuentasAhorro = config.cuentas_ahorro || [];
                     ordenPanelesGasto = config.orden_paneles_gasto || [];
+                    historialAhorros = config.historial_ahorros || [];
 
                 } else {
                     document.getElementById('usd-mep').dataset.raw = 0; document.getElementById('usd-mep').value = window.formatearDinero(0);
@@ -787,6 +825,7 @@
                     tiposGastoAsociaciones = { "Fijos": [], "Tarjeta": [], "Terceros": [] };
                     cuentasAhorro = [];
                     ordenPanelesGasto = [];
+                    historialAhorros = [];
                 }
                 
                 Object.keys(tiposGastoAsociaciones).forEach(cat => {
@@ -800,6 +839,7 @@
                 tiposGastoAsociaciones = { "Fijos": [], "Tarjeta": [], "Terceros": [] };
                 cuentasAhorro = [];
                 ordenPanelesGasto = [];
+                historialAhorros = [];
             }
         }
 
@@ -827,7 +867,8 @@
                         grupos_distribucion: gruposDistribucion,
                         tipos_gasto: tiposGastoAsociaciones,
                         cuentas_ahorro: cuentasAhorro,
-                        orden_paneles_gasto: ordenPanelesGasto
+                        orden_paneles_gasto: ordenPanelesGasto,
+                        historial_ahorros: historialAhorros
                     }
                 };
                 await setDoc(docRef, fullConfig);
@@ -1190,11 +1231,10 @@
                     if (g.tipo === 'Tarjeta') {
                         cuotasDetalle = `<br><span style="font-size:11px; color:#174ea6;">${g.tarjeta || 'Tarjeta'} (${g.cuotas_pagadas}/${g.cuotas_totales})</span>`;
                         if (parseInt(g.cuotas_pagadas) >= parseInt(g.cuotas_totales)) {
-                            bgRowStyle = 'background-color: #e6f4ea;'; // Verde claro para última cuota
+                            bgRowStyle = 'background-color: #e6f4ea;';
                         }
                     }
 
-                    // Boton Desglose USD
                     let usdBtn = '';
                     let breakdownHtml = '';
                     if (g.moneda === 'USD') {
@@ -1585,6 +1625,29 @@
             await actualizarDashboard();
         }
 
+        window.abrirModalHistorial = function() {
+            const container = document.getElementById('historial-lista');
+            container.innerHTML = '';
+            if(!historialAhorros || historialAhorros.length === 0) {
+                container.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding: 20px;">No hay movimientos recientes.</p>';
+            } else {
+                historialAhorros.forEach(h => {
+                    let color = h.accion === 'Ahorrado' ? '#137333' : '#c5221f';
+                    let icon = h.accion === 'Ahorrado' ? '💰' : '🔙';
+                    container.innerHTML += `
+                        <div style="border-bottom: 1px solid #eee; padding: 10px 0; display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <div style="font-size:11px; color:var(--text-muted);">${h.fecha}</div>
+                                <div style="font-weight:500;">${icon} ${h.accion}: <span style="font-weight:normal;">${h.objetivo} -> ${h.cuenta}</span></div>
+                            </div>
+                            <div style="font-weight:bold; color:${color};">${formatearDinero(h.monto)}</div>
+                        </div>
+                    `;
+                });
+            }
+            document.getElementById('modal-historial').style.display = 'flex';
+        }
+
         function renderCuentasAhorro() {
             const cont = document.getElementById('contenedor-cuentas-ahorro');
             cont.innerHTML = '';
@@ -1592,7 +1655,8 @@
             let totalAhorrosHistorico = 0;
             let totalDepositadoMes = 0;
             let ahorrosSumaMesActual = {};
-            cuentasAhorro.forEach(c => ahorrosSumaMesActual[c.id] = 0);
+            let ahorrosProyectado = {};
+            cuentasAhorro.forEach(c => { ahorrosSumaMesActual[c.id] = 0; ahorrosProyectado[c.id] = 0; });
             const dMep = parseFloat(document.getElementById('usd-mep').dataset.raw || 0);
 
             for(let grupoName in gruposDistribucion) {
@@ -1600,7 +1664,11 @@
                 let arrItems = Array.isArray(gruposDistribucion[grupoName]) ? gruposDistribucion[grupoName] : [];
                 arrItems.forEach(it => {
                     if(it && it.ahorro_id && ahorrosSumaMesActual[it.ahorro_id] !== undefined) {
-                        ahorrosSumaMesActual[it.ahorro_id] += totalGrupo * (it.porc / 100);
+                        if (it.ahorrado) {
+                            ahorrosSumaMesActual[it.ahorro_id] += (it.monto_ahorrado || 0);
+                        } else {
+                            ahorrosProyectado[it.ahorro_id] += totalGrupo * (it.porc / 100);
+                        }
                     }
                 });
             }
@@ -1609,15 +1677,16 @@
 
             cuentasAhorro.forEach(c => {
                 let aporteMes = ahorrosSumaMesActual[c.id] || 0;
+                let proyMes = ahorrosProyectado[c.id] || 0;
                 let saldoAnt = c.saldo_anterior || 0;
                 let retiros = c.retiros || 0;
-                let sumaTotal = saldoAnt + aporteMes - retiros;
+                let sumaTotal = saldoAnt + aporteMes - retiros; // Solo sumamos lo EFECTIVAMENTE ahorrado este mes
 
                 totalAhorrosHistorico += sumaTotal;
                 if (c.depositado) totalDepositadoMes += aporteMes;
 
-                if (aporteMes > 0) {
-                    htmlResumen += `<div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;"><span>${c.nombre} ${c.depositado?'(Depositado)':''}</span> <strong style="color:#673ab7;">${formatearDinero(aporteMes)}</strong></div>`;
+                if (aporteMes > 0 || proyMes > 0) {
+                    htmlResumen += `<div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;"><span>${c.nombre} ${c.depositado?'(Depositado)':''}</span> <strong style="color:#673ab7;">${formatearDinero(aporteMes)} <span style="font-size:10px; color:var(--text-muted); font-weight:normal;">+${formatearDinero(proyMes)} proy.</span></strong></div>`;
                 }
 
                 let bgStyle = c.depositado ? 'background-color: #e6f4ea; border: 2px solid #137333;' : 'border-top: 4px solid #673ab7; cursor: pointer;';
@@ -1626,7 +1695,8 @@
                 let usdText = dMep > 0 ? `<div style="font-size:14px; color:var(--text-muted); margin-top:5px;">U$D ${(sumaTotal / dMep).toFixed(2)}</div>` : '';
                 
                 let textSaldoAnt = saldoAnt > 0 ? `<div style="font-size:11px; color:var(--text-muted);">Saldo ant.: ${formatearDinero(saldoAnt)}</div>` : '';
-                let textAporte = `<div style="font-size:11px; color:var(--text-muted);">Aporte mes: ${formatearDinero(aporteMes)}</div>`;
+                let textAporte = `<div style="font-size:11px; color:var(--text-muted);">Efectivizado mes: ${formatearDinero(aporteMes)}</div>`;
+                let textProy = proyMes > 0 ? `<div style="font-size:11px; color:#f29900;">Proyectado pendiente: ${formatearDinero(proyMes)}</div>` : '';
                 let textRetiros = retiros !== 0 ? `<div style="font-size:11px; color:#d93025;">Retiros: -${formatearDinero(retiros)}</div>` : '';
 
                 cont.innerHTML += `
@@ -1643,6 +1713,7 @@
                             <div style="margin-top: 10px; display:flex; flex-direction:column; gap:2px;">
                                 ${textSaldoAnt}
                                 ${textAporte}
+                                ${textProy}
                                 ${textRetiros}
                             </div>
                             <div class="value" style="color:${fontColor}; font-size:24px; margin-top:5px;">${formatearDinero(sumaTotal)}</div>
@@ -1671,7 +1742,7 @@
             if (!nombre || nombre.trim() === "") return;
             const gNombre = nombre.trim();
             if (gruposDistribucion[gNombre]) return alert("Este grupo ya existe.");
-            gruposDistribucion[gNombre] = [{ nombre: "Objetivo Inicial", porc: 100 }];
+            gruposDistribucion[gNombre] = [{ nombre: "Nuevo Objetivo", porc: 100, ahorrado: false, monto_ahorrado: 0 }];
             autoGuardarDistribucionEstructura(true);
         };
 
@@ -1706,8 +1777,8 @@
 
         window.agregarObjetivoLinea = function(grupoName) {
             if(!Array.isArray(gruposDistribucion[grupoName])) gruposDistribucion[grupoName] = [];
-            gruposDistribucion[grupoName].push({ nombre: "Nuevo Objetivo", porc: 0, ahorro_id: "" });
-            renderDistribucionDirecta();
+            gruposDistribucion[grupoName].push({ nombre: "Nuevo Objetivo", porc: 0, ahorro_id: "", ahorrado: false, monto_ahorrado: 0 });
+            window.recargarDatosVisuales();
             dispararDebounceAutoguardado();
         };
 
@@ -1726,8 +1797,53 @@
         window.asignarAhorroObjetivo = function(grupoName, index, ahorroId) {
             gruposDistribucion[grupoName][index].ahorro_id = ahorroId;
             dispararDebounceAutoguardado();
-            renderCuentasAhorro();
+            window.recargarDatosVisuales();
         }
+
+        window.efectivizarAhorroObjetivo = async function(grupoName, index) {
+            let it = gruposDistribucion[grupoName][index];
+            if (!it.ahorro_id) return alert("Selecciona una Cuenta de Ahorro primero.");
+            
+            const totalDineroGrupo = sumPorGrupo[grupoName] || 0;
+            let monto = totalDineroGrupo * (it.porc / 100);
+
+            it.ahorrado = true;
+            it.monto_ahorrado = monto;
+
+            let cuentaName = cuentasAhorro.find(c => c.id === it.ahorro_id)?.nombre || 'Cuenta eliminada';
+            
+            historialAhorros.unshift({
+                id: Date.now(),
+                fecha: new Date().toLocaleString(),
+                accion: 'Ahorrado',
+                objetivo: it.nombre,
+                cuenta: cuentaName,
+                monto: monto
+            });
+
+            autoGuardarDistribucionEstructura(true);
+        };
+
+        window.devolverAhorroObjetivo = async function(grupoName, index) {
+            if(!confirm("¿Deshacer este ahorro y devolver el dinero a Disponible?")) return;
+            let it = gruposDistribucion[grupoName][index];
+            
+            let cuentaName = cuentasAhorro.find(c => c.id === it.ahorro_id)?.nombre || 'Cuenta eliminada';
+            
+            historialAhorros.unshift({
+                id: Date.now(),
+                fecha: new Date().toLocaleString(),
+                accion: 'Devuelto',
+                objetivo: it.nombre,
+                cuenta: cuentaName,
+                monto: it.monto_ahorrado
+            });
+
+            it.ahorrado = false;
+            it.monto_ahorrado = 0;
+
+            autoGuardarDistribucionEstructura(true);
+        };
 
         window.calcularBidireccionalLinea = function(grupoName, index, disparadoPor) {
             const totalDineroGrupo = sumPorGrupo[grupoName] || 0;
@@ -1768,6 +1884,8 @@
             }
 
             dispararDebounceAutoguardado();
+            // Actualizar proyeccion visualmente sin recargar todo
+            renderCuentasAhorro();
         };
 
         function dispararDebounceAutoguardado() {
@@ -1780,7 +1898,10 @@
         async function autoGuardarDistribucionEstructura(recargarUI = false) {
             try {
                 if(recargarUI) mostrarCargando(true);
-                await actualizarConfiguracionDB({"configuracion.grupos_distribucion": gruposDistribucion});
+                await actualizarConfiguracionDB({
+                    "configuracion.grupos_distribucion": gruposDistribucion,
+                    "configuracion.historial_ahorros": historialAhorros
+                });
                 if(recargarUI) await actualizarDashboard();
             } catch(e) { console.error("Error autoguardando:", e); }
         }
@@ -1805,6 +1926,9 @@
                     }
                 });
             }
+            
+            // Restar del total distribuible global lo que ya está congelado en TODOS los grupos
+            totalDistribuibleGlobal -= totalAhorrosEfectivizados;
 
             let resHtml = '';
             if(Object.keys(gruposDistribucion).length === 0) {
@@ -1817,6 +1941,10 @@
                 let sumPorcentajesGrupo = cfgItems.reduce((acc, el) => acc + (el.porc || 0), 0);
                 let colorValidacion = Math.abs(sumPorcentajesGrupo - 100) < 0.1 ? 'green' : 'red';
 
+                let grupoAhorrado = 0;
+                cfgItems.forEach(it => { if(it.ahorrado) grupoAhorrado += (it.monto_ahorrado || 0); });
+                let disponibleReal = totalGrupo - grupoAhorrado;
+
                 let htmlBlock = `
                     <div style="background:#f8f9fa; border-radius:8px; padding:15px; margin-bottom:15px; border:1px solid var(--card-border);">
                         <div style="display:flex; justify-content:space-between; margin-bottom:10px; align-items:center; flex-wrap:wrap; gap:5px;">
@@ -1826,7 +1954,7 @@
                             </div>
                             <div style="display:flex; align-items:center; gap:10px;">
                                 <span id="sum-card-pct-${grupoName}" style="font-size:12px; font-weight:bold; color:${colorValidacion};">Total: ${sumPorcentajesGrupo.toFixed(2)}%</span>
-                                <span style="font-weight:600; font-size:13px;">Disponible: ${formatearDinero(totalGrupo)}</span>
+                                <span style="font-weight:600; font-size:13px; color:#4285F4;">Disp. Restante: ${formatearDinero(disponibleReal)}</span>
                                 <button class="btn-icon" onclick="window.eliminarGrupoDistribucion('${grupoName}')" title="Eliminar Grupo Completo">❌</button>
                             </div>
                         </div>
@@ -1840,28 +1968,43 @@
                     let dineroCalculado = totalGrupo * ((it.porc || 0) / 100);
                     let opcionesAhorroHTML = cuentasAhorro.map(c => `<option value="${c.id}" ${it.ahorro_id === c.id ? 'selected':''}>${c.nombre}</option>`).join('');
 
-                    let usdText = dMep > 0 ? `<div id="usd-calc-${grupoName}-${idx}" style="font-size:10px; color:var(--text-muted); text-align:center; margin-top:2px;">U$D ${(dineroCalculado / dMep).toFixed(2)}</div>` : `<div id="usd-calc-${grupoName}-${idx}" style="font-size:10px; color:var(--text-muted); text-align:center; margin-top:2px;"></div>`;
-
-                    htmlBlock += `
-                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                            <input type="text" value="${it.nombre}" style="flex:2; padding:5px; font-size:12px;" oninput="window.actualizarDatoObjetivoMemory('${grupoName}', ${idx}, 'nombre', this.value)" placeholder="Objetivo">
-                            <input type="text" id="pct-${grupoName}-${idx}" value="${Number(it.porc).toFixed(2)}" style="width:60px; padding:5px; font-size:12px; text-align:center;" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pct')" placeholder="%">
-                            <span style="font-size:11px;">%</span>
-                            <div style="display:flex; flex-direction:column;">
-                                <input type="text" id="pesos-${grupoName}-${idx}" value="${formatearDinero(dineroCalculado)}" class="money-input" style="width:105px; padding:5px; font-size:12px;" data-raw="${dineroCalculado}" onfocus="window.onMoneyFocus(this)" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pesos'); window.onMoneyBlur(this, 'ARS')" placeholder="$">
-                                ${usdText}
+                    if (it.ahorrado) {
+                        htmlBlock += `
+                            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; background: #e6f4ea; padding: 8px; border-radius: 6px; border: 1px solid #137333;">
+                                <span style="flex:2; font-size:12px; font-weight:600; color:#137333;">🔒 ${it.nombre}</span>
+                                <span style="width:60px; text-align:center; font-size:12px; color:#137333;">${Number(it.porc).toFixed(2)}%</span>
+                                <span style="width:105px; font-size:13px; font-weight:bold; color:#137333;">${formatearDinero(it.monto_ahorrado)}</span>
+                                <span style="width:110px; font-size:11px; color:#137333; font-style:italic;">-> ${cuentasAhorro.find(c => c.id === it.ahorro_id)?.nombre || 'Cta'}</span>
+                                <button class="btn-icon" onclick="window.devolverAhorroObjetivo('${grupoName}', ${idx})" title="Deshacer y Devolver a Disponible">🔙</button>
                             </div>
-                            
-                            <select onchange="window.asignarAhorroObjetivo('${grupoName}', ${idx}, this.value)" style="width:110px; padding:4px; font-size:11px; background:#f1f3f4; border:1px solid #ccc; border-radius:4px;">
-                                <option value="">-- Cuenta Ahorro --</option>
-                                ${opcionesAhorroHTML}
-                            </select>
-                            
-                            <button class="btn-icon" onclick="window.eliminarObjetivoLinea('${grupoName}', ${idx})">🗑️</button>
-                        </div>
-                    `;
-                    let usdSummary = dMep > 0 ? ` <span style="font-size:11px; color:var(--text-muted);">(U$D ${(dineroCalculado/dMep).toFixed(2)})</span>` : '';
-                    resHtml += `<span style="color: var(--text-main);">${it.nombre} (${Number(it.porc).toFixed(2)}%):</span> ${formatearDinero(dineroCalculado)}${usdSummary}<br>`;
+                        `;
+                        let usdSummary = dMep > 0 ? ` <span style="font-size:11px; color:var(--text-muted);">(U$D ${(it.monto_ahorrado/dMep).toFixed(2)})</span>` : '';
+                        resHtml += `<span style="color: #137333;">🔒 ${it.nombre} (${Number(it.porc).toFixed(2)}%):</span> ${formatearDinero(it.monto_ahorrado)}${usdSummary}<br>`;
+                    } else {
+                        let usdText = dMep > 0 ? `<div id="usd-calc-${grupoName}-${idx}" style="font-size:10px; color:var(--text-muted); text-align:center; margin-top:2px;">U$D ${(dineroCalculado / dMep).toFixed(2)}</div>` : `<div id="usd-calc-${grupoName}-${idx}" style="font-size:10px; color:var(--text-muted); text-align:center; margin-top:2px;"></div>`;
+
+                        htmlBlock += `
+                            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                                <input type="text" value="${it.nombre}" style="flex:2; padding:5px; font-size:12px;" oninput="window.actualizarDatoObjetivoMemory('${grupoName}', ${idx}, 'nombre', this.value)" placeholder="Objetivo">
+                                <input type="text" id="pct-${grupoName}-${idx}" value="${Number(it.porc).toFixed(2)}" style="width:60px; padding:5px; font-size:12px; text-align:center;" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pct')" placeholder="%">
+                                <span style="font-size:11px;">%</span>
+                                <div style="display:flex; flex-direction:column;">
+                                    <input type="text" id="pesos-${grupoName}-${idx}" value="${formatearDinero(dineroCalculado)}" class="money-input" style="width:105px; padding:5px; font-size:12px;" data-raw="${dineroCalculado}" onfocus="window.onMoneyFocus(this)" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pesos'); window.onMoneyBlur(this, 'ARS')" placeholder="$">
+                                    ${usdText}
+                                </div>
+                                
+                                <select onchange="window.asignarAhorroObjetivo('${grupoName}', ${idx}, this.value)" style="width:110px; padding:4px; font-size:11px; background:#f1f3f4; border:1px solid #ccc; border-radius:4px;">
+                                    <option value="">-- Cuenta Ahorro --</option>
+                                    ${opcionesAhorroHTML}
+                                </select>
+                                
+                                <button class="btn-icon" onclick="window.efectivizarAhorroObjetivo('${grupoName}', ${idx})" title="Ahorrar este monto">💰</button>
+                                <button class="btn-icon" onclick="window.eliminarObjetivoLinea('${grupoName}', ${idx})" title="Eliminar Objetivo">🗑️</button>
+                            </div>
+                        `;
+                        let usdSummary = dMep > 0 ? ` <span style="font-size:11px; color:var(--text-muted);">(U$D ${(dineroCalculado/dMep).toFixed(2)})</span>` : '';
+                        resHtml += `<span style="color: var(--text-main);">${it.nombre} (${Number(it.porc).toFixed(2)}%):</span> ${formatearDinero(dineroCalculado)}${usdSummary}<br>`;
+                    }
                 });
 
                 htmlBlock += `
@@ -1873,7 +2016,7 @@
                 divDist.innerHTML += htmlBlock;
             }
 
-            resDist.innerHTML = `<div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: var(--text-main);">Disponible Total para Objetivos: ${formatearDinero(totalDistribuibleGlobal)}</div>` + resHtml;
+            resDist.innerHTML = `<div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: #4285F4;">Disponible Total Libre: ${formatearDinero(totalDistribuibleGlobal)}</div>` + resHtml;
         }
 
         window.abrirModalNuevoIngreso = function() {
@@ -2005,14 +2148,20 @@
         }
 
         function calcularBalance() {
-            const balance = totalIngresosGlobal - totalGastosGlobal;
+            const balance = totalIngresosGlobal - totalGastosGlobal - totalAhorrosEfectivizados;
             const bElement = document.getElementById('res-balance');
             bElement.innerText = formatearDinero(balance);
             bElement.style.color = balance >= 0 ? '#137333' : '#d93025';
 
             if (chartResumen) chartResumen.destroy();
             chartResumen = new Chart(document.getElementById('chart-resumen').getContext('2d'), {
-                type: 'pie', data: { labels: ['Gastos Totales', 'Ingresos Totales Bruto'], datasets: [{ data: [totalGastosGlobal, totalIngresosGlobal], backgroundColor: ['#EA4335', '#34A853'] }] },
+                type: 'pie', data: { 
+                    labels: ['Gastos Totales', 'Ahorrado Congelado', 'Disponible Libre'], 
+                    datasets: [{ 
+                        data: [totalGastosGlobal, totalAhorrosEfectivizados, balance > 0 ? balance : 0], 
+                        backgroundColor: ['#EA4335', '#9c27b0', '#4285F4'] 
+                    }] 
+                },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: {boxWidth: 10, font: {size: 10}} } } }
             });
         }
@@ -2058,7 +2207,6 @@
                     if (g.propietario === 'Tercero') return;
                     let costoCalculado = getCostoCalculado(g, dDebito, dImpuesto);
                     
-                    // Si el gasto era compartido localmente sumamos miParte
                     if (g.compartir_con && g.compartir_tipo) {
                         let cuotaTotal = g.tipo === 'Tarjeta' ? (costoCalculado / (g.cuotas_totales || 1)) : costoCalculado;
                         if (g.compartir_tipo === 'divisor') {
@@ -2095,11 +2243,10 @@
 
                 let totalAhorroMes = 0;
                 for(let gName in gruposDistLocal) {
-                    let totalGrupo = sumPorGrupoLocal[gName] || 0;
                     let cfgItemsLocal = Array.isArray(gruposDistLocal[gName]) ? gruposDistLocal[gName] : [];
                     cfgItemsLocal.forEach(it => {
-                        if (it && it.ahorro_id) {
-                            totalAhorroMes += totalGrupo * (it.porc / 100);
+                        if (it && it.ahorro_id && it.ahorrado) {
+                            totalAhorroMes += (it.monto_ahorrado || 0);
                         }
                     });
                 }
@@ -2231,11 +2378,10 @@
 
                 let ahorrosSumaPrev = {};
                 for(let gName in prevDist) {
-                    let totalGrupo = sumPorGrupoPrev[gName] || 0;
                     let arrItems = Array.isArray(prevDist[gName]) ? prevDist[gName] : [];
                     arrItems.forEach(it => {
-                        if (it && it.ahorro_id) {
-                            ahorrosSumaPrev[it.ahorro_id] = (ahorrosSumaPrev[it.ahorro_id] || 0) + (totalGrupo * (it.porc / 100));
+                        if (it && it.ahorro_id && it.ahorrado) {
+                            ahorrosSumaPrev[it.ahorro_id] = (ahorrosSumaPrev[it.ahorro_id] || 0) + (it.monto_ahorrado || 0);
                         }
                     });
                 }
