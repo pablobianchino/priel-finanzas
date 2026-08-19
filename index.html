@@ -41,20 +41,10 @@
             background: rgba(255,255,255,0.9); z-index: 4000; justify-content: center; align-items: center; flex-direction: column;
         }
 
-        /* SIDEBAR OVERLAY */
-        .sidebar-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.5); z-index: 2000;
-        }
-        .sidebar-overlay.open { display: block; }
-        
         .sidebar {
             width: 250px; flex-shrink: 0; background-color: var(--sidebar-bg); border-right: 1px solid var(--card-border);
-            display: flex; flex-direction: column; padding: 20px 0; transition: margin-left 0.3s ease, transform 0.3s ease; z-index: 2001;
+            display: flex; flex-direction: column; padding: 20px 0; z-index: 2001;
         }
-        .sidebar.desktop-closed { margin-left: -251px; border-right: none; }
-
-        .close-sidebar-btn { display: none; }
 
         .logo { text-align: center; font-size: 22px; font-weight: 600; color: var(--text-main); margin-bottom: 30px; }
 
@@ -70,13 +60,9 @@
         .main-content { flex: 1; display: flex; flex-direction: column; padding: 30px; overflow-y: auto; position: relative; }
 
         .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px; }
-        .title { display: flex; align-items: center; gap: 10px; }
+        .title { display: flex; align-items: center; gap: 15px; }
         .title h1 { margin: 0; font-size: 24px; font-weight: 600; }
         
-        /* Menu hamburguesa visible por defecto en todas las resoluciones */
-        .mobile-menu-btn { display: block; font-size: 24px; cursor: pointer; background: none; border: none; color: var(--text-main); padding: 0; transition: 0.2s; }
-        .mobile-menu-btn:hover { transform: scale(1.1); }
-
         .selectors select { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--card-border); font-size: 14px; margin-left: 10px; outline: none; }
 
         .view { display: none; }
@@ -125,18 +111,31 @@
         .saldo-ok { background-color: #e6f4ea; color: #137333; }
         .saldo-danger { background-color: #fce8e6; color: #c5221f; }
 
-        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-        <meta http-equiv="Pragma" content="no-cache">
-        <meta http-equiv="Expires" content="0">
+        /* Elementos específicos de móvil ocultos en desktop */
+        .bottom-nav { display: none; }
+        .topbar-mobile-logout { display: none; }
 
         @media (max-width: 1024px) {
-            .close-sidebar-btn { display: block; background: none; border: none; font-size: 20px; color: var(--text-main); cursor: pointer; align-self: flex-end; padding: 0 20px; margin-bottom: -15px; margin-top: 5px; }
-            .sidebar { position: fixed; height: 100vh; transform: translateX(-100%); margin-left: 0; z-index: 2001; box-shadow: 2px 0 10px rgba(0,0,0,0.1); width: 260px; }
-            .sidebar.open { transform: translateX(0); }
-            .sidebar.desktop-closed { margin-left: 0; } /* Se anula en móviles */
-            .main-content { padding: 15px; }
+            .sidebar { display: none !important; }
+            .main-content { padding: 15px; padding-bottom: 80px; }
             .cards-grid, .grid-2, .grid-3 { grid-template-columns: 1fr; }
             .filter-bar { flex-direction: column; align-items: stretch; }
+            
+            .topbar-mobile-logout { display: inline-block !important; background: #fce8e6; color: #c5221f; border: none; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer;}
+            
+            .bottom-nav {
+                display: flex; position: fixed; bottom: 0; left: 0; width: 100%;
+                background-color: var(--sidebar-bg); border-top: 1px solid var(--card-border);
+                z-index: 2000; justify-content: space-around; padding: 8px 0;
+                box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+            }
+            .nav-btn-bottom {
+                background: none; border: none; display: flex; flex-direction: column; align-items: center;
+                color: var(--text-muted); cursor: pointer; flex: 1; padding: 5px; font-family: inherit;
+            }
+            .nav-btn-bottom.active { color: var(--text-main); font-weight: 600; }
+            .nav-btn-bottom .icon { font-size: 20px; margin-bottom: 4px; }
+            .nav-btn-bottom .text { font-size: 11px; }
         }
     </style>
 </head>
@@ -164,11 +163,7 @@
 
     <div id="app-container" style="display: none; width: 100%; height: 100%;">
         
-        <!-- Overlay para movil -->
-        <div class="sidebar-overlay" id="sidebar-overlay" onclick="window.toggleSidebar()"></div>
-        
         <nav class="sidebar" id="sidebar">
-            <button class="close-sidebar-btn" onclick="window.toggleSidebar()">✖</button>
             <div class="logo">Finanzas Priel</div>
             <button class="nav-btn active" onclick="switchView('resumen', this)">⊞ Resumen</button>
             <button class="nav-btn" onclick="switchView('gastos', this)">▼ Gastos</button>
@@ -178,7 +173,7 @@
             
             <div class="user-info">
                 <span id="user-email">No autenticado</span><br>
-                <div style="font-size: 10px; margin-top: 4px; color: #9aa0a6;">v1.7.0</div>
+                <div style="font-size: 10px; margin-top: 4px; color: #9aa0a6;">v1.8.0</div>
                 <a href="#" id="logout-btn" style="color: #d93025; text-decoration: none; margin-top: 10px; display: none; font-weight: 500;">Salir</a>
             </div>
         </nav>
@@ -186,8 +181,8 @@
         <main class="main-content">
             <div class="topbar">
                 <div class="title">
-                    <button class="mobile-menu-btn" onclick="window.toggleSidebar()">☰</button>
                     <h1 id="view-title">Resumen</h1>
+                    <button id="logout-btn-mobile" class="topbar-mobile-logout">Salir</button>
                 </div>
                 <div class="selectors" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                     <select id="mes-selector">
@@ -385,6 +380,26 @@
                 </div>
             </div>
         </main>
+        
+        <!-- Barra de navegación inferior móvil -->
+        <nav class="bottom-nav" id="bottom-nav">
+            <button class="nav-btn-bottom active" onclick="switchView('resumen', this)">
+                <span class="icon">⊞</span><span class="text">Resumen</span>
+            </button>
+            <button class="nav-btn-bottom" onclick="switchView('gastos', this)">
+                <span class="icon">▼</span><span class="text">Gastos</span>
+            </button>
+            <button class="nav-btn-bottom" onclick="switchView('ingresos', this)">
+                <span class="icon">▲</span><span class="text">Ingresos</span>
+            </button>
+            <button class="nav-btn-bottom" onclick="switchView('ahorros', this)">
+                <span class="icon">◆</span><span class="text">Ahorros</span>
+            </button>
+            <button class="nav-btn-bottom" onclick="switchView('estadisticas', this)">
+                <span class="icon">▤</span><span class="text">Estad.</span>
+            </button>
+        </nav>
+        
     </div>
 
     <!-- Modal Historial Ahorros -->
@@ -648,24 +663,21 @@
             });
         }
 
-        window.toggleSidebar = function() { 
-            if(window.innerWidth <= 1024) {
-                document.getElementById('sidebar').classList.toggle('open'); 
-                document.getElementById('sidebar-overlay').classList.toggle('open');
-            } else {
-                document.getElementById('sidebar').classList.toggle('desktop-closed');
-            }
-        };
-        
+        document.getElementById('logout-btn-mobile').addEventListener('click', (e) => { e.preventDefault(); signOut(auth); });
+
         window.switchView = async function(viewId, element) {
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.nav-btn-bottom').forEach(b => b.classList.remove('active'));
+            
             document.getElementById(viewId).classList.add('active');
-            element.classList.add('active');
-            document.getElementById('view-title').innerText = element.innerText.replace(/[^\w\s]/gi, '').trim();
-            if(window.innerWidth <= 1024 && document.getElementById('sidebar').classList.contains('open')) {
-                window.toggleSidebar();
-            }
+            
+            document.querySelectorAll(`.nav-btn[onclick*="'${viewId}'"]`).forEach(b => b.classList.add('active'));
+            document.querySelectorAll(`.nav-btn-bottom[onclick*="'${viewId}'"]`).forEach(b => b.classList.add('active'));
+
+            let rawTitle = element.querySelector('.text') ? element.querySelector('.text').innerText : element.innerText;
+            document.getElementById('view-title').innerText = rawTitle.replace(/[^\w\s]/gi, '').trim();
+            
             if (viewId === 'estadisticas') await cargarEstadisticasAnuales();
         };
 
@@ -1242,11 +1254,10 @@
                     if (g.tipo === 'Tarjeta') {
                         cuotasDetalle = `<br><span style="font-size:11px; color:#174ea6;">${g.tarjeta || 'Tarjeta'} (${g.cuotas_pagadas}/${g.cuotas_totales})</span>`;
                         if (parseInt(g.cuotas_pagadas) >= parseInt(g.cuotas_totales)) {
-                            bgRowStyle = 'background-color: #e6f4ea;'; // Verde claro para última cuota
+                            bgRowStyle = 'background-color: #e6f4ea;';
                         }
                     }
 
-                    // Boton Desglose USD
                     let usdBtn = '';
                     let breakdownHtml = '';
                     if (g.moneda === 'USD') {
@@ -2020,7 +2031,7 @@
                                 </select>
                                 
                                 <button class="btn-icon" onclick="window.efectivizarAhorroObjetivo('${grupoName}', ${idx})" title="Ahorrar este monto">💰</button>
-                                <button class="btn-icon" onclick="window.eliminarObjetivoLinea('${grupoName}', ${idx})" title="Eliminar Objetivo">🗑️</button>
+                                <button class="btn-icon" onclick="window.eliminarObjetivoLinea('${grupoName}', ${idx})">🗑️</button>
                             </div>
                         `;
                         let usdSummary = dMep > 0 ? ` <span style="font-size:11px; color:var(--text-muted);">(U$D ${(dineroCalculado/dMep).toFixed(2)})</span>` : '';
@@ -2037,7 +2048,7 @@
                 divDist.innerHTML += htmlBlock;
             }
 
-            resDist.innerHTML = `<div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: var(--text-main);">Disponible Total para Objetivos: ${formatearDinero(totalDistribuibleGlobal)}</div>` + resHtml;
+            resDist.innerHTML = `<div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: #4285F4;">Disponible Total Libre: ${formatearDinero(totalDistribuibleGlobal)}</div>` + resHtml;
         }
 
         window.abrirModalNuevoIngreso = function() {
