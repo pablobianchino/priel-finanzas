@@ -1,160 +1,378 @@
-:root {
-    --bg-color: #f8f9fa;
-    --sidebar-bg: #ffffff;
-    --text-main: #202124;
-    --text-muted: #5f6368;
-    --primary-color: #000000;
-    --card-border: #e8eaed;
-}
-
-body {
-    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: var(--bg-color); color: var(--text-main); display: flex; height: 100vh; overflow: hidden;
-}
-
-.loader {
-    border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%;
-    width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px;
-}
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-#loading-screen {
-    display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(255,255,255,0.9); z-index: 4000; justify-content: center; align-items: center; flex-direction: column;
-}
-
-.login-wrapper { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; width: 100vw; background-color: #ffffff; position: absolute; top: 0; left: 0; z-index: 3000; }
-.login-box { background: #f4f6f9; padding: 40px; border-radius: 16px; text-align: center; width: 280px; }
-.login-box h1 { margin-top: 0; font-size: 22px; font-weight: 600; color: var(--text-main); }
-.google-btn { background: #ffffff; color: var(--text-main); border: 1px solid var(--card-border); padding: 12px 20px; border-radius: 10px; font-size: 15px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; margin-top: 30px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-
-.sidebar-overlay {
-    display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(0,0,0,0.5); z-index: 2000;
-}
-.sidebar-overlay.open { display: block; }
-
-.sidebar {
-    width: 250px; flex-shrink: 0; background-color: var(--sidebar-bg); border-right: 1px solid var(--card-border);
-    display: flex; flex-direction: column; padding: 20px 0; transition: margin-left 0.3s ease, transform 0.3s ease; z-index: 2001;
-}
-.sidebar.desktop-closed { margin-left: -251px; border-right: none; }
-
-.close-sidebar-btn { display: none; }
-
-.logo { text-align: center; font-size: 22px; font-weight: 600; color: var(--text-main); margin-bottom: 30px; }
-
-.nav-btn {
-    background: none; border: none; padding: 15px 20px; text-align: left; font-size: 15px;
-    color: var(--text-main); cursor: pointer; transition: 0.2s; border-left: 3px solid transparent; display: flex; align-items: center; gap: 12px;
-}
-.nav-btn:hover { background-color: var(--bg-color); }
-.nav-btn.active { font-weight: 600; border-left: 3px solid var(--primary-color); background-color: #f1f3f4; }
-
-.user-info { margin-top: auto; padding: 20px; font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--card-border); }
-
-.main-content { flex: 1; display: flex; flex-direction: column; padding: 30px; overflow-y: auto; position: relative; }
-
-.topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px; }
-.title { display: flex; align-items: center; gap: 10px; }
-.title h1 { margin: 0; font-size: 24px; font-weight: 600; }
-
-.mobile-menu-btn { display: block; font-size: 24px; cursor: pointer; background: none; border: none; color: var(--text-main); padding: 0; transition: 0.2s; }
-.mobile-menu-btn:hover { transform: scale(1.1); }
-
-.selectors { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.selectors select { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--card-border); font-size: 14px; margin-left: 10px; outline: none; }
-
-.view { display: none; }
-.view.active { display: block; }
-
-.cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px;}
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;}
-.grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 20px;}
-
-.card { background-color: #ffffff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); border: 1px solid var(--card-border); }
-
-.card-header-toggle { display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; margin-bottom: 10px; }
-.card-header-toggle h3, .card-header-toggle h2 { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-main); }
-.card-header-toggle .toggle-icon { font-size: 12px; color: var(--text-muted); }
-
-.card h3 { margin-top: 0; color: var(--text-muted); font-size: 13px; font-weight: 500;}
-.card h2 { font-size: 16px; color: var(--text-main); font-weight: 600; margin-bottom: 15px;}
-.card .value { font-size: 28px; font-weight: bold; color: var(--text-main); margin-top: 10px;}
-
-table { width: 100%; border-collapse: collapse; text-align: left; margin-top: 15px; font-size: 13px; }
-th { padding: 10px 0; border-bottom: 2px solid var(--card-border); color: var(--text-muted); font-weight: 500; }
-td { padding: 10px 0; border-bottom: 1px solid #f1f3f4; }
-
-input, select { padding: 10px; border: 1px solid var(--card-border); border-radius: 8px; outline: none; box-sizing: border-box; font-family: inherit; }
-
-.btn-black {
-    background-color: #000000; color: #ffffff; border: none; padding: 10px 24px;
-    border-radius: 20px; font-size: 14px; font-weight: 600; cursor: pointer;
-    transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-}
-.btn-black:hover { background-color: #333333; }
-.btn-icon { background: none; border: none; font-size: 16px; cursor: pointer; padding: 4px; transition: transform 0.1s; }
-.btn-icon:hover { transform: scale(1.1); }
-
-.filter-bar { display: flex; gap: 15px; align-items: center; background-color: #f1f3f4; padding: 10px 15px; border-radius: 8px; margin-bottom: 15px; flex-wrap: wrap;}
-
-.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
-.modal-content { background: #ffffff; padding: 30px; border-radius: 16px; width: 90%; max-width: 500px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-height: 90vh; overflow-y: auto; }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); }
-
-.tr-clickable:hover { background-color: #fcfcfc; cursor: pointer; }
-.details-row td { background-color: #f8f9fa; border-radius: 8px; border: 1px solid #eee;}
-.chart-container { position: relative; width: 100%; }
-
-.saldo-ok { background-color: #e6f4ea; color: #137333; }
-.saldo-danger { background-color: #fce8e6; color: #c5221f; }
-
-.bottom-nav { display: none; }
-.topbar-mobile-logout { display: none; }
-
-.floating-version {
-    position: fixed;
-    bottom: 10px;
-    right: 10px;
-    font-size: 10px;
-    color: var(--text-muted);
-    background: rgba(255, 255, 255, 0.9);
-    padding: 4px 8px;
-    border-radius: 6px;
-    z-index: 9999;
-    pointer-events: none;
-    border: 1px solid var(--card-border);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-@media (max-width: 1024px) {
-    .close-sidebar-btn { display: block; background: none; border: none; font-size: 20px; color: var(--text-main); cursor: pointer; align-self: flex-end; padding: 0 20px; margin-bottom: -15px; margin-top: 5px; }
-    .sidebar { position: fixed; height: 100vh; transform: translateX(-100%); margin-left: 0; z-index: 2001; box-shadow: 2px 0 10px rgba(0,0,0,0.1); width: 260px; }
-    .sidebar.open { transform: translateX(0); }
-    .sidebar.desktop-closed { margin-left: 0; }
-    .main-content { padding: 15px; padding-bottom: 80px; }
-    .cards-grid, .grid-2, .grid-3 { grid-template-columns: 1fr; }
-    .filter-bar { flex-direction: column; align-items: stretch; }
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finanzas Priel</title>
     
-    .topbar-mobile-logout { display: inline-block !important; background: #fce8e6; color: #c5221f; border: none; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer;}
-    
-    .bottom-nav {
-        display: flex; position: fixed; bottom: 0; left: 0; width: 100%;
-        background-color: var(--sidebar-bg); border-top: 1px solid var(--card-border);
-        z-index: 2000; justify-content: space-around; padding: 8px 0;
-        box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
-    }
-    .nav-btn-bottom {
-        background: none; border: none; display: flex; flex-direction: column; align-items: center;
-        color: var(--text-muted); cursor: pointer; flex: 1; padding: 5px; font-family: inherit;
-    }
-    .nav-btn-bottom.active { color: var(--text-main); font-weight: 600; }
-    .nav-btn-bottom .icon { font-size: 20px; margin-bottom: 4px; }
-    .nav-btn-bottom .text { font-size: 11px; }
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" type="image/png" href="icon-192.png">
 
-    .floating-version {
-        bottom: 70px;
-    }
-}
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+</head>
+<body>
+
+    <div id="loading-screen">
+        <div class="loader"></div>
+        <div style="color: var(--text-main); font-weight: 600;">Cargando datos...</div>
+    </div>
+
+    <div id="login-screen" class="login-wrapper">
+        <div class="login-box">
+            <h1>Finanzas Priel</h1>
+            <button id="login-btn-main" class="google-btn">
+                <svg version="1.1" viewBox="0 0 48 48" style="width: 18px; height: 18px;">
+                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
+                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
+                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
+                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
+                </svg>
+                Ingresar con Google
+            </button>
+        </div>
+    </div>
+
+    <div id="app-container" style="display: none; width: 100%; height: 100%;">
+        
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="window.toggleSidebar()"></div>
+        
+        <nav class="sidebar" id="sidebar">
+            <button class="close-sidebar-btn" onclick="window.toggleSidebar()">✖</button>
+            <div class="logo">Finanzas Priel</div>
+            <button class="nav-btn active" onclick="window.switchView('resumen', this)">⊞ Resumen</button>
+            <button class="nav-btn" onclick="window.switchView('gastos', this)">▼ Gastos</button>
+            <button class="nav-btn" onclick="window.switchView('ingresos', this)">▲ Ingresos / Objetivos</button>
+            <button class="nav-btn" onclick="window.switchView('ahorros', this)">◆ Ahorros</button>
+            <button class="nav-btn" onclick="window.switchView('estadisticas', this)">▤ Estadísticas</button>
+            
+            <div class="user-info">
+                <span id="user-email">No autenticado</span><br>
+                <div id="sidebar-version" style="font-size: 10px; margin-top: 4px; color: #9aa0a6;"></div>
+                <a href="#" id="logout-btn" style="color: #d93025; text-decoration: none; margin-top: 10px; display: none; font-weight: 500;">Salir</a>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <div class="topbar">
+                <div class="title">
+                    <button class="mobile-menu-btn" onclick="window.toggleSidebar()">☰</button>
+                    <h1 id="view-title">Resumen</h1>
+                    <button id="logout-btn-mobile" class="topbar-mobile-logout">Salir</button>
+                </div>
+                <div class="selectors">
+                    <select id="mes-selector">
+                        <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option>
+                        <option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option>
+                        <option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option>
+                        <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+                    </select>
+                    <select id="anio-selector"></select>
+                </div>
+            </div>
+
+            <!-- VISTA RESUMEN -->
+            <div id="resumen" class="view active">
+                <div style="display: flex; justify-content: flex-end; gap:10px; margin-bottom: 15px; flex-wrap:wrap;">
+                    <button onclick="window.exportarBackupMes()" class="btn-black" style="background-color: #34A853; border: 1px solid #137333;">📥 Backup JSON</button>
+                    <button onclick="window.copiarMesAnterior()" class="btn-black" style="background-color: #e8eaed; color: #202124; border: 1px solid var(--card-border);">🔄 Importar Mes Anterior</button>
+                </div>
+
+                <div class="card" style="margin-bottom: 20px; border-top: 4px solid var(--text-muted);">
+                    <div class="card-header-toggle" onclick="window.toggleCard(this)">
+                        <h2 style="margin: 0; font-size: 16px;">Configuración USD</h2><span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="card-content" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                        <label>MEP (Ahorros): <input type="text" id="usd-mep" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
+                        <label>Débito (Gastos): <input type="text" id="usd-debito" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
+                        <label>Impuesto (Gastos): <input type="text" id="usd-impuesto" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
+                        <button class="btn-black" style="padding: 6px 15px;" onclick="window.guardarConfiguracionDolar('resumen')">Guardar Rate</button>
+                    </div>
+                </div>
+
+                <div class="cards-grid">
+                    <div class="card" style="border-top: 4px solid #f29900;">
+                        <div class="card-header-toggle" onclick="window.toggleCard(this)">
+                            <h3>Distribución de Objetivos</h3><span class="toggle-icon">▼</span>
+                        </div>
+                        <div class="card-content" id="res-ingresos-dist"></div>
+                    </div>
+                    
+                    <div style="display:flex; flex-direction:column; gap:20px;">
+                        <div class="card" style="border-top: 4px solid #34A853;">
+                            <h3>Ingresos Netos del Mes</h3>
+                            <div class="value" id="res-ingresos-mes">$0,00</div>
+                        </div>
+                        
+                        <div class="card" style="border-top: 4px solid #9c27b0;">
+                            <div class="card-header-toggle" onclick="window.toggleCard(this)">
+                                <h3>Cuentas de Ahorro (Mes)</h3><span class="toggle-icon">▼</span>
+                            </div>
+                            <div class="card-content" id="res-ahorros-list"></div>
+                        </div>
+
+                        <div class="card" style="border-top: 4px solid #174ea6;">
+                            <h3>Gastos Totales (Propios)</h3>
+                            <div class="value" id="res-gastos-fijos">$0,00</div>
+                        </div>
+
+                        <div class="card" style="border-top: 4px solid #e91e63;">
+                            <h3>Deuda Futura (Tarjetas)</h3>
+                            <div class="value" id="res-deuda-futura" style="color: #e91e63;">$0,00</div>
+                            <p style="font-size:11px; color:var(--text-muted); margin-top:5px; margin-bottom:0;">Suma total de cuotas pendientes a futuro</p>
+                        </div>
+
+                        <div class="card" style="border-top: 4px solid #EA4335;">
+                            <h3>Saldo a favor general</h3>
+                            <div class="value" id="res-balance">$0,00</div>
+                            <div class="chart-container" style="height: 150px; margin-top: 15px;"><canvas id="chart-resumen"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISTA GASTOS -->
+            <div id="gastos" class="view">
+                <div class="card" style="margin-bottom: 20px; border-top: 4px solid var(--text-muted);">
+                    <div class="card-header-toggle" onclick="window.toggleCard(this)">
+                        <h2 style="margin: 0; font-size: 16px;">Configuración USD</h2><span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="card-content" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                        <label>MEP (Ahorros): <input type="text" id="usd-mep-gastos" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
+                        <label>Débito (Gastos): <input type="text" id="usd-debito-gastos" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
+                        <label>Impuesto (Gastos): <input type="text" id="usd-impuesto-gastos" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
+                        <button class="btn-black" style="padding: 6px 15px;" onclick="window.guardarConfiguracionDolar('gastos')">Guardar Rate</button>
+                    </div>
+                </div>
+
+                <div class="cards-grid">
+                    <div class="card" style="border-top: 4px solid var(--text-main);">
+                        <h3>Gastos Totales (Propios)</h3>
+                        <div class="value" id="sum-gastos-total">$0,00</div>
+                    </div>
+                    <div class="card" style="border-top: 4px solid #5f6368;">
+                        <h3>Gastos de Terceros</h3>
+                        <div class="value" id="sum-gastos-terceros">$0,00</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
+                    <h2 style="margin: 0;">Gestión de Gastos</h2>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button onclick="window.crearNuevoTipoGastoPanel()" class="btn-black">➕ Crear Panel</button>
+                        <button onclick="window.abrirModalNuevoGasto()" class="btn-black" style="background-color: #202124;">➕ Nuevo Ítem Gasto</button>
+                        <button onclick="window.abrirModalCargaMasiva()" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">Carga CSV</button>
+                    </div>
+                </div>
+
+                <div class="filter-bar"><input type="text" id="filtro-texto-gastos" placeholder="Buscar gasto por panel o nombre de ítem..." style="flex: 1;"></div>
+                
+                <div id="contenedor-dinamico-gastos" style="display: flex; flex-direction: column; gap: 15px;"></div>
+            </div>
+
+            <!-- VISTA INGRESOS Y OBJETIVOS -->
+            <div id="ingresos" class="view">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
+                    <h2 style="margin: 0;">Gestión de Ingresos</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="window.abrirModalHistorial()" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">🧾 Historial Ahorros</button>
+                        <button onclick="window.abrirModalNuevoIngreso()" class="btn-black">➕ Nuevo Ingreso</button>
+                        <button onclick="window.crearNuevoGrupoDistribucion()" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">➕ Nuevo Grupo Dist.</button>
+                    </div>
+                </div>
+                <div class="filter-bar"><input type="text" id="filtro-texto-ingresos" placeholder="Buscar ingreso..." style="flex: 1;"></div>
+                <div class="grid-2">
+                    <div class="card" style="border-top: 4px solid #34A853;">
+                        <div class="card-header-toggle" onclick="window.toggleCard(this)">
+                            <h3 style="font-size:15px;">Ingresos del Mes</h3>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <div style="display:flex; flex-direction:column; text-align:right;">
+                                    <span style="font-size: 11px; color:var(--text-muted);">Total Bruto: <span id="sum-ingresos-mes"></span></span>
+                                    <span class="value" id="sum-ingresos-disponible" style="font-size: 16px; margin: 0; color:#137333;">$0,00 Disp.</span>
+                                </div>
+                                <span class="toggle-icon">▼</span>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <table>
+                                <thead><tr><th>Origen</th><th>Grupo Vinculado</th><th>Bruto</th><th>Disponible</th><th>⚙️</th></tr></thead>
+                                <tbody id="tabla-ingresos"></tbody>
+                            </table>
+                            <div class="chart-container" style="height: 250px; margin-top:20px;"><canvas id="chart-ingresos-mes"></canvas></div>
+                        </div>
+                    </div>
+                    <div class="card" style="border-top: 4px solid #f29900;">
+                        <div class="card-header-toggle" onclick="window.toggleCard(this)">
+                            <h3 style="font-size: 15px;">Distribución Directa de Objetivos</h3><span class="toggle-icon">▼</span>
+                        </div>
+                        <div class="card-content" id="tabla-distribucion"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISTA AHORROS -->
+            <div id="ahorros" class="view">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
+                    <h2 style="margin: 0;">Cuentas de Ahorro Histórico</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="window.abrirModalHistorial()" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">🧾 Ver Historial</button>
+                        <button onclick="window.crearCuentaAhorro()" class="btn-black">➕ Nueva Cuenta</button>
+                    </div>
+                </div>
+                
+                <div class="cards-grid">
+                    <div class="card" style="border-top: 4px solid #9c27b0;">
+                        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px;">
+                            <div>
+                                <h3>Total Global Ahorrado (Histórico)</h3>
+                                <div class="value" id="sum-ahorros-total" style="display: flex; flex-direction: column; gap: 5px; font-size: 22px;">$0,00</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <h3 style="color: #137333;">Total Depositado (Mes Actual)</h3>
+                                <div class="value" id="sum-ahorros-depositado" style="color: #137333; font-size: 22px; display: flex; flex-direction: column; gap: 5px;">$0,00</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="contenedor-cuentas-ahorro" class="cards-grid"></div>
+            </div>
+
+            <!-- VISTA ESTADISTICAS -->
+            <div id="estadisticas" class="view">
+                <div class="card" style="border-top: 4px solid var(--text-main);">
+                    <div class="card-header-toggle" onclick="window.toggleCard(this)">
+                        <h3 style="font-size: 16px;">Estadísticas Anual de Ingresos vs Gastos vs Ahorros</h3><span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="card-content">
+                        <div class="chart-container" style="height: 400px; margin-top: 20px;"><canvas id="chart-estadisticas"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <nav class="bottom-nav" id="bottom-nav">
+            <button class="nav-btn-bottom active" onclick="window.switchView('resumen', this)"><span class="icon">⊞</span><span class="text">Resumen</span></button>
+            <button class="nav-btn-bottom" onclick="window.switchView('gastos', this)"><span class="icon">▼</span><span class="text">Gastos</span></button>
+            <button class="nav-btn-bottom" onclick="window.switchView('ingresos', this)"><span class="icon">▲</span><span class="text">Ingresos</span></button>
+            <button class="nav-btn-bottom" onclick="window.switchView('ahorros', this)"><span class="icon">◆</span><span class="text">Ahorros</span></button>
+            <button class="nav-btn-bottom" onclick="window.switchView('estadisticas', this)"><span class="icon">▤</span><span class="text">Estad.</span></button>
+        </nav>
+        
+    </div>
+
+    <div id="floating-version" class="floating-version"></div>
+
+    <!-- MODALES -->
+    <div id="modal-historial" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2 style="margin: 0; font-size: 18px;">Historial de Ahorros y Retiros</h2>
+                <button class="modal-close" onclick="window.cerrarModal('modal-historial')">✖</button>
+            </div>
+            <div id="historial-lista" style="max-height: 400px; overflow-y: auto; font-size: 13px;"></div>
+        </div>
+    </div>
+
+    <div id="modal-gasto" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 style="margin: 0; font-size: 18px;" id="titulo-modal-gasto">Gasto</h2>
+                <button class="modal-close" onclick="window.cerrarModal('modal-gasto')">✖</button>
+            </div>
+            <form id="form-gasto" style="display: flex; flex-direction: column; gap: 15px;">
+                <input type="hidden" id="gasto-id">
+                <div style="display: flex; gap: 10px;">
+                    <select id="gasto-propietario" style="flex:1;" onchange="window.toggleTercero('gasto')">
+                        <option value="Propio">Gasto Propio</option>
+                        <option value="Tercero">Gasto de Tercero</option>
+                    </select>
+                    <input type="text" id="gasto-tercero-nombre" placeholder="Nombre Tercero" style="display:none; flex:1;">
+                </div>
+                <input type="text" id="gasto-nombre" placeholder="Nombre (ej. Internet)" required>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="gasto-monto" class="money-input" placeholder="Monto Total" required style="flex: 1;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this)">
+                    <select id="gasto-moneda" onchange="window.onMoneyBlur(document.getElementById('gasto-monto'))">
+                        <option value="ARS">ARS</option>
+                        <option value="USD">USD</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 12px; color: var(--text-muted);">Asignar a Panel de Gasto:</label>
+                    <select id="gasto-categoria-select" style="width: 100%; margin-top: 5px;" required onchange="window.actualizarOrigenesGastoModal()"></select>
+                </div>
+                <div id="box-gasto-origen" style="display:none;">
+                    <label style="font-size: 12px; color: var(--text-muted);">Selecciona a qué ingreso descontar (Mío):</label>
+                    <select id="gasto-origen-select" style="width: 100%; margin-top: 5px;"></select>
+                </div>
+                <select id="gasto-tipo" onchange="window.toggleCamposTarjeta('gasto')">
+                    <option value="Fijo">Fijo / Pago Único</option><option value="Tarjeta">Tarjeta de Crédito</option>
+                </select>
+                <div id="box-recurrente" style="display: flex; align-items: center; gap: 10px; margin-top:5px;">
+                    <input type="checkbox" id="gasto-recurrente" checked style="width: 16px; height: 16px; cursor: pointer;">
+                    <label for="gasto-recurrente" style="font-size: 13px; cursor: pointer; color: var(--text-main);">Gasto Fijo Recurrente (copiar al próximo mes)</label>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;" id="box-compartir">
+                    <input type="checkbox" id="gasto-compartir" style="width: 16px; height: 16px;" onchange="window.toggleDivisor('gasto')">
+                    <label for="gasto-compartir" style="font-size: 14px; cursor: pointer;">Compartir / Dividir gasto</label>
+                    <input type="text" id="gasto-compartir-con" placeholder="Compartir con (Nombre)" style="display: none; flex: 1; padding: 6px; font-size:13px; border-radius: 6px; border: 1px solid #ccc;">
+                    <select id="gasto-compartir-tipo" style="display: none; padding: 6px; font-size:13px;" onchange="window.toggleDivisor('gasto')">
+                        <option value="divisor">Dividir en partes</option><option value="fijo">Monto exacto (Mi parte)</option>
+                    </select>
+                    <select id="gasto-divisor" style="display: none; padding: 6px; font-size:13px;">
+                        <option value="2">2</option><option value="3">3</option><option value="4">4</option>
+                    </select>
+                    <input type="text" id="gasto-monto-fijo" class="money-input" style="display: none; width: 120px; padding: 6px; font-size:13px;" placeholder="ARS final" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')">
+                </div>
+                <div id="campos-tarjeta" style="display: none; gap: 10px; flex-wrap: wrap;">
+                    <select id="gasto-tarjeta" style="flex: 1;"><option value="VISA">VISA</option><option value="MASTERCARD">MASTERCARD</option><option value="MP">MP</option></select>
+                    <input type="number" id="gasto-cuotas-totales" placeholder="Cuotas Tot" min="1" style="width: 100px;">
+                    <input type="number" id="gasto-cuotas-pagadas" placeholder="Cuotas Pag" min="1" style="width: 100px;">
+                </div>
+                <button type="submit" class="btn-black" style="margin-top: 10px;">Guardar Gasto</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-ingreso" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 style="margin: 0; font-size: 18px;" id="titulo-modal-ingreso">Ingreso</h2>
+                <button class="modal-close" onclick="window.cerrarModal('modal-ingreso')">✖</button>
+            </div>
+            <form id="form-ingreso" style="display: flex; flex-direction: column; gap: 15px;">
+                <input type="hidden" id="ingreso-id">
+                <input type="text" id="ingreso-nombre" placeholder="Origen (ej. Mandala Ensambles)" required>
+                <input type="text" id="ingreso-monto" class="money-input" placeholder="Monto Total ARS" required onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')">
+                <div>
+                    <label style="font-size: 13px; color: var(--text-muted);">Vincular a Grupo de Distribución:</label>
+                    <select id="ingreso-grupo" style="width:100%; margin-top:5px;"></select>
+                </div>
+                <button type="submit" class="btn-black" style="margin-top: 10px;">Guardar Ingreso</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-carga-masiva" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 style="margin: 0; font-size: 18px;">Carga Masiva (CSV)</h2>
+                <button class="modal-close" onclick="window.cerrarModal('modal-carga-masiva')">✖</button>
+            </div>
+            <input type="file" id="archivo-csv" accept=".csv" style="width: 100%; box-sizing: border-box; margin-bottom: 15px;">
+            <button class="btn-black" onclick="window.procesarCSV()" style="width: 100%;">Importar Gastos</button>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
