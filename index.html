@@ -49,9 +49,10 @@
         .sidebar-overlay.open { display: block; }
         
         .sidebar {
-            width: 250px; background-color: var(--sidebar-bg); border-right: 1px solid var(--card-border);
-            display: flex; flex-direction: column; padding: 20px 0; transition: transform 0.3s ease; z-index: 2001;
+            width: 250px; flex-shrink: 0; background-color: var(--sidebar-bg); border-right: 1px solid var(--card-border);
+            display: flex; flex-direction: column; padding: 20px 0; transition: margin-left 0.3s ease, transform 0.3s ease; z-index: 2001;
         }
+        .sidebar.desktop-closed { margin-left: -251px; border-right: none; }
 
         .close-sidebar-btn { display: none; }
 
@@ -69,10 +70,13 @@
         .main-content { flex: 1; display: flex; flex-direction: column; padding: 30px; overflow-y: auto; position: relative; }
 
         .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px; }
-        .title { display: flex; align-items: center; gap: 15px; }
+        .title { display: flex; align-items: center; gap: 10px; }
         .title h1 { margin: 0; font-size: 24px; font-weight: 600; }
         
-        .mobile-menu-btn { display: none; font-size: 24px; cursor: pointer; background: none; border: none; }
+        /* Menu hamburguesa visible por defecto en todas las resoluciones */
+        .mobile-menu-btn { display: block; font-size: 24px; cursor: pointer; background: none; border: none; color: var(--text-main); padding: 0; transition: 0.2s; }
+        .mobile-menu-btn:hover { transform: scale(1.1); }
+
         .selectors select { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--card-border); font-size: 14px; margin-left: 10px; outline: none; }
 
         .view { display: none; }
@@ -125,11 +129,11 @@
         <meta http-equiv="Pragma" content="no-cache">
         <meta http-equiv="Expires" content="0">
 
-        @media (max-width: 768px) {
+        @media (max-width: 1024px) {
             .close-sidebar-btn { display: block; background: none; border: none; font-size: 20px; color: var(--text-main); cursor: pointer; align-self: flex-end; padding: 0 20px; margin-bottom: -15px; margin-top: 5px; }
-            .sidebar { position: fixed; height: 100vh; transform: translateX(-100%); z-index: 2001; box-shadow: 2px 0 10px rgba(0,0,0,0.1); }
+            .sidebar { position: fixed; height: 100vh; transform: translateX(-100%); margin-left: 0; z-index: 2001; box-shadow: 2px 0 10px rgba(0,0,0,0.1); width: 260px; }
             .sidebar.open { transform: translateX(0); }
-            .mobile-menu-btn { display: block; }
+            .sidebar.desktop-closed { margin-left: 0; } /* Se anula en móviles */
             .main-content { padding: 15px; }
             .cards-grid, .grid-2, .grid-3 { grid-template-columns: 1fr; }
             .filter-bar { flex-direction: column; align-items: stretch; }
@@ -161,10 +165,10 @@
     <div id="app-container" style="display: none; width: 100%; height: 100%;">
         
         <!-- Overlay para movil -->
-        <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="window.toggleSidebar()"></div>
         
         <nav class="sidebar" id="sidebar">
-            <button class="close-sidebar-btn" onclick="toggleSidebar()">✖</button>
+            <button class="close-sidebar-btn" onclick="window.toggleSidebar()">✖</button>
             <div class="logo">Finanzas Priel</div>
             <button class="nav-btn active" onclick="switchView('resumen', this)">⊞ Resumen</button>
             <button class="nav-btn" onclick="switchView('gastos', this)">▼ Gastos</button>
@@ -174,7 +178,7 @@
             
             <div class="user-info">
                 <span id="user-email">No autenticado</span><br>
-                <div style="font-size: 10px; margin-top: 4px; color: #9aa0a6;">v1.6.0</div>
+                <div style="font-size: 10px; margin-top: 4px; color: #9aa0a6;">v1.7.0</div>
                 <a href="#" id="logout-btn" style="color: #d93025; text-decoration: none; margin-top: 10px; display: none; font-weight: 500;">Salir</a>
             </div>
         </nav>
@@ -182,7 +186,7 @@
         <main class="main-content">
             <div class="topbar">
                 <div class="title">
-                    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                    <button class="mobile-menu-btn" onclick="window.toggleSidebar()">☰</button>
                     <h1 id="view-title">Resumen</h1>
                 </div>
                 <div class="selectors" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -518,6 +522,7 @@
         const anioSelector = document.getElementById('anio-selector');
         const colorPalette = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#9C27B0', '#00BCD4', '#FF9800', '#795548', '#8BC34A', '#E91E63', '#3F51B5'];
 
+        // Seteo de fecha actual automatica al cargar scripts
         const today = new Date();
         const currentMonth = String(today.getMonth() + 1).padStart(2, '0');
         const currentYear = String(today.getFullYear());
@@ -644,8 +649,12 @@
         }
 
         window.toggleSidebar = function() { 
-            document.getElementById('sidebar').classList.toggle('open'); 
-            document.getElementById('sidebar-overlay').classList.toggle('open');
+            if(window.innerWidth <= 1024) {
+                document.getElementById('sidebar').classList.toggle('open'); 
+                document.getElementById('sidebar-overlay').classList.toggle('open');
+            } else {
+                document.getElementById('sidebar').classList.toggle('desktop-closed');
+            }
         };
         
         window.switchView = async function(viewId, element) {
@@ -654,7 +663,9 @@
             document.getElementById(viewId).classList.add('active');
             element.classList.add('active');
             document.getElementById('view-title').innerText = element.innerText.replace(/[^\w\s]/gi, '').trim();
-            if(window.innerWidth <= 768) window.toggleSidebar();
+            if(window.innerWidth <= 1024 && document.getElementById('sidebar').classList.contains('open')) {
+                window.toggleSidebar();
+            }
             if (viewId === 'estadisticas') await cargarEstadisticasAnuales();
         };
 
@@ -1231,10 +1242,11 @@
                     if (g.tipo === 'Tarjeta') {
                         cuotasDetalle = `<br><span style="font-size:11px; color:#174ea6;">${g.tarjeta || 'Tarjeta'} (${g.cuotas_pagadas}/${g.cuotas_totales})</span>`;
                         if (parseInt(g.cuotas_pagadas) >= parseInt(g.cuotas_totales)) {
-                            bgRowStyle = 'background-color: #e6f4ea;';
+                            bgRowStyle = 'background-color: #e6f4ea;'; // Verde claro para última cuota
                         }
                     }
 
+                    // Boton Desglose USD
                     let usdBtn = '';
                     let breakdownHtml = '';
                     if (g.moneda === 'USD') {
@@ -1611,6 +1623,16 @@
                 let monto = window.parseMoney(val);
                 if(!isNaN(monto)) {
                     acc.retiros = (acc.retiros || 0) + monto;
+                    
+                    historialAhorros.unshift({
+                        id: Date.now(),
+                        fecha: new Date().toLocaleString(),
+                        accion: monto >= 0 ? 'Retiro' : 'Ajuste',
+                        objetivo: 'Manual',
+                        cuenta: acc.nombre,
+                        monto: monto
+                    });
+
                     guardarConfiguracionAhorros();
                 }
             }
@@ -1620,7 +1642,8 @@
             mostrarCargando(true);
             await actualizarConfiguracionDB({
                 "configuracion.cuentas_ahorro": cuentasAhorro,
-                "configuracion.grupos_distribucion": gruposDistribucion
+                "configuracion.grupos_distribucion": gruposDistribucion,
+                "configuracion.historial_ahorros": historialAhorros
             });
             await actualizarDashboard();
         }
@@ -1680,7 +1703,7 @@
                 let proyMes = ahorrosProyectado[c.id] || 0;
                 let saldoAnt = c.saldo_anterior || 0;
                 let retiros = c.retiros || 0;
-                let sumaTotal = saldoAnt + aporteMes - retiros; // Solo sumamos lo EFECTIVAMENTE ahorrado este mes
+                let sumaTotal = saldoAnt + aporteMes - retiros; 
 
                 totalAhorrosHistorico += sumaTotal;
                 if (c.depositado) totalDepositadoMes += aporteMes;
@@ -1884,8 +1907,7 @@
             }
 
             dispararDebounceAutoguardado();
-            // Actualizar proyeccion visualmente sin recargar todo
-            renderCuentasAhorro();
+            window.recargarDatosVisuales();
         };
 
         function dispararDebounceAutoguardado() {
@@ -1927,7 +1949,6 @@
                 });
             }
             
-            // Restar del total distribuible global lo que ya está congelado en TODOS los grupos
             totalDistribuibleGlobal -= totalAhorrosEfectivizados;
 
             let resHtml = '';
@@ -2016,7 +2037,7 @@
                 divDist.innerHTML += htmlBlock;
             }
 
-            resDist.innerHTML = `<div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: #4285F4;">Disponible Total Libre: ${formatearDinero(totalDistribuibleGlobal)}</div>` + resHtml;
+            resDist.innerHTML = `<div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: var(--text-main);">Disponible Total para Objetivos: ${formatearDinero(totalDistribuibleGlobal)}</div>` + resHtml;
         }
 
         window.abrirModalNuevoIngreso = function() {
@@ -2422,4 +2443,4 @@
         }
     </script>
 </body>
-</html> 
+</html>
