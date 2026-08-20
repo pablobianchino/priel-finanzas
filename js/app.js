@@ -8,12 +8,10 @@ import { vistaAhorros } from '../vistas/ahorros.js';
 import { vistaEstadisticas } from '../vistas/estadisticas.js';
 import { vistaModales } from '../vistas/modales.js';
 
-// --- 1. INYECTAR VISTAS AL DOM ---
 document.getElementById('views-container').innerHTML = vistaResumen + vistaGastos + vistaIngresos + vistaAhorros + vistaEstadisticas;
 document.getElementById('modals-container').innerHTML = vistaModales;
 
-// --- 2. CONFIGURACIÓN INICIAL Y ESTADOS ---
-const APP_VERSION = "v2.0.0";
+const APP_VERSION = "v2.0.1"; // Versión corregida
 window.APP_VERSION = APP_VERSION;
 
 const updateVersionTags = () => {
@@ -57,7 +55,6 @@ let sumatoriaGastosPorOrigen = {};
 let debounceTimer;
 let sortablePaneles = null;
 
-// --- 3. EXPOSICIÓN GLOBAL (Habilitar OnClicks de HTML) ---
 window.parseMoney = parseMoney;
 window.formatearDinero = formatearDinero;
 
@@ -158,7 +155,6 @@ window.switchView = async function(viewId, element) {
     if (viewId === 'estadisticas') await cargarEstadisticasAnuales();
 };
 
-// --- 4. EVENTOS DE AUTENTICACIÓN Y LISTENERS PRINCIPALES ---
 document.getElementById('login-btn-main').addEventListener('click', () => {
     signInWithPopup(auth, provider).catch((error) => {
         alert("Error de inicio de sesión. Si estás en local con archivo (file://) debes subirlo a Vercel.");
@@ -208,7 +204,6 @@ window.exportarBackupMes = async function() {
     window.mostrarCargando(false);
 }
 
-// --- 5. FUNCIONES CORE ---
 async function actualizarDashboard() {
     if (!auth.currentUser) return;
     window.mostrarCargando(true);
@@ -537,6 +532,9 @@ function renderizacioDinamicaGastosPaneles(gastosProcesados, dDebito, dImpuesto)
 
     panelesData.forEach(p => {
         let isOpen = panelesAbiertos.includes(p.categoria);
+        let displayStyle = isOpen ? 'block' : 'none';
+        let iconText = isOpen ? '▼' : '▶';
+
         let hasUnassociated = p.itemsPanel.some(g => !g.es_clon_destino && !g.ignorar_origen && ((p.origenesDelPanel.length > 1 && (!g.id_origen || !p.origenesDelPanel.includes(g.id_origen))) || p.origenesDelPanel.length === 0));
         let alertBadge = hasUnassociated ? `<span style="background-color: #fce8e6; color: #c5221f; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 10px; vertical-align: text-bottom;">⚠️ Falta origen</span>` : '';
 
@@ -586,7 +584,7 @@ function renderizacioDinamicaGastosPaneles(gastosProcesados, dDebito, dImpuesto)
                         <span class="toggle-icon">${iconText}</span>
                     </div>
                 </div>
-                <div class="card-content" style="display:${isOpen ? 'block' : 'none'}; margin-top:15px;">
+                <div class="card-content" style="display:${displayStyle}; margin-top:15px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
                         <button class="btn-black" style="padding: 4px 10px; font-size: 11px;" onclick="window.abrirModalNuevoGasto('${p.categoria}')">➕ Añadir Gasto</button>
                         <div style="display: flex; gap: 5px;">
@@ -955,6 +953,46 @@ window.abrirModalEditarIngreso = function(data) {
     document.getElementById('ingreso-grupo').value = data.grupo || ""; document.getElementById('titulo-modal-ingreso').innerText = "Editar Ingreso"; document.getElementById('modal-ingreso').style.display = 'flex';
 }
 
+document.getElementById('form-gasto').addEventListener('submit', async (e) => {
+    e.preventDefault(); window.mostrarCargando(true);
+    const idGasto = document.getElementById('gasto-id').value, prop = document.getElementById('gasto-propietario').value, tipo = document.getElementById('gasto-tipo').value, cat = document.getElementById('gasto-categoria-select').value, isRecurrente = document.getElementById('gasto-recurrente').checked;
+    const checkboxCompartir = document.getElementById('gasto-compartir').checked, compCon = document.getElementById('gasto-compartir-con').value.trim(), compTipo = document.getElementById('gasto-compartir-tipo').value;
+    const montoGasto = parseFloat(document.getElementById('gasto-monto').dataset.raw || window.parseMoney(document.getElementById('gasto-monto').value));
+    const montoFijo = parseFloat(document.getElementById('gasto-monto-fijo').dataset.raw || window.parseMoney(document.getElementById('gasto-monto-fijo').value));
+
+    if (prop === 'Propio' && checkboxCompartir && compCon !== '') {
+        let catCompartida = "Gastos de " + compCon;
+        if (tiposGastoAsociaciones[catCompartida] === undefined) {
+            tiposGastoAsociaciones[catCompartida] = []; ordenPanelesGasto.push(catCompartida);
+            await actualizarConfiguracionDB({ "configuracion.tipos_gasto": tiposGastoAsociaciones, "configuracion.orden_paneles_gasto": ordenPanelesGasto });
+        }
+    }
+
+    let origenesPanel = (tiposGastoAsociaciones[cat] || []).filter(id => id && id.trim() !== "");
+    let id_origen = origenesPanel.length > 1 ? document.getElementById('gasto-origen-select').value : (origenesPanel.length === 1 ? origenesPanel[0] : "");
+
+    let datosGasto = { propietario: prop, tercero_nombre: prop === 'Tercero' ? document.getElementById('gasto-tercero-nombre').value : '', nombre: document.getElementById('gasto-nombre').value, monto: montoGasto, moneda: document.getElementById('gasto-moneda').value, tipo: tipo, categoria: cat, id_origen: id_origen, recurrente: isRecurrente, compartir_con: (prop === 'Propio' && checkboxCompartir) ? compCon : '', compartir_tipo: (prop === 'Propio' && checkboxCompartir) ? compTipo : 'divisor', divisor: (prop === 'Propio' && checkboxCompartir && compTipo === 'divisor') ? parseInt(document.getElementById('gasto-divisor').value) || 1 : 1, monto_fijo: (prop === 'Propio' && checkboxCompartir && compTipo === 'fijo') ? montoFijo : null };
+
+    let oldGasto = listaGastos.find(g => g.id === idGasto);
+    if(oldGasto && oldGasto.ignorar_origen !== undefined) datosGasto.ignorar_origen = oldGasto.ignorar_origen;
+
+    if (tipo === 'Tarjeta') { datosGasto.tarjeta = document.getElementById('gasto-tarjeta').value; datosGasto.cuotas_totales = parseInt(document.getElementById('gasto-cuotas-totales').value) || 1; datosGasto.cuotas_pagadas = parseInt(document.getElementById('gasto-cuotas-pagadas').value) || 1; }
+
+    if (idGasto) await updateDoc(doc(db, "finanzas", obtenerMesId(), "gastos", idGasto), datosGasto);
+    else await addDoc(collection(db, "finanzas", obtenerMesId(), "gastos"), datosGasto);
+    
+    window.cerrarModal('modal-gasto'); await actualizarDashboard();
+});
+
+document.getElementById('form-ingreso').addEventListener('submit', async (e) => {
+    e.preventDefault(); window.mostrarCargando(true);
+    const id = document.getElementById('ingreso-id').value;
+    const data = { nombre: document.getElementById('ingreso-nombre').value, monto: parseFloat(document.getElementById('ingreso-monto').dataset.raw || window.parseMoney(document.getElementById('ingreso-monto').value)), grupo: document.getElementById('ingreso-grupo').value };
+    if(id) await updateDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", id), data);
+    else await addDoc(collection(db, "finanzas", obtenerMesId(), "ingresos"), data);
+    window.cerrarModal('modal-ingreso'); await actualizarDashboard();
+});
+
 window.borrarIngreso = async function(id) { 
     window.mostrarCargando(true); await deleteDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", id)); await actualizarDashboard(); 
 };
@@ -1139,53 +1177,6 @@ window.copiarMesAnterior = async function() {
         await actualizarDashboard();
     } catch (e) { console.error(e); window.mostrarCargando(false); alert("Error al copiar datos: " + e.message); }
 };
-
-// --- LISTENERS DE FORMULARIOS AL FINAL ---
-document.getElementById('form-gasto').addEventListener('submit', async (e) => {
-    e.preventDefault(); window.mostrarCargando(true);
-    const idGasto = document.getElementById('gasto-id').value, prop = document.getElementById('gasto-propietario').value, tipo = document.getElementById('gasto-tipo').value, cat = document.getElementById('gasto-categoria-select').value, isRecurrente = document.getElementById('gasto-recurrente').checked;
-    const checkboxCompartir = document.getElementById('gasto-compartir').checked, compCon = document.getElementById('gasto-compartir-con').value.trim(), compTipo = document.getElementById('gasto-compartir-tipo').value;
-    const montoGasto = parseFloat(document.getElementById('gasto-monto').dataset.raw || window.parseMoney(document.getElementById('gasto-monto').value));
-    const montoFijo = parseFloat(document.getElementById('gasto-monto-fijo').dataset.raw || window.parseMoney(document.getElementById('gasto-monto-fijo').value));
-
-    if (prop === 'Propio' && checkboxCompartir && compCon !== '') {
-        let catCompartida = "Gastos de " + compCon;
-        if (tiposGastoAsociaciones[catCompartida] === undefined) {
-            tiposGastoAsociaciones[catCompartida] = []; ordenPanelesGasto.push(catCompartida);
-            await actualizarConfiguracionDB({ "configuracion.tipos_gasto": tiposGastoAsociaciones, "configuracion.orden_paneles_gasto": ordenPanelesGasto });
-        }
-    }
-
-    let origenesPanel = (tiposGastoAsociaciones[cat] || []).filter(id => id && id.trim() !== "");
-    let id_origen = origenesPanel.length > 1 ? document.getElementById('gasto-origen-select').value : (origenesPanel.length === 1 ? origenesPanel[0] : "");
-
-    let datosGasto = {
-        propietario: prop, tercero_nombre: prop === 'Tercero' ? document.getElementById('gasto-tercero-nombre').value : '', nombre: document.getElementById('gasto-nombre').value, monto: montoGasto, moneda: document.getElementById('gasto-moneda').value, tipo: tipo, categoria: cat, id_origen: id_origen, recurrente: isRecurrente, compartir_con: (prop === 'Propio' && checkboxCompartir) ? compCon : '', compartir_tipo: (prop === 'Propio' && checkboxCompartir) ? compTipo : 'divisor', divisor: (prop === 'Propio' && checkboxCompartir && compTipo === 'divisor') ? parseInt(document.getElementById('gasto-divisor').value) || 1 : 1, monto_fijo: (prop === 'Propio' && checkboxCompartir && compTipo === 'fijo') ? montoFijo : null
-    };
-
-    let oldGasto = listaGastos.find(g => g.id === idGasto);
-    if(oldGasto && oldGasto.ignorar_origen !== undefined) datosGasto.ignorar_origen = oldGasto.ignorar_origen;
-
-    if (tipo === 'Tarjeta') {
-        datosGasto.tarjeta = document.getElementById('gasto-tarjeta').value;
-        datosGasto.cuotas_totales = parseInt(document.getElementById('gasto-cuotas-totales').value) || 1;
-        datosGasto.cuotas_pagadas = parseInt(document.getElementById('gasto-cuotas-pagadas').value) || 1;
-    }
-
-    if (idGasto) await updateDoc(doc(db, "finanzas", obtenerMesId(), "gastos", idGasto), datosGasto);
-    else await addDoc(collection(db, "finanzas", obtenerMesId(), "gastos"), datosGasto);
-    
-    window.cerrarModal('modal-gasto'); await actualizarDashboard();
-});
-
-document.getElementById('form-ingreso').addEventListener('submit', async (e) => {
-    e.preventDefault(); window.mostrarCargando(true);
-    const id = document.getElementById('ingreso-id').value;
-    const data = { nombre: document.getElementById('ingreso-nombre').value, monto: parseFloat(document.getElementById('ingreso-monto').dataset.raw || window.parseMoney(document.getElementById('ingreso-monto').value)), grupo: document.getElementById('ingreso-grupo').value };
-    if(id) await updateDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", id), data);
-    else await addDoc(collection(db, "finanzas", obtenerMesId(), "ingresos"), data);
-    window.cerrarModal('modal-ingreso'); await actualizarDashboard();
-});
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
