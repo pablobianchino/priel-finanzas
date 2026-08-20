@@ -1,11 +1,20 @@
-const CACHE_NAME = 'finanzas-priel-v3'; // Cuando hagas un cambio MUY grande, cambias a v3, v4, etc.
+const CACHE_NAME = 'finanzas-priel-v2.0.1'; // Versión actualizada
 const urlsToCache = [
   '/',
   '/index.html',
+  '/style.css',
+  '/js/app.js',
+  '/js/logica.js',
+  '/js/firebase.js',
+  '/vistas/resumen.js',
+  '/vistas/gastos.js',
+  '/vistas/ingresos.js',
+  '/vistas/ahorros.js',
+  '/vistas/estadisticas.js',
+  '/vistas/modales.js',
   '/manifest.json'
 ];
 
-// Instala el Service Worker y fuerza la actualización inmediata
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
@@ -13,7 +22,6 @@ self.addEventListener('install', event => {
   );
 });
 
-// Activa y limpia cachés de versiones anteriores
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
@@ -29,19 +37,22 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Estrategia: Network First (Red primero, fallback a caché si falla)
 self.addEventListener('fetch', event => {
+  // SOLUCIÓN: Solo guardar en caché peticiones GET (Firebase usa POST y tira error si intentamos cachearlo)
+  if (event.request.method !== 'GET') return;
+
+  // Ignorar extensiones del navegador y peticiones externas raras
+  if (!event.request.url.startsWith('http')) return;
+
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        // Si hay conexión, actualiza la caché silenciosamente con la versión más reciente
         return caches.open(CACHE_NAME).then(cache => {
           cache.put(event.request, response.clone());
           return response;
         });
       })
       .catch(() => {
-        // Si no hay conexión (offline), usa la versión guardada en caché
         return caches.match(event.request);
       })
   );
