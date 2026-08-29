@@ -11,7 +11,7 @@ import { vistaModales } from '../vistas/modales.js';
 document.getElementById('views-container').innerHTML = vistaResumen + vistaGastos + vistaIngresos + vistaAhorros + vistaEstadisticas;
 document.getElementById('modals-container').innerHTML = vistaModales;
 
-const APP_VERSION = "v2.0.1"; // Versión corregida
+const APP_VERSION = "v2.0.2"; // Versión corregida de cálculos
 window.APP_VERSION = APP_VERSION;
 
 const updateVersionTags = () => {
@@ -355,11 +355,12 @@ function procesarListaGastos(dDebito, dImpuesto) {
     let arr = [];
     totalGastosGlobal = 0; subtotalTerceros = 0; deudaFuturaTotal = 0;
     if(!listaGastos) return arr;
+    
     listaGastos.forEach(g => {
-        let cuotaTotal = g.tipo === 'Tarjeta' ? (getCostoCalculado(g, dDebito, dImpuesto) / (g.cuotas_totales || 1)) : getCostoCalculado(g, dDebito, dImpuesto);
+        let cuotaTotal = getCostoCalculado(g, dDebito, dImpuesto); // Llama a logica.js para obtener el valor de 1 cuota completa.
 
         if (g.compartir_con && g.compartir_tipo && g.propietario === 'Propio') {
-            let miParte = g.compartir_tipo === 'divisor' ? cuotaTotal / (g.divisor || 2) : (g.monto_fijo || 0);
+            let miParte = g.compartir_tipo === 'divisor' ? (cuotaTotal / (g.divisor || 2)) : (g.monto_fijo || 0);
             let suParte = cuotaTotal - miParte;
 
             arr.push({ ...g, costoCalculado: miParte, es_clon_origen: true });
@@ -374,6 +375,7 @@ function procesarListaGastos(dDebito, dImpuesto) {
             else subtotalTerceros += cuotaTotal;
         }
     });
+    
     document.getElementById('res-gastos-fijos').innerText = window.formatearDinero(totalGastosGlobal);
     document.getElementById('sum-gastos-total').innerText = window.formatearDinero(totalGastosGlobal);
     document.getElementById('sum-gastos-terceros').innerText = window.formatearDinero(subtotalTerceros);
@@ -1065,9 +1067,9 @@ async function cargarEstadisticasAnuales() {
         const gasSnap = await getDocs(collection(db, "finanzas", mesId, "gastos"));
         gasSnap.forEach(d => {
             let g = d.data(); if (g.propietario === 'Tercero') return;
-            let costoCalculado = getCostoCalculado(g, dDebito, dImpuesto);
+            let cuotaTotal = getCostoCalculado(g, dDebito, dImpuesto);
+            let costoCalculado = cuotaTotal;
             if (g.compartir_con && g.compartir_tipo) {
-                let cuotaTotal = g.tipo === 'Tarjeta' ? (costoCalculado / (g.cuotas_totales || 1)) : costoCalculado;
                 costoCalculado = g.compartir_tipo === 'divisor' ? cuotaTotal / (g.divisor || 2) : (g.monto_fijo || 0);
             }
             totalGas += costoCalculado;
@@ -1148,9 +1150,9 @@ window.copiarMesAnterior = async function() {
             if(g.tipo==='Tarjeta'){ if(g.cuotas_pagadas < g.cuotas_totales) { let gCopy = {...g}; gCopy.cuotas_pagadas++; prevGastosToCopy.push(gCopy); } } 
             else if (g.tipo === 'Fijo' && g.recurrente !== false) { prevGastosToCopy.push({...g}); }
             if(g.propietario !== 'Tercero') {
-                let costo = getCostoCalculado(g, dDebito, dImpuesto);
+                let cuotaTotal = getCostoCalculado(g, dDebito, dImpuesto);
+                let costo = cuotaTotal;
                 if (g.compartir_con && g.compartir_tipo) {
-                    let cuotaTotal = g.tipo === 'Tarjeta' ? (costo / (g.cuotas_totales || 1)) : costo;
                     costo = g.compartir_tipo === 'divisor' ? cuotaTotal / (g.divisor || 2) : (g.monto_fijo || 0);
                 }
                 let origenesPanel = prevTipos[g.categoria || "Fijos"] || []; let origenId = g.id_origen || (origenesPanel.length > 0 ? origenesPanel[0] : null);
