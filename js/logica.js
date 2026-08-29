@@ -26,11 +26,5 @@ export function getCostoCalculado(g, dDebito, dImpuesto) {
         let vImp = g.monto * dImpuesto;
         costoArsBase = (vImp * 0.02) + (vImp * 0.21) + (vImp * 0.30) + (g.monto * dDebito);
     }
-    let divisor = g.divisor || 1;
-    if (g.propietario !== 'Tercero' && g.compartir_tipo === 'fijo') {
-        return g.monto_fijo || 0;
-    } else {
-        let cuotaBase = g.tipo === 'Tarjeta' ? (costoArsBase / (g.cuotas_totales || 1)) : costoArsBase;
-        return cuotaBase / divisor;
-    }
+    return g.tipo === 'Tarjeta' ? (costoArsBase / (g.cuotas_totales || 1)) : costoArsBase;
 }
