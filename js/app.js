@@ -11,7 +11,7 @@ import { vistaModales } from '../vistas/modales.js';
 document.getElementById('views-container').innerHTML = vistaResumen + vistaGastos + vistaIngresos + vistaAhorros + vistaEstadisticas;
 document.getElementById('modals-container').innerHTML = vistaModales;
 
-const APP_VERSION = "v2.0.2"; // Versión corregida de cálculos
+const APP_VERSION = "v2.0.3"; // Corrección de clonación de IDs en Importar Mes
 window.APP_VERSION = APP_VERSION;
 
 const updateVersionTags = () => {
@@ -357,7 +357,7 @@ function procesarListaGastos(dDebito, dImpuesto) {
     if(!listaGastos) return arr;
     
     listaGastos.forEach(g => {
-        let cuotaTotal = getCostoCalculado(g, dDebito, dImpuesto); // Llama a logica.js para obtener el valor de 1 cuota completa.
+        let cuotaTotal = getCostoCalculado(g, dDebito, dImpuesto);
 
         if (g.compartir_con && g.compartir_tipo && g.propietario === 'Propio') {
             let miParte = g.compartir_tipo === 'divisor' ? (cuotaTotal / (g.divisor || 2)) : (g.monto_fijo || 0);
@@ -384,6 +384,7 @@ function procesarListaGastos(dDebito, dImpuesto) {
 }
 
 function getOrigenIdDeGasto(g) {
+    if (g.ignorar_origen) return null; // FIX: Si se ignora, no se descuenta
     let catAsociada = g.categoria || "Fijos";
     let origenesPanel = tiposGastoAsociaciones[catAsociada] || [];
     origenesPanel = origenesPanel.filter(id => id && id.trim() !== "");
@@ -630,9 +631,12 @@ window.abrirModalNuevoGasto = function(categoriaPredefinida = '') {
 }
 
 window.abrirModalEditarGasto = function(data) {
-    document.getElementById('gasto-id').value = data.id; document.getElementById('gasto-propietario').value = data.propietario || 'Propio';
-    document.getElementById('gasto-tercero-nombre').value = data.tercero_nombre || ''; document.getElementById('gasto-nombre').value = data.nombre;
-    document.getElementById('gasto-monto').dataset.raw = data.monto; document.getElementById('gasto-moneda').value = data.moneda || "ARS";
+    document.getElementById('gasto-id').value = data.id;
+    document.getElementById('gasto-propietario').value = data.propietario || 'Propio';
+    document.getElementById('gasto-tercero-nombre').value = data.tercero_nombre || '';
+    document.getElementById('gasto-nombre').value = data.nombre;
+    document.getElementById('gasto-monto').dataset.raw = data.monto;
+    document.getElementById('gasto-moneda').value = data.moneda || "ARS";
     document.getElementById('gasto-monto').value = window.formatearDinero(data.monto, data.moneda);
     document.getElementById('gasto-recurrente').checked = data.recurrente !== false; 
     
@@ -1073,8 +1077,10 @@ async function cargarEstadisticasAnuales() {
                 costoCalculado = g.compartir_tipo === 'divisor' ? cuotaTotal / (g.divisor || 2) : (g.monto_fijo || 0);
             }
             totalGas += costoCalculado;
-            let origenesPanel = tiposGastoLocal[g.categoria || "Fijos"] || []; let origenId = g.id_origen || (origenesPanel.length > 0 ? origenesPanel[0] : null);
-            if (origenId) sumatoriaGastosPorOrigenLocal[origenId] = (sumatoriaGastosPorOrigenLocal[origenId] || 0) + costoCalculado;
+            if(!g.ignorar_origen) {
+                let origenesPanel = tiposGastoLocal[g.categoria || "Fijos"] || []; let origenId = g.id_origen || (origenesPanel.length > 0 ? origenesPanel[0] : null);
+                if (origenId) sumatoriaGastosPorOrigenLocal[origenId] = (sumatoriaGastosPorOrigenLocal[origenId] || 0) + costoCalculado;
+            }
         });
         gastosData[index] = totalGas;
 
@@ -1147,9 +1153,10 @@ window.copiarMesAnterior = async function() {
         let prevGastosToCopy = [];
         snapG.forEach(d => {
             let g = d.data();
+            g.id = d.id; // PRESERVAR ID FIREBASE
             if(g.tipo==='Tarjeta'){ if(g.cuotas_pagadas < g.cuotas_totales) { let gCopy = {...g}; gCopy.cuotas_pagadas++; prevGastosToCopy.push(gCopy); } } 
             else if (g.tipo === 'Fijo' && g.recurrente !== false) { prevGastosToCopy.push({...g}); }
-            if(g.propietario !== 'Tercero') {
+            if(g.propietario !== 'Tercero' && !g.ignorar_origen) {
                 let cuotaTotal = getCostoCalculado(g, dDebito, dImpuesto);
                 let costo = cuotaTotal;
                 if (g.compartir_con && g.compartir_tipo) {
@@ -1162,7 +1169,9 @@ window.copiarMesAnterior = async function() {
         let sumPorGrupoPrev = {}; const snapI = await getDocs(collection(db, "finanzas", prev, "ingresos"));
         let prevIngresosToCopy = [];
         snapI.forEach(d => {
-            let ing = {id: d.id, ...d.data()}; prevIngresosToCopy.push(d.data());
+            let ing = d.data();
+            ing.id = d.id; // PRESERVAR ID FIREBASE
+            prevIngresosToCopy.push(ing);
             if (ing.grupo) sumPorGrupoPrev[ing.grupo] = (sumPorGrupoPrev[ing.grupo] || 0) + (ing.monto - (sumatoriaGastosPrev[ing.id] || 0));
         });
         let ahorrosSumaPrev = {};
@@ -1174,8 +1183,14 @@ window.copiarMesAnterior = async function() {
         let nuevasCuentas = prevCuentas.map(c => { return { id: c.id, nombre: c.nombre, depositado: false, saldo_anterior: (c.saldo_anterior || 0) + (ahorrosSumaPrev[c.id] || 0) - (c.retiros || 0), retiros: 0 }; });
         prevConfig.cuentas_ahorro = nuevasCuentas;
         await setDoc(doc(db, "finanzas", actual), { configuracion: prevConfig }, { merge: true });
-        for(const g of prevGastosToCopy) { await addDoc(collection(db, "finanzas", actual, "gastos"), g); }
-        for(const ing of prevIngresosToCopy) { await addDoc(collection(db, "finanzas", actual, "ingresos"), ing); }
+        for(const g of prevGastosToCopy) { 
+            let docId = g.id; delete g.id;
+            await setDoc(doc(db, "finanzas", actual, "gastos", docId), g); 
+        }
+        for(const ing of prevIngresosToCopy) { 
+            let docId = ing.id; delete ing.id;
+            await setDoc(doc(db, "finanzas", actual, "ingresos", docId), ing); 
+        }
         await actualizarDashboard();
     } catch (e) { console.error(e); window.mostrarCargando(false); alert("Error al copiar datos: " + e.message); }
 };
