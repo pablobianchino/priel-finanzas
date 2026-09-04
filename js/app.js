@@ -11,7 +11,7 @@ import { vistaModales } from '../vistas/modales.js';
 document.getElementById('views-container').innerHTML = vistaResumen + vistaGastos + vistaIngresos + vistaAhorros + vistaEstadisticas;
 document.getElementById('modals-container').innerHTML = vistaModales;
 
-const APP_VERSION = "v2.2.0";
+const APP_VERSION = "v2.3.0";
 window.APP_VERSION = APP_VERSION;
 
 const updateVersionTags = () => {
@@ -245,7 +245,8 @@ function renderResumenUSD(gastosProc, dDebito) {
     const contenido = document.getElementById('contenido-resumen-usd');
     if (!panel || !contenido) return;
 
-    let gastosUSD = gastosProc.filter(g => g.moneda === 'USD' && g.propietario !== 'Tercero');
+    // Quitamos la condición de que sea SOLO "Propio", ahora incluye Terceros.
+    let gastosUSD = gastosProc.filter(g => g.moneda === 'USD');
 
     if (gastosUSD.length === 0 || dDebito <= 0) {
         panel.style.display = 'none';
@@ -266,7 +267,13 @@ function renderResumenUSD(gastosProc, dDebito) {
 
         let infoExtra = '';
         if (g.tipo === 'Tarjeta') infoExtra += ` <span style="font-size:10px; color:#aaa;">(${g.cuotas_pagadas}/${g.cuotas_totales})</span>`;
-        if (g.es_clon_origen) infoExtra += ` <span style="font-size:10px; color:#aaa;">(Tu parte)</span>`;
+        
+        if (g.es_clon_origen) {
+            infoExtra += ` <span style="font-size:10px; color:#aaa;">(Tu parte)</span>`;
+        } else if (g.propietario === 'Tercero') {
+            let nomTercero = g.es_clon_destino ? (g.categoria.replace('Gastos de ', '')) : (g.tercero_nombre || 'Tercero');
+            infoExtra += ` <span style="font-size:10px; background:#fce8e6; color:#c5221f; padding:2px 4px; border-radius:4px; margin-left:4px;">De: ${nomTercero}</span>`;
+        }
 
         totalUSD += usdReal;
         totalARS += arsReal;
