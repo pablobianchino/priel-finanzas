@@ -11,7 +11,7 @@ export const vistaResumen = `
         </div>
         <div class="card-content" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
             <label>MEP (Ahorros): <input type="text" id="usd-mep" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
-            <label>Débito (Gastos): <input type="text" id="usd-debito" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
+            <label>MEP Tarjeta (Gastos): <input type="text" id="usd-debito" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
             <label>Impuesto (Gastos): <input type="text" id="usd-impuesto" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
             <button class="btn-black" style="padding: 6px 15px;" onclick="window.guardarConfiguracionDolar('resumen')">Guardar Rate</button>
         </div>
