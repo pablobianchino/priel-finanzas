@@ -11,7 +11,7 @@ import { vistaModales } from '../vistas/modales.js';
 document.getElementById('views-container').innerHTML = vistaResumen + vistaGastos + vistaIngresos + vistaAhorros + vistaEstadisticas;
 document.getElementById('modals-container').innerHTML = vistaModales;
 
-const APP_VERSION = "v2.1.0";
+const APP_VERSION = "v2.2.0";
 window.APP_VERSION = APP_VERSION;
 
 const updateVersionTags = () => {
@@ -232,11 +232,63 @@ window.recargarDatosVisuales = function() {
         });
     }
 
+    renderResumenUSD(gastosProc, dDebito);
     renderizacioDinamicaGastosPaneles(gastosProc, dDebito, dImpuesto);
     renderTablaIngresos(gastosProc); 
     renderDistribucionDirecta(); 
     renderCuentasAhorro(); 
     calcularBalance();
+}
+
+function renderResumenUSD(gastosProc, dDebito) {
+    const panel = document.getElementById('panel-resumen-usd');
+    const contenido = document.getElementById('contenido-resumen-usd');
+    if (!panel || !contenido) return;
+
+    let gastosUSD = gastosProc.filter(g => g.moneda === 'USD' && g.propietario !== 'Tercero');
+
+    if (gastosUSD.length === 0 || dDebito <= 0) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    panel.style.display = 'block';
+    let totalUSD = 0;
+    let totalARS = 0;
+    
+    let html = `<table style="width:100%; margin-top:0;">
+                    <thead><tr><th>Gasto</th><th style="text-align:right;">U$D Mes</th><th style="text-align:right;">ARS</th></tr></thead>
+                    <tbody>`;
+    
+    gastosUSD.forEach(g => {
+        let arsReal = g.costoCalculado; 
+        let usdReal = arsReal / dDebito; 
+
+        let infoExtra = '';
+        if (g.tipo === 'Tarjeta') infoExtra += ` <span style="font-size:10px; color:#aaa;">(${g.cuotas_pagadas}/${g.cuotas_totales})</span>`;
+        if (g.es_clon_origen) infoExtra += ` <span style="font-size:10px; color:#aaa;">(Tu parte)</span>`;
+
+        totalUSD += usdReal;
+        totalARS += arsReal;
+
+        html += `<tr>
+                    <td>${g.nombre}${infoExtra}</td>
+                    <td style="text-align:right;">U$D ${usdReal.toFixed(2)}</td>
+                    <td style="text-align:right; font-weight:600;">${window.formatearDinero(arsReal)}</td>
+                 </tr>`;
+    });
+
+    html += `</tbody>
+             <tfoot style="border-top: 2px solid var(--card-border);">
+                <tr>
+                    <td style="font-weight:bold; padding-top:10px;">TOTAL USD MES</td>
+                    <td style="text-align:right; font-weight:bold; color:#174ea6; padding-top:10px;">U$D ${totalUSD.toFixed(2)}</td>
+                    <td style="text-align:right; font-weight:bold; padding-top:10px;">${window.formatearDinero(totalARS)}</td>
+                </tr>
+             </tfoot>
+           </table>`;
+    
+    contenido.innerHTML = html;
 }
 
 async function cargarGastosFetch() {
@@ -568,9 +620,9 @@ function renderizacioDinamicaGastosPaneles(gastosProcesados, dDebito, dImpuesto)
 
             let usdBtn = '', breakdownHtml = '';
             if (g.moneda === 'USD') {
-                let vImp = g.monto * dImpuesto, sumImp = (vImp * 0.02) + (vImp * 0.21) + (vImp * 0.30), vDeb = g.monto * dDebito, totalCosto = sumImp + vDeb;
+                let vDeb = g.monto * dDebito, totalCosto = vDeb;
                 usdBtn = `<br><span style="color:#174ea6; font-size:10px; cursor:pointer; text-decoration:underline;" onclick="event.stopPropagation(); document.getElementById('usd-detail-${g.id}').style.display = document.getElementById('usd-detail-${g.id}').style.display === 'none' ? 'table-row' : 'none'">Ver cálculo USD</span>`;
-                breakdownHtml = `<tr id="usd-detail-${g.id}" style="display:none; background-color:#f8f9fa;"><td colspan="4" style="padding: 10px; font-size:11px; color:var(--text-muted);"><strong>Cálculo USD:</strong><br>Monto original: U$D ${g.monto}<br>Monto x Dólar Impuesto (${dImpuesto}): $${(vImp).toFixed(2)} -> Impuestos (2%+21%+30%): $${(sumImp).toFixed(2)}<br>Monto x Dólar Débito (${dDebito}): $${(vDeb).toFixed(2)}<br><b>Subtotal: $${(totalCosto).toFixed(2)}</b>${(g.divisor && g.divisor > 1) ? `<br><i>Dividido en ${g.divisor} partes: $${(totalCosto/g.divisor).toFixed(2)}</i>` : ''}</td></tr>`;
+                breakdownHtml = `<tr id="usd-detail-${g.id}" style="display:none; background-color:#f8f9fa;"><td colspan="4" style="padding: 10px; font-size:11px; color:var(--text-muted);"><strong>Cálculo USD:</strong><br>Monto original: U$D ${g.monto}<br>Monto x Dólar MEP Tarjeta (${dDebito}): $${(vDeb).toFixed(2)}<br><b>Subtotal: $${(totalCosto).toFixed(2)}</b>${(g.divisor && g.divisor > 1) ? `<br><i>Dividido en ${g.divisor} partes: $${(totalCosto/g.divisor).toFixed(2)}</i>` : ''}</td></tr>`;
             }
 
             let actionsHtml = g.es_clon_destino ? `<span style="font-size:10px; color:#c5221f; font-weight:600;">🔒 Compartido (Edite original)</span>` : `<button class="btn-icon" onclick="event.stopPropagation(); window.borrarGasto('${g.id}')">🗑️</button>`;
@@ -878,7 +930,7 @@ window.efectivizarAhorroObjetivo = async function(grupoName, index) {
     const totalDineroGrupo = sumPorGrupo[grupoName] || 0;
     let monto = totalDineroGrupo * (it.porc / 100);
 
-    if (monto <= 0) return alert("No hay saldo disponible suficiente o el monto es 0.");
+    if (monto <= 0) return alert("No hay saldo disponible suficiente o el monto a guardar es 0.");
 
     it.ahorrado = true; it.monto_ahorrado = monto;
     let cuentaName = cuentasAhorro.find(c => c.id === it.ahorro_id)?.nombre || 'Cuenta eliminada';
