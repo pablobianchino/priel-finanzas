@@ -23,8 +23,14 @@ export function formatearDinero(num, moneda = 'ARS') {
 export function getCostoCalculado(g, dDebito, dImpuesto) {
     let costoArsBase = g.monto;
     if (g.moneda === 'USD') {
-        let vImp = g.monto * dImpuesto;
-        costoArsBase = (vImp * 0.02) + (vImp * 0.21) + (vImp * 0.30) + (g.monto * dDebito);
+        // Nueva regla simple: Monto en USD multiplicado por el valor Dólar MEP Tarjeta
+        costoArsBase = g.monto * dDebito;
     }
-    return g.tipo === 'Tarjeta' ? (costoArsBase / (g.cuotas_totales || 1)) : costoArsBase;
+    let divisor = g.divisor || 1;
+    if (g.propietario !== 'Tercero' && g.compartir_tipo === 'fijo') {
+        return g.monto_fijo || 0;
+    } else {
+        let cuotaBase = g.tipo === 'Tarjeta' ? (costoArsBase / (g.cuotas_totales || 1)) : costoArsBase;
+        return cuotaBase / divisor;
+    }
 }
