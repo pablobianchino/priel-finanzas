@@ -11,7 +11,7 @@ import { vistaModales } from '../vistas/modales.js';
 document.getElementById('views-container').innerHTML = vistaResumen + vistaGastos + vistaIngresos + vistaAhorros + vistaEstadisticas;
 document.getElementById('modals-container').innerHTML = vistaModales;
 
-const APP_VERSION = "v2.0.3"; // Corrección de clonación de IDs en Importar Mes
+const APP_VERSION = "v2.1.0";
 window.APP_VERSION = APP_VERSION;
 
 const updateVersionTags = () => {
@@ -384,7 +384,7 @@ function procesarListaGastos(dDebito, dImpuesto) {
 }
 
 function getOrigenIdDeGasto(g) {
-    if (g.ignorar_origen) return null; // FIX: Si se ignora, no se descuenta
+    if (g.ignorar_origen) return null;
     let catAsociada = g.categoria || "Fijos";
     let origenesPanel = tiposGastoAsociaciones[catAsociada] || [];
     origenesPanel = origenesPanel.filter(id => id && id.trim() !== "");
@@ -452,11 +452,11 @@ window.toggleOrigenPanel = function(categoria, idOrigen, isChecked) {
 }
 
 window.guardarConfiguracionDolar = async function(origenPanel) {
-    let mep = origenPanel === 'gastos' ? document.getElementById('usd-mep-gastos').dataset.raw : document.getElementById('usd-mep').dataset.raw;
-    let debito = origenPanel === 'gastos' ? document.getElementById('usd-debito-gastos').dataset.raw : document.getElementById('usd-debito').dataset.raw;
-    let impuesto = origenPanel === 'gastos' ? document.getElementById('usd-impuesto-gastos').dataset.raw : document.getElementById('usd-impuesto').dataset.raw;
+    let mep = window.parseMoney(document.getElementById(origenPanel === 'gastos' ? 'usd-mep-gastos' : 'usd-mep').value);
+    let debito = window.parseMoney(document.getElementById(origenPanel === 'gastos' ? 'usd-debito-gastos' : 'usd-debito').value);
+    let impuesto = window.parseMoney(document.getElementById(origenPanel === 'gastos' ? 'usd-impuesto-gastos' : 'usd-impuesto').value);
     window.mostrarCargando(true);
-    await actualizarConfiguracionDB({ "configuracion.dolar_mep": parseFloat(mep||0), "configuracion.dolar_debito": parseFloat(debito||0), "configuracion.dolar_impuesto": parseFloat(impuesto||0) });
+    await actualizarConfiguracionDB({ "configuracion.dolar_mep": mep, "configuracion.dolar_debito": debito, "configuracion.dolar_impuesto": impuesto });
     await actualizarDashboard();
 }
 
@@ -547,7 +547,7 @@ function renderizacioDinamicaGastosPaneles(gastosProcesados, dDebito, dImpuesto)
 
             if (!g.es_clon_destino) {
                 if (p.origenesDelPanel.length > 1) {
-                    originHtml = `<br><select onchange="window.cambiarOrigenGastoDirecto('${g.id}', this.value)" style="font-size:10px; padding:2px; margin-top:4px; max-width: 140px; border-radius:4px; border:1px solid #ccc; background:#fff;"><option value="" ${!g.id_origen ? 'selected' : ''}>- Seleccionar Origen -</option>${p.origenesDelPanel.map(idInc => {
+                    originHtml = `<br><select onclick="event.stopPropagation()" onchange="window.cambiarOrigenGastoDirecto('${g.id}', this.value)" style="font-size:10px; padding:2px; margin-top:4px; max-width: 140px; border-radius:4px; border:1px solid #ccc; background:#fff;"><option value="" ${!g.id_origen ? 'selected' : ''}>- Seleccionar Origen -</option>${p.origenesDelPanel.map(idInc => {
                         let io = listaIngresos.find(i => i.id === idInc);
                         return io ? `<option value="${io.id}" ${g.id_origen === idInc ? 'selected' : ''}>${io.nombre}</option>` : '';
                     }).join('')}</select>`;
@@ -559,23 +559,23 @@ function renderizacioDinamicaGastosPaneles(gastosProcesados, dDebito, dImpuesto)
             }
 
             if (!g.es_clon_destino && isUnassociated) {
-                originHtml += `<div style="margin-top: 4px; padding: 2px 4px; background: ${g.ignorar_origen ? '#f1f3f4' : '#fce8e6'}; border-radius: 4px; display: inline-block;"><label style="font-size:10px; color:${g.ignorar_origen ? '#5f6368' : '#c5221f'}; display:flex; align-items:center; gap:4px; cursor:pointer; margin:0;"><input type="checkbox" onchange="window.toggleIgnorarOrigenGasto('${g.id}', this.checked)" ${g.ignorar_origen ? 'checked' : ''} style="width:12px; height:12px; margin:0; cursor:pointer;"> ${g.ignorar_origen ? 'Aviso ignorado' : 'Ignorar falta de origen'}</label></div>`;
+                originHtml += `<div style="margin-top: 4px; padding: 2px 4px; background: ${g.ignorar_origen ? '#f1f3f4' : '#fce8e6'}; border-radius: 4px; display: inline-block;"><label style="font-size:10px; color:${g.ignorar_origen ? '#5f6368' : '#c5221f'}; display:flex; align-items:center; gap:4px; cursor:pointer; margin:0;"><input type="checkbox" onclick="event.stopPropagation()" onchange="window.toggleIgnorarOrigenGasto('${g.id}', this.checked)" ${g.ignorar_origen ? 'checked' : ''} style="width:12px; height:12px; margin:0; cursor:pointer;"> ${g.ignorar_origen ? 'Aviso ignorado' : 'Ignorar falta de origen'}</label></div>`;
             }
             
-            let recCheckbox = g.tipo === 'Tarjeta' ? '<span style="color:#ccc; font-size:10px;">N/A</span>' : `<input type="checkbox" style="cursor:pointer;" onchange="window.toggleRecurrenciaGasto('${g.id}', this.checked)" ${g.recurrente !== false ? 'checked' : ''}>`;
+            let recCheckbox = g.tipo === 'Tarjeta' ? '<span style="color:#ccc; font-size:10px;">N/A</span>' : `<input type="checkbox" style="cursor:pointer;" onclick="event.stopPropagation()" onchange="window.toggleRecurrenciaGasto('${g.id}', this.checked)" ${g.recurrente !== false ? 'checked' : ''}>`;
             let cuotasDetalle = g.tipo === 'Tarjeta' ? `<br><span style="font-size:11px; color:#174ea6;">${g.tarjeta || 'Tarjeta'} (${g.cuotas_pagadas}/${g.cuotas_totales})</span>` : '';
             let bgRowStyle = g.tipo === 'Tarjeta' && parseInt(g.cuotas_pagadas) >= parseInt(g.cuotas_totales) ? 'background-color: #e6f4ea;' : '';
 
             let usdBtn = '', breakdownHtml = '';
             if (g.moneda === 'USD') {
                 let vImp = g.monto * dImpuesto, sumImp = (vImp * 0.02) + (vImp * 0.21) + (vImp * 0.30), vDeb = g.monto * dDebito, totalCosto = sumImp + vDeb;
-                usdBtn = `<br><span style="color:#174ea6; font-size:10px; cursor:pointer; text-decoration:underline;" onclick="document.getElementById('usd-detail-${g.id}').style.display = document.getElementById('usd-detail-${g.id}').style.display === 'none' ? 'table-row' : 'none'">Ver cálculo USD</span>`;
+                usdBtn = `<br><span style="color:#174ea6; font-size:10px; cursor:pointer; text-decoration:underline;" onclick="event.stopPropagation(); document.getElementById('usd-detail-${g.id}').style.display = document.getElementById('usd-detail-${g.id}').style.display === 'none' ? 'table-row' : 'none'">Ver cálculo USD</span>`;
                 breakdownHtml = `<tr id="usd-detail-${g.id}" style="display:none; background-color:#f8f9fa;"><td colspan="4" style="padding: 10px; font-size:11px; color:var(--text-muted);"><strong>Cálculo USD:</strong><br>Monto original: U$D ${g.monto}<br>Monto x Dólar Impuesto (${dImpuesto}): $${(vImp).toFixed(2)} -> Impuestos (2%+21%+30%): $${(sumImp).toFixed(2)}<br>Monto x Dólar Débito (${dDebito}): $${(vDeb).toFixed(2)}<br><b>Subtotal: $${(totalCosto).toFixed(2)}</b>${(g.divisor && g.divisor > 1) ? `<br><i>Dividido en ${g.divisor} partes: $${(totalCosto/g.divisor).toFixed(2)}</i>` : ''}</td></tr>`;
             }
 
-            let actionsHtml = g.es_clon_destino ? `<span style="font-size:10px; color:#c5221f; font-weight:600;">🔒 Compartido (Edite original)</span>` : `<button class="btn-icon" onclick='window.abrirModalEditarGasto(${JSON.stringify(g).replace(/'/g, "&apos;")})'>✏️</button><button class="btn-icon" onclick="window.borrarGasto('${g.id}')">🗑️</button>`;
+            let actionsHtml = g.es_clon_destino ? `<span style="font-size:10px; color:#c5221f; font-weight:600;">🔒 Compartido (Edite original)</span>` : `<button class="btn-icon" onclick="event.stopPropagation(); window.borrarGasto('${g.id}')">🗑️</button>`;
 
-            return `<tr style="${bgRowStyle}"><td><strong>${g.nombre}</strong>${cuotasDetalle}${originHtml}${usdBtn}</td><td style="font-weight:600;">${window.formatearDinero(g.costoCalculado)}</td><td style="text-align:center;">${recCheckbox}</td><td style="white-space:nowrap;">${actionsHtml}</td></tr>${breakdownHtml}`;
+            return `<tr style="${bgRowStyle} cursor:pointer;" onclick='window.abrirModalEditarGasto(${JSON.stringify(g).replace(/'/g, "&apos;")})'><td><strong>${g.nombre}</strong>${cuotasDetalle}${originHtml}${usdBtn}</td><td style="font-weight:600;">${window.formatearDinero(g.costoCalculado)}</td><td style="text-align:center;">${recCheckbox}</td><td style="white-space:nowrap;">${actionsHtml}</td></tr>${breakdownHtml}`;
         }).join('');
 
         contenedor.innerHTML += `
@@ -715,9 +715,22 @@ window.crearCuentaAhorro = function() {
 }
 
 window.borrarCuentaAhorro = function(id) {
-    if(!confirm("¿Seguro que quieres eliminar esta cuenta de ahorro?")) return;
+    let acc = cuentasAhorro.find(c => c.id === id);
+    if(!acc) return;
+    if(!confirm("¿Seguro que quieres eliminar esta cuenta de ahorro? Se devolverán los ahorros a los saldos disponibles.")) return;
+    for(let g in gruposDistribucion) { 
+        (gruposDistribucion[g] || []).forEach(item => { 
+            if (item && item.ahorro_id === id) {
+                if (item.ahorrado) {
+                    historialAhorros.unshift({ id: Date.now(), fecha: new Date().toLocaleString(), accion: 'Devuelto (Cta. Eliminada)', objetivo: item.nombre, cuenta: acc.nombre, monto: item.monto_ahorrado });
+                    item.ahorrado = false;
+                    item.monto_ahorrado = 0;
+                }
+                item.ahorro_id = ""; 
+            }
+        }); 
+    }
     cuentasAhorro = cuentasAhorro.filter(c => c.id !== id);
-    for(let g in gruposDistribucion) { (gruposDistribucion[g] || []).forEach(item => { if (item && item.ahorro_id === id) item.ahorro_id = ""; }); }
     window.guardarConfiguracionAhorros();
 }
 
@@ -757,7 +770,7 @@ window.abrirModalHistorial = function() {
     container.innerHTML = '';
     if(!historialAhorros || historialAhorros.length === 0) container.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding: 20px;">No hay movimientos recientes.</p>';
     else historialAhorros.forEach(h => {
-        container.innerHTML += `<div style="border-bottom: 1px solid #eee; padding: 10px 0; display:flex; justify-content:space-between; align-items:center;"><div><div style="font-size:11px; color:var(--text-muted);">${h.fecha}</div><div style="font-weight:500;">${h.accion === 'Ahorrado' ? '💰' : '🔙'} ${h.accion}: <span style="font-weight:normal;">${h.objetivo} -> ${h.cuenta}</span></div></div><div style="font-weight:bold; color:${h.accion === 'Ahorrado' ? '#137333' : '#c5221f'};">${window.formatearDinero(h.monto)}</div></div>`;
+        container.innerHTML += `<div style="border-bottom: 1px solid #eee; padding: 10px 0; display:flex; justify-content:space-between; align-items:center;"><div><div style="font-size:11px; color:var(--text-muted);">${h.fecha}</div><div style="font-weight:500;">${h.accion.includes('Ahorrado') ? '💰' : '🔙'} ${h.accion}: <span style="font-weight:normal;">${h.objetivo} -> ${h.cuenta}</span></div></div><div style="font-weight:bold; color:${h.accion.includes('Ahorrado') ? '#137333' : '#c5221f'};">${window.formatearDinero(h.monto)}</div></div>`;
     });
     document.getElementById('modal-historial').style.display = 'flex';
 }
@@ -861,15 +874,24 @@ window.asignarAhorroObjetivo = function(grupoName, index, ahorroId) {
 window.efectivizarAhorroObjetivo = async function(grupoName, index) {
     let it = gruposDistribucion[grupoName][index];
     if (!it.ahorro_id) return alert("Selecciona una Cuenta de Ahorro primero.");
-    it.ahorrado = true; it.monto_ahorrado = (sumPorGrupo[grupoName] || 0) * (it.porc / 100);
-    historialAhorros.unshift({ id: Date.now(), fecha: new Date().toLocaleString(), accion: 'Ahorrado', objetivo: it.nombre, cuenta: cuentasAhorro.find(c => c.id === it.ahorro_id)?.nombre || 'Cuenta eliminada', monto: it.monto_ahorrado });
+    
+    const totalDineroGrupo = sumPorGrupo[grupoName] || 0;
+    let monto = totalDineroGrupo * (it.porc / 100);
+
+    if (monto <= 0) return alert("No hay saldo disponible suficiente o el monto es 0.");
+
+    it.ahorrado = true; it.monto_ahorrado = monto;
+    let cuentaName = cuentasAhorro.find(c => c.id === it.ahorro_id)?.nombre || 'Cuenta eliminada';
+    
+    historialAhorros.unshift({ id: Date.now(), fecha: new Date().toLocaleString(), accion: 'Ahorrado', objetivo: it.nombre, cuenta: cuentaName, monto: monto });
     window.autoGuardarDistribucionEstructura(true);
 };
 
 window.devolverAhorroObjetivo = async function(grupoName, index) {
     if(!confirm("¿Deshacer este ahorro y devolver el dinero a Disponible?")) return;
     let it = gruposDistribucion[grupoName][index];
-    historialAhorros.unshift({ id: Date.now(), fecha: new Date().toLocaleString(), accion: 'Devuelto', objetivo: it.nombre, cuenta: cuentasAhorro.find(c => c.id === it.ahorro_id)?.nombre || 'Cuenta eliminada', monto: it.monto_ahorrado });
+    let cuentaName = cuentasAhorro.find(c => c.id === it.ahorro_id)?.nombre || 'Cuenta eliminada';
+    historialAhorros.unshift({ id: Date.now(), fecha: new Date().toLocaleString(), accion: 'Devuelto', objetivo: it.nombre, cuenta: cuentaName, monto: it.monto_ahorrado });
     it.ahorrado = false; it.monto_ahorrado = 0; window.autoGuardarDistribucionEstructura(true);
 };
 
@@ -1000,7 +1022,13 @@ document.getElementById('form-ingreso').addEventListener('submit', async (e) => 
 });
 
 window.borrarIngreso = async function(id) { 
+    if(!confirm("¿Estás seguro de eliminar este ingreso?")) return;
     window.mostrarCargando(true); await deleteDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", id)); await actualizarDashboard(); 
+};
+
+window.borrarGasto = async function(id) { 
+    if(!confirm("¿Estás seguro de eliminar este gasto?")) return;
+    window.mostrarCargando(true); await deleteDoc(doc(db, "finanzas", obtenerMesId(), "gastos", id)); await actualizarDashboard(); 
 };
 
 function renderTablaIngresos(gastosProc) {
@@ -1020,7 +1048,7 @@ function renderTablaIngresos(gastosProc) {
 
         let gastosAsociados = gastosProc.filter(g => g.propietario !== 'Tercero' && getOrigenIdDeGasto(g) === data.id);
         const trMain = document.createElement('tr'); trMain.className = "tr-clickable"; trMain.onclick = function() { window.toggleIngresoDetalle(data.id); };
-        trMain.innerHTML = `<td><div style="display:flex; align-items:center; gap:8px;"><span id="icon-ingreso-${data.id}" style="font-size:10px; color:var(--text-muted);">▶</span><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${assignedColor};"></span>${data.nombre}</div></td><td><span style="background:#e8eaed; padding:2px 6px; border-radius:4px; font-size:11px;">${data.grupo || 'Ninguno'}</span></td><td style="color:var(--text-muted);">${window.formatearDinero(data.monto)}</td><td style="font-weight:600; color:${disponibleReal < 0 ? '#d93025' : '#137333'}">${window.formatearDinero(disponibleReal)}</td><td style="white-space: nowrap;"><button class="btn-icon" onclick='event.stopPropagation(); window.abrirModalEditarIngreso(${JSON.stringify(data).replace(/"/g, '&quot;')})'>✏️</button><button class="btn-icon" onclick="event.stopPropagation(); window.borrarIngreso('${data.id}')">🗑️</button></td>`;
+        trMain.innerHTML = `<td><div style="display:flex; align-items:center; gap:8px;"><span id="icon-ingreso-${data.id}" style="font-size:10px; color:var(--text-muted);">▶</span><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${assignedColor};"></span><strong style="cursor:pointer; color:var(--text-main); text-decoration:underline;" onclick='event.stopPropagation(); window.abrirModalEditarIngreso(${JSON.stringify(data).replace(/"/g, '&quot;')})'>${data.nombre}</strong></div></td><td><span style="background:#e8eaed; padding:2px 6px; border-radius:4px; font-size:11px;">${data.grupo || 'Ninguno'}</span></td><td style="color:var(--text-muted);">${window.formatearDinero(data.monto)}</td><td style="font-weight:600; color:${disponibleReal < 0 ? '#d93025' : '#137333'}">${window.formatearDinero(disponibleReal)}</td><td style="white-space: nowrap;"><button class="btn-icon" onclick="event.stopPropagation(); window.borrarIngreso('${data.id}')">🗑️</button></td>`;
         tabla.appendChild(trMain);
 
         const trDetail = document.createElement('tr'); trDetail.id = `detalle-ingreso-${data.id}`; trDetail.className = "details-row"; trDetail.style.display = "none";
@@ -1125,7 +1153,7 @@ window.procesarCSV = async function() {
             for (let i = 1; i < rows.length; i++) {
                 const col = rows[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
                 if (col.length >= 4) {
-                    let monto = parseFloat(col[1].replace(',', '.'));
+                    let monto = window.parseMoney(col[1]);
                     if (!col[0] || isNaN(monto)) continue;
                     let tipo = (col[3]||'').toLowerCase().includes('tarjeta') ? 'Tarjeta' : 'Fijo';
                     batch.set(doc(ref), { propietario: 'Propio', tercero_nombre: '', nombre: col[0], monto: monto, moneda: col[2].toUpperCase() === 'USD' ? 'USD' : 'ARS', tipo: tipo, categoria: "Fijos", id_origen: "", recurrente: true, compartir_con: '', compartir_tipo: 'divisor', divisor: parseInt(col[4]) || 1, monto_fijo: null, tarjeta: tipo === 'Tarjeta' ? (col[5]||'VISA') : null, cuotas_totales: tipo === 'Tarjeta' ? (parseInt(col[6])||1) : null, cuotas_pagadas: tipo === 'Tarjeta' ? (parseInt(col[7])||1) : null });
@@ -1153,7 +1181,7 @@ window.copiarMesAnterior = async function() {
         let prevGastosToCopy = [];
         snapG.forEach(d => {
             let g = d.data();
-            g.id = d.id; // PRESERVAR ID FIREBASE
+            g.id = d.id;
             if(g.tipo==='Tarjeta'){ if(g.cuotas_pagadas < g.cuotas_totales) { let gCopy = {...g}; gCopy.cuotas_pagadas++; prevGastosToCopy.push(gCopy); } } 
             else if (g.tipo === 'Fijo' && g.recurrente !== false) { prevGastosToCopy.push({...g}); }
             if(g.propietario !== 'Tercero' && !g.ignorar_origen) {
@@ -1170,7 +1198,7 @@ window.copiarMesAnterior = async function() {
         let prevIngresosToCopy = [];
         snapI.forEach(d => {
             let ing = d.data();
-            ing.id = d.id; // PRESERVAR ID FIREBASE
+            ing.id = d.id;
             prevIngresosToCopy.push(ing);
             if (ing.grupo) sumPorGrupoPrev[ing.grupo] = (sumPorGrupoPrev[ing.grupo] || 0) + (ing.monto - (sumatoriaGastosPrev[ing.id] || 0));
         });
@@ -1183,14 +1211,8 @@ window.copiarMesAnterior = async function() {
         let nuevasCuentas = prevCuentas.map(c => { return { id: c.id, nombre: c.nombre, depositado: false, saldo_anterior: (c.saldo_anterior || 0) + (ahorrosSumaPrev[c.id] || 0) - (c.retiros || 0), retiros: 0 }; });
         prevConfig.cuentas_ahorro = nuevasCuentas;
         await setDoc(doc(db, "finanzas", actual), { configuracion: prevConfig }, { merge: true });
-        for(const g of prevGastosToCopy) { 
-            let docId = g.id; delete g.id;
-            await setDoc(doc(db, "finanzas", actual, "gastos", docId), g); 
-        }
-        for(const ing of prevIngresosToCopy) { 
-            let docId = ing.id; delete ing.id;
-            await setDoc(doc(db, "finanzas", actual, "ingresos", docId), ing); 
-        }
+        for(const g of prevGastosToCopy) { let docId = g.id; delete g.id; await setDoc(doc(db, "finanzas", actual, "gastos", docId), g); }
+        for(const ing of prevIngresosToCopy) { let docId = ing.id; delete ing.id; await setDoc(doc(db, "finanzas", actual, "ingresos", docId), ing); }
         await actualizarDashboard();
     } catch (e) { console.error(e); window.mostrarCargando(false); alert("Error al copiar datos: " + e.message); }
 };
