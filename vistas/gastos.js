@@ -6,10 +6,18 @@ export const vistaGastos = `
         </div>
         <div class="card-content" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
             <label>MEP (Ahorros): <input type="text" id="usd-mep-gastos" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
-            <label>Débito (Gastos): <input type="text" id="usd-debito-gastos" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
+            <label>MEP Tarjeta (Gastos): <input type="text" id="usd-debito-gastos" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
             <label>Impuesto (Gastos): <input type="text" id="usd-impuesto-gastos" class="money-input" value="0" style="width: 100px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
             <button class="btn-black" style="padding: 6px 15px;" onclick="window.guardarConfiguracionDolar('gastos')">Guardar Rate</button>
         </div>
+    </div>
+
+    <!-- NUEVO PANEL RESUMEN USD -->
+    <div class="card" id="panel-resumen-usd" style="margin-bottom: 20px; border-top: 4px solid #174ea6; display: none;">
+        <div class="card-header-toggle" onclick="window.toggleCard(this)">
+            <h2 style="margin: 0; font-size: 16px;">Resumen Gastos en USD</h2><span class="toggle-icon">▼</span>
+        </div>
+        <div class="card-content" id="contenido-resumen-usd"></div>
     </div>
 
     <div class="cards-grid">
