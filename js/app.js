@@ -11,7 +11,7 @@ import { vistaModales } from '../vistas/modales.js';
 document.getElementById('views-container').innerHTML = vistaResumen + vistaGastos + vistaIngresos + vistaAhorros + vistaEstadisticas;
 document.getElementById('modals-container').innerHTML = vistaModales;
 
-const APP_VERSION = "v2.4.0";
+const APP_VERSION = "v2.5.0";
 window.APP_VERSION = APP_VERSION;
 
 const updateVersionTags = () => {
@@ -21,6 +21,26 @@ const updateVersionTags = () => {
     if(sidebarTag) sidebarTag.innerText = APP_VERSION;
 };
 updateVersionTags();
+
+// GESTIÓN DE TEMA CLARO / OSCURO
+window.toggleTheme = function() {
+    const isDark = document.body.classList.toggle('dark-mode');
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    actualizarIconoTema(isDark);
+};
+
+function actualizarIconoTema(isDark) {
+    const btn = document.getElementById('theme-toggle-btn');
+    if (btn) btn.innerText = isDark ? '☀️' : '🌙';
+}
+
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme === 'dark') {
+    document.body.classList.add('dark-mode');
+    actualizarIconoTema(true);
+} else {
+    actualizarIconoTema(false);
+}
 
 const mesSelector = document.getElementById('mes-selector');
 const anioSelector = document.getElementById('anio-selector');
@@ -246,7 +266,7 @@ function renderResumenUSD(gastosProc, dDebito) {
     if (!panel || !contenido) return;
 
     let gastosUSD = gastosProc.filter(g => g.moneda === 'USD');
-    gastosUSD.sort((a, b) => b.costoCalculado - a.costoCalculado); // Orden descendente
+    gastosUSD.sort((a, b) => b.costoCalculado - a.costoCalculado);
 
     if (gastosUSD.length === 0 || dDebito <= 0) {
         panel.style.display = 'none';
@@ -266,10 +286,10 @@ function renderResumenUSD(gastosProc, dDebito) {
         let usdReal = arsReal / dDebito; 
 
         let infoExtra = '';
-        if (g.tipo === 'Tarjeta') infoExtra += ` <span style="font-size:10px; color:#aaa;">(${g.cuotas_pagadas}/${g.cuotas_totales})</span>`;
+        if (g.tipo === 'Tarjeta') infoExtra += ` <span style="font-size:10px; color:var(--text-muted);">(${g.cuotas_pagadas}/${g.cuotas_totales})</span>`;
         
         if (g.es_clon_origen) {
-            infoExtra += ` <span style="font-size:10px; color:#aaa;">(Tu parte)</span>`;
+            infoExtra += ` <span style="font-size:10px; color:var(--text-muted);">(Tu parte)</span>`;
         } else if (g.propietario === 'Tercero') {
             let nomTercero = g.es_clon_destino ? (g.categoria.replace('Gastos de ', '')) : (g.tercero_nombre || 'Tercero');
             infoExtra += ` <span style="font-size:10px; background:#fce8e6; color:#c5221f; padding:2px 4px; border-radius:4px; margin-left:4px;">De: ${nomTercero}</span>`;
@@ -328,18 +348,15 @@ async function cargarConfiguracion() {
         if (docSnap.exists() && docSnap.data().configuracion) {
             const config = docSnap.data().configuracion;
             
-            document.getElementById('usd-mep').dataset.raw = config.dolar_mep || 0;
-            document.getElementById('usd-mep').value = window.formatearDinero(config.dolar_mep || 0, 'ARS');
-            document.getElementById('usd-debito').dataset.raw = config.dolar_debito || 0;
-            document.getElementById('usd-debito').value = window.formatearDinero(config.dolar_debito || 0, 'ARS');
-            document.getElementById('usd-impuesto').dataset.raw = config.dolar_impuesto || 0;
-            document.getElementById('usd-impuesto').value = window.formatearDinero(config.dolar_impuesto || 0, 'ARS');
-            document.getElementById('usd-mep-gastos').dataset.raw = config.dolar_mep || 0;
-            document.getElementById('usd-mep-gastos').value = window.formatearDinero(config.dolar_mep || 0, 'ARS');
-            document.getElementById('usd-debito-gastos').dataset.raw = config.dolar_debito || 0;
-            document.getElementById('usd-debito-gastos').value = window.formatearDinero(config.dolar_debito || 0, 'ARS');
-            document.getElementById('usd-impuesto-gastos').dataset.raw = config.dolar_impuesto || 0;
-            document.getElementById('usd-impuesto-gastos').value = window.formatearDinero(config.dolar_impuesto || 0, 'ARS');
+            const suffixes = ['', '-gastos', '-ingresos', '-ahorros'];
+            suffixes.forEach(s => {
+                const mepEl = document.getElementById(`usd-mep${s}`);
+                if (mepEl) { mepEl.dataset.raw = config.dolar_mep || 0; mepEl.value = window.formatearDinero(config.dolar_mep || 0, 'ARS'); }
+                const debEl = document.getElementById(`usd-debito${s}`);
+                if (debEl) { debEl.dataset.raw = config.dolar_debito || 0; debEl.value = window.formatearDinero(config.dolar_debito || 0, 'ARS'); }
+                const impEl = document.getElementById(`usd-impuesto${s}`);
+                if (impEl) { impEl.dataset.raw = config.dolar_impuesto || 0; impEl.value = window.formatearDinero(config.dolar_impuesto || 0, 'ARS'); }
+            });
             
             gruposDistribucion = config.grupos_distribucion || {};
             for (let g in gruposDistribucion) {
@@ -371,12 +388,15 @@ async function cargarConfiguracion() {
 }
 
 function resetConfig() {
-    document.getElementById('usd-mep').dataset.raw = 0; document.getElementById('usd-mep').value = window.formatearDinero(0);
-    document.getElementById('usd-debito').dataset.raw = 0; document.getElementById('usd-debito').value = window.formatearDinero(0);
-    document.getElementById('usd-impuesto').dataset.raw = 0; document.getElementById('usd-impuesto').value = window.formatearDinero(0);
-    document.getElementById('usd-mep-gastos').dataset.raw = 0; document.getElementById('usd-mep-gastos').value = window.formatearDinero(0);
-    document.getElementById('usd-debito-gastos').dataset.raw = 0; document.getElementById('usd-debito-gastos').value = window.formatearDinero(0);
-    document.getElementById('usd-impuesto-gastos').dataset.raw = 0; document.getElementById('usd-impuesto-gastos').value = window.formatearDinero(0);
+    const suffixes = ['', '-gastos', '-ingresos', '-ahorros'];
+    suffixes.forEach(s => {
+        const mepEl = document.getElementById(`usd-mep${s}`);
+        if (mepEl) { mepEl.dataset.raw = 0; mepEl.value = window.formatearDinero(0); }
+        const debEl = document.getElementById(`usd-debito${s}`);
+        if (debEl) { debEl.dataset.raw = 0; debEl.value = window.formatearDinero(0); }
+        const impEl = document.getElementById(`usd-impuesto${s}`);
+        if (impEl) { impEl.dataset.raw = 0; impEl.value = window.formatearDinero(0); }
+    });
     gruposDistribucion = {}; tiposGastoAsociaciones = { "Fijos": [], "Tarjeta": [], "Terceros": [] }; cuentasAhorro = []; ordenPanelesGasto = []; historialAhorros = [];
 }
 
@@ -511,9 +531,10 @@ window.toggleOrigenPanel = function(categoria, idOrigen, isChecked) {
 }
 
 window.guardarConfiguracionDolar = async function(origenPanel) {
-    let mep = window.parseMoney(document.getElementById(origenPanel === 'gastos' ? 'usd-mep-gastos' : 'usd-mep').value);
-    let debito = window.parseMoney(document.getElementById(origenPanel === 'gastos' ? 'usd-debito-gastos' : 'usd-debito').value);
-    let impuesto = window.parseMoney(document.getElementById(origenPanel === 'gastos' ? 'usd-impuesto-gastos' : 'usd-impuesto').value);
+    let suffix = origenPanel === 'resumen' ? '' : `-${origenPanel}`;
+    let mep = window.parseMoney(document.getElementById(`usd-mep${suffix}`).value);
+    let debito = window.parseMoney(document.getElementById(`usd-debito${suffix}`).value);
+    let impuesto = window.parseMoney(document.getElementById(`usd-impuesto${suffix}`).value);
     window.mostrarCargando(true);
     await actualizarConfiguracionDB({ "configuracion.dolar_mep": mep, "configuracion.dolar_debito": debito, "configuracion.dolar_impuesto": impuesto });
     await actualizarDashboard();
@@ -586,7 +607,7 @@ function renderizacioDinamicaGastosPaneles(gastosProcesados, dDebito, dImpuesto)
 
         if (buscador && !matchesCatName && itemsPanel.length === 0) continue;
         
-        itemsPanel.sort((a, b) => b.costoCalculado - a.costoCalculado); // Orden descendente
+        itemsPanel.sort((a, b) => b.costoCalculado - a.costoCalculado);
 
         let totalPanel = itemsPanel.reduce((sum, g) => sum + g.costoCalculado, 0);
         let saldoHtml = origenesDelPanel.length === 0 ? `<div class="saldo-ok" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; margin-bottom: 10px; display: inline-block;">Sin origen vinculado</div>` : `<div style="display: flex; flex-wrap: wrap; margin-bottom: 5px;">${origenesDelPanel.map(idInc => {
@@ -618,7 +639,7 @@ function renderizacioDinamicaGastosPaneles(gastosProcesados, dDebito, dImpuesto)
 
             if (!g.es_clon_destino) {
                 if (p.origenesDelPanel.length > 1) {
-                    originHtml = `<br><select onclick="event.stopPropagation()" onchange="window.cambiarOrigenGastoDirecto('${g.id}', this.value)" style="font-size:10px; padding:2px; margin-top:4px; max-width: 140px; border-radius:4px; border:1px solid #ccc; background:#fff;"><option value="" ${!g.id_origen ? 'selected' : ''}>- Seleccionar Origen -</option>${p.origenesDelPanel.map(idInc => {
+                    originHtml = `<br><select onclick="event.stopPropagation()" onchange="window.cambiarOrigenGastoDirecto('${g.id}', this.value)" style="font-size:10px; padding:2px; margin-top:4px; max-width: 140px; border-radius:4px; border:1px solid var(--card-border); background:var(--input-bg); color:var(--text-main);"><option value="" ${!g.id_origen ? 'selected' : ''}>- Seleccionar Origen -</option>${p.origenesDelPanel.map(idInc => {
                         let io = listaIngresos.find(i => i.id === idInc);
                         return io ? `<option value="${io.id}" ${g.id_origen === idInc ? 'selected' : ''}>${io.nombre}</option>` : '';
                     }).join('')}</select>`;
@@ -630,18 +651,18 @@ function renderizacioDinamicaGastosPaneles(gastosProcesados, dDebito, dImpuesto)
             }
 
             if (!g.es_clon_destino && isUnassociated) {
-                originHtml += `<div style="margin-top: 4px; padding: 2px 4px; background: ${g.ignorar_origen ? '#f1f3f4' : '#fce8e6'}; border-radius: 4px; display: inline-block;"><label style="font-size:10px; color:${g.ignorar_origen ? '#5f6368' : '#c5221f'}; display:flex; align-items:center; gap:4px; cursor:pointer; margin:0;"><input type="checkbox" onclick="event.stopPropagation()" onchange="window.toggleIgnorarOrigenGasto('${g.id}', this.checked)" ${g.ignorar_origen ? 'checked' : ''} style="width:12px; height:12px; margin:0; cursor:pointer;"> ${g.ignorar_origen ? 'Aviso ignorado' : 'Ignorar falta de origen'}</label></div>`;
+                originHtml += `<div style="margin-top: 4px; padding: 2px 4px; background: ${g.ignorar_origen ? 'var(--highlight-bg)' : '#fce8e6'}; border-radius: 4px; display: inline-block;"><label style="font-size:10px; color:${g.ignorar_origen ? 'var(--text-muted)' : '#c5221f'}; display:flex; align-items:center; gap:4px; cursor:pointer; margin:0;"><input type="checkbox" onclick="event.stopPropagation()" onchange="window.toggleIgnorarOrigenGasto('${g.id}', this.checked)" ${g.ignorar_origen ? 'checked' : ''} style="width:12px; height:12px; margin:0; cursor:pointer;"> ${g.ignorar_origen ? 'Aviso ignorado' : 'Ignorar falta de origen'}</label></div>`;
             }
             
-            let recCheckbox = g.tipo === 'Tarjeta' ? '<span style="color:#ccc; font-size:10px;">N/A</span>' : `<input type="checkbox" style="cursor:pointer;" onclick="event.stopPropagation()" onchange="window.toggleRecurrenciaGasto('${g.id}', this.checked)" ${g.recurrente !== false ? 'checked' : ''}>`;
+            let recCheckbox = g.tipo === 'Tarjeta' ? '<span style="color:var(--text-muted); font-size:10px;">N/A</span>' : `<input type="checkbox" style="cursor:pointer;" onclick="event.stopPropagation()" onchange="window.toggleRecurrenciaGasto('${g.id}', this.checked)" ${g.recurrente !== false ? 'checked' : ''}>`;
             let cuotasDetalle = g.tipo === 'Tarjeta' ? `<br><span style="font-size:11px; color:#174ea6;">${g.tarjeta || 'Tarjeta'} (${g.cuotas_pagadas}/${g.cuotas_totales})</span>` : '';
-            let bgRowStyle = g.tipo === 'Tarjeta' && parseInt(g.cuotas_pagadas) >= parseInt(g.cuotas_totales) ? 'background-color: #e6f4ea;' : '';
+            let bgRowStyle = g.tipo === 'Tarjeta' && parseInt(g.cuotas_pagadas) >= parseInt(g.cuotas_totales) ? 'background-color: var(--highlight-bg);' : '';
 
             let usdBtn = '', breakdownHtml = '';
             if (g.moneda === 'USD') {
                 let vDeb = g.monto * dDebito, totalCosto = vDeb;
                 usdBtn = `<br><span style="color:#174ea6; font-size:10px; cursor:pointer; text-decoration:underline;" onclick="event.stopPropagation(); document.getElementById('usd-detail-${g.id}').style.display = document.getElementById('usd-detail-${g.id}').style.display === 'none' ? 'table-row' : 'none'">Ver cálculo USD</span>`;
-                breakdownHtml = `<tr id="usd-detail-${g.id}" style="display:none; background-color:#f8f9fa;"><td colspan="4" style="padding: 10px; font-size:11px; color:var(--text-muted);"><strong>Cálculo USD:</strong><br>Monto original: U$D ${g.monto}<br>Monto x Dólar MEP Tarjeta (${dDebito}): $${(vDeb).toFixed(2)}<br><b>Subtotal: $${(totalCosto).toFixed(2)}</b>${(g.divisor && g.divisor > 1) ? `<br><i>Dividido en ${g.divisor} partes: $${(totalCosto/g.divisor).toFixed(2)}</i>` : ''}</td></tr>`;
+                breakdownHtml = `<tr id="usd-detail-${g.id}" style="display:none; background-color:var(--highlight-bg);"><td colspan="4" style="padding: 10px; font-size:11px; color:var(--text-muted);"><strong>Cálculo USD:</strong><br>Monto original: U$D ${g.monto}<br>Monto x Dólar MEP Tarjeta (${dDebito}): $${(vDeb).toFixed(2)}<br><b>Subtotal: $${(totalCosto).toFixed(2)}</b>${(g.divisor && g.divisor > 1) ? `<br><i>Dividido en ${g.divisor} partes: $${(totalCosto/g.divisor).toFixed(2)}</i>` : ''}</td></tr>`;
             }
 
             let actionsHtml = g.es_clon_destino ? `<span style="font-size:10px; color:#c5221f; font-weight:600;">🔒 Compartido (Edite original)</span>` : `<button class="btn-icon" onclick="event.stopPropagation(); window.borrarGasto('${g.id}')">🗑️</button>`;
@@ -652,24 +673,24 @@ function renderizacioDinamicaGastosPaneles(gastosProcesados, dDebito, dImpuesto)
         contenedor.innerHTML += `
             <div class="card panel-gasto-item" data-categoria="${p.categoria}" style="border-top: 4px solid var(--primary-color);">
                 <div style="display:flex; align-items:center;">
-                    <span class="drag-handle" style="cursor:grab; margin-right:10px; font-size:20px; color:#ccc;">⠿</span>
+                    <span class="drag-handle" style="cursor:grab; margin-right:10px; font-size:20px; color:var(--text-muted);">⠿</span>
                     <div class="card-header-toggle" onclick="window.togglePanelGasto(this)" style="margin-bottom:0; flex:1; display:flex; justify-content:space-between; align-items:center;">
                         <h2 style="margin:0; font-size:15px; flex:1;">${p.categoria} ${alertBadge}<span style="font-weight:normal; font-size:13px; color:var(--text-muted);"> | Total: <b style="color:var(--text-main);">${window.formatearDinero(p.totalPanel)}</b></span></h2>
                         <span class="toggle-icon">${iconText}</span>
                     </div>
                 </div>
                 <div class="card-content" style="display:${displayStyle}; margin-top:15px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--card-border);">
                         <button class="btn-black" style="padding: 4px 10px; font-size: 11px;" onclick="window.abrirModalNuevoGasto('${p.categoria}')">➕ Añadir Gasto</button>
                         <div style="display: flex; gap: 5px;">
                             <button class="btn-icon" onclick="window.editarNombreTipoGastoPanel('${p.categoria}')">✏️</button>
                             <button class="btn-icon" onclick="window.eliminarTipoGastoPanel('${p.categoria}')">🗑️</button>
                         </div>
                     </div>
-                    <div style="margin-top:10px; border-bottom:1px solid #eee; padding-bottom:10px;">
+                    <div style="margin-top:10px; border-bottom:1px solid var(--card-border); padding-bottom:10px;">
                         <label style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:5px;">Ingresos que alimentan este panel:</label>
                         <div style="display:flex; flex-wrap:wrap; gap:5px;">
-                            ${listaIngresos.map(ing => `<label style="font-size:11px; background:#e8eaed; padding:3px 6px; border-radius:4px; cursor:pointer;"><input type="checkbox" onchange="window.toggleOrigenPanel('${p.categoria}', '${ing.id}', this.checked)" ${p.origenesDelPanel.includes(ing.id)?'checked':''}> ${ing.nombre}</label>`).join('')}
+                            ${listaIngresos.map(ing => `<label style="font-size:11px; background:var(--highlight-bg); padding:3px 6px; border-radius:4px; cursor:pointer;"><input type="checkbox" onchange="window.toggleOrigenPanel('${p.categoria}', '${ing.id}', this.checked)" ${p.origenesDelPanel.includes(ing.id)?'checked':''}> ${ing.nombre}</label>`).join('')}
                         </div>
                     </div>
                     ${p.saldoHtml}
@@ -841,7 +862,7 @@ window.abrirModalHistorial = function() {
     container.innerHTML = '';
     if(!historialAhorros || historialAhorros.length === 0) container.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding: 20px;">No hay movimientos recientes.</p>';
     else historialAhorros.forEach(h => {
-        container.innerHTML += `<div style="border-bottom: 1px solid #eee; padding: 10px 0; display:flex; justify-content:space-between; align-items:center;"><div><div style="font-size:11px; color:var(--text-muted);">${h.fecha}</div><div style="font-weight:500;">${h.accion.includes('Ahorrado') ? '💰' : '🔙'} ${h.accion}: <span style="font-weight:normal;">${h.objetivo} -> ${h.cuenta}</span></div></div><div style="font-weight:bold; color:${h.accion.includes('Ahorrado') ? '#137333' : '#c5221f'};">${window.formatearDinero(h.monto)}</div></div>`;
+        container.innerHTML += `<div style="border-bottom: 1px solid var(--card-border); padding: 10px 0; display:flex; justify-content:space-between; align-items:center;"><div><div style="font-size:11px; color:var(--text-muted);">${h.fecha}</div><div style="font-weight:500;">${h.accion.includes('Ahorrado') ? '💰' : '🔙'} ${h.accion}: <span style="font-weight:normal;">${h.objetivo} -> ${h.cuenta}</span></div></div><div style="font-weight:bold; color:${h.accion.includes('Ahorrado') ? '#137333' : '#c5221f'};">${window.formatearDinero(h.monto)}</div></div>`;
     });
     document.getElementById('modal-historial').style.display = 'flex';
 }
@@ -869,12 +890,12 @@ function renderCuentasAhorro() {
         let aporteMes = ahorrosSumaMesActual[c.id] || 0, proyMes = ahorrosProyectado[c.id] || 0, saldoAnt = c.saldo_anterior || 0, retiros = c.retiros || 0;
         let sumaTotal = saldoAnt + aporteMes - retiros; 
         return {...c, aporteMes, proyMes, saldoAnt, retiros, sumaTotal};
-    }).sort((a, b) => b.sumaTotal - a.sumaTotal); // Orden descendente por saldo acumulado
+    }).sort((a, b) => b.sumaTotal - a.sumaTotal);
 
     cuentasOrdenadas.forEach(c => {
         totalAhorrosHistorico += c.sumaTotal; if (c.depositado) totalDepositadoMes += c.aporteMes;
 
-        if (c.aporteMes > 0 || c.proyMes > 0) htmlResumen += `<div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;"><span>${c.nombre} ${c.depositado?'(Depositado)':''}</span> <strong style="color:#673ab7;">${window.formatearDinero(c.aporteMes)} <span style="font-size:10px; color:var(--text-muted); font-weight:normal;">+${window.formatearDinero(c.proyMes)} proy.</span></strong></div>`;
+        if (c.aporteMes > 0 || c.proyMes > 0) htmlResumen += `<div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid var(--card-border); padding-bottom:5px;"><span>${c.nombre} ${c.depositado?'(Depositado)':''}</span> <strong style="color:#673ab7;">${window.formatearDinero(c.aporteMes)} <span style="font-size:10px; color:var(--text-muted); font-weight:normal;">+${window.formatearDinero(c.proyMes)} proy.</span></strong></div>`;
 
         cont.innerHTML += `
             <div class="card tr-clickable" style="${c.depositado ? 'background-color: #e6f4ea; border: 2px solid #137333;' : 'border-top: 4px solid #673ab7; cursor: pointer;'} display:flex; flex-direction:column; justify-content:space-between;" onclick="window.toggleDepositoCuenta('${c.id}')">
@@ -1016,7 +1037,7 @@ function renderDistribucionDirecta() {
     if(Object.keys(gruposDistribucion).length === 0) divDist.innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No hay grupos de distribución creados.</p>';
 
     for(let grupoName in gruposDistribucion) {
-        gruposDistribucion[grupoName].sort((a, b) => (b.porc || 0) - (a.porc || 0)); // Orden descendente
+        gruposDistribucion[grupoName].sort((a, b) => (b.porc || 0) - (a.porc || 0));
         
         let totalGrupo = sumPorGrupo[grupoName] || 0;
         let cfgItems = Array.isArray(gruposDistribucion[grupoName]) ? gruposDistribucion[grupoName] : [];
@@ -1025,7 +1046,7 @@ function renderDistribucionDirecta() {
         let grupoAhorrado = 0; cfgItems.forEach(it => { if(it.ahorrado) grupoAhorrado += (it.monto_ahorrado || 0); });
         let disponibleReal = totalGrupo - grupoAhorrado;
 
-        let htmlBlock = `<div style="background:#f8f9fa; border-radius:8px; padding:15px; margin-bottom:15px; border:1px solid var(--card-border);"><div style="display:flex; justify-content:space-between; margin-bottom:10px; align-items:center; flex-wrap:wrap; gap:5px;"><div style="display:flex; align-items:center; gap:5px;"><strong style="font-size:14px; color:var(--text-main);">${grupoName}</strong><button class="btn-icon" onclick="window.editarNombreGrupoDistribucion('${grupoName}')" style="font-size:12px;">✏️</button></div><div style="display:flex; align-items:center; gap:10px;"><span id="sum-card-pct-${grupoName}" style="font-size:12px; font-weight:bold; color:${Math.abs(sumPorcentajesGrupo - 100) < 0.1 ? 'green' : 'red'};">Total: ${sumPorcentajesGrupo.toFixed(2)}%</span><span style="font-weight:600; font-size:13px; color:#4285F4;">Disp. Restante: ${window.formatearDinero(disponibleReal)}</span><button class="btn-icon" onclick="window.eliminarGrupoDistribucion('${grupoName}')" title="Eliminar Grupo Completo">❌</button></div></div><div style="display:flex; flex-direction:column; gap:8px;">`;
+        let htmlBlock = `<div style="background:var(--highlight-bg); border-radius:8px; padding:15px; margin-bottom:15px; border:1px solid var(--card-border);"><div style="display:flex; justify-content:space-between; margin-bottom:10px; align-items:center; flex-wrap:wrap; gap:5px;"><div style="display:flex; align-items:center; gap:5px;"><strong style="font-size:14px; color:var(--text-main);">${grupoName}</strong><button class="btn-icon" onclick="window.editarNombreGrupoDistribucion('${grupoName}')" style="font-size:12px;">✏️</button></div><div style="display:flex; align-items:center; gap:10px;"><span id="sum-card-pct-${grupoName}" style="font-size:12px; font-weight:bold; color:${Math.abs(sumPorcentajesGrupo - 100) < 0.1 ? 'green' : 'red'};">Total: ${sumPorcentajesGrupo.toFixed(2)}%</span><span style="font-weight:600; font-size:13px; color:#4285F4;">Disp. Restante: ${window.formatearDinero(disponibleReal)}</span><button class="btn-icon" onclick="window.eliminarGrupoDistribucion('${grupoName}')" title="Eliminar Grupo Completo">❌</button></div></div><div style="display:flex; flex-direction:column; gap:8px;">`;
 
         resHtml += `<strong style="font-size:13px; display:block; margin-top:10px;">${grupoName}:</strong><div style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">`;
 
@@ -1038,11 +1059,11 @@ function renderDistribucionDirecta() {
                 htmlBlock += `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; background: #e6f4ea; padding: 8px; border-radius: 6px; border: 1px solid #137333;"><span style="flex:2; font-size:12px; font-weight:600; color:#137333;">🔒 ${it.nombre}</span><span style="width:60px; text-align:center; font-size:12px; color:#137333;">${Number(it.porc).toFixed(2)}%</span><span style="width:105px; font-size:13px; font-weight:bold; color:#137333;">${window.formatearDinero(it.monto_ahorrado)}</span><span style="width:110px; font-size:11px; color:#137333; font-style:italic;">-> ${cuentasAhorro.find(c => c.id === it.ahorro_id)?.nombre || 'Cta'}</span><button class="btn-icon" onclick="window.devolverAhorroObjetivo('${grupoName}', ${idx})" title="Deshacer">🔙</button></div>`;
                 resHtml += `<span style="color: #137333;">🔒 ${it.nombre} (${Number(it.porc).toFixed(2)}%):</span> ${window.formatearDinero(it.monto_ahorrado)}${dMep > 0 ? ` <span style="font-size:11px; color:var(--text-muted);">(U$D ${(it.monto_ahorrado/dMep).toFixed(2)})</span>` : ''}<br>`;
             } else {
-                htmlBlock += `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;"><input type="text" value="${it.nombre}" style="flex:2; padding:5px; font-size:12px;" oninput="window.actualizarDatoObjetivoMemory('${grupoName}', ${idx}, 'nombre', this.value)" placeholder="Objetivo"><input type="text" id="pct-${grupoName}-${idx}" value="${Number(it.porc).toFixed(2)}" style="width:60px; padding:5px; font-size:12px; text-align:center;" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pct')" placeholder="%"><span style="font-size:11px;">%</span><div style="display:flex; flex-direction:column;"><input type="text" id="pesos-${grupoName}-${idx}" value="${window.formatearDinero(dineroCalculado)}" class="money-input" style="width:105px; padding:5px; font-size:12px;" data-raw="${dineroCalculado}" onfocus="window.onMoneyFocus(this)" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pesos'); window.onMoneyBlur(this, 'ARS')" placeholder="$"><div id="usd-calc-${grupoName}-${idx}" style="font-size:10px; color:var(--text-muted); text-align:center; margin-top:2px;">${dMep > 0 ? `U$D ${(dineroCalculado / dMep).toFixed(2)}` : ''}</div></div><select onchange="window.asignarAhorroObjetivo('${grupoName}', ${idx}, this.value)" style="width:110px; padding:4px; font-size:11px; background:#f1f3f4; border:1px solid #ccc; border-radius:4px;"><option value="">-- Cuenta Ahorro --</option>${opcionesAhorroHTML}</select><button class="btn-icon" onclick="window.efectivizarAhorroObjetivo('${grupoName}', ${idx})" title="Ahorrar este monto">💰</button><button class="btn-icon" onclick="window.eliminarObjetivoLinea('${grupoName}', ${idx})">🗑️</button></div>`;
+                htmlBlock += `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;"><input type="text" value="${it.nombre}" style="flex:2; padding:5px; font-size:12px;" oninput="window.actualizarDatoObjetivoMemory('${grupoName}', ${idx}, 'nombre', this.value)" placeholder="Objetivo"><input type="text" id="pct-${grupoName}-${idx}" value="${Number(it.porc).toFixed(2)}" style="width:60px; padding:5px; font-size:12px; text-align:center;" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pct')" placeholder="%"><span style="font-size:11px;">%</span><div style="display:flex; flex-direction:column;"><input type="text" id="pesos-${grupoName}-${idx}" value="${window.formatearDinero(dineroCalculado)}" class="money-input" style="width:105px; padding:5px; font-size:12px;" data-raw="${dineroCalculado}" onfocus="window.onMoneyFocus(this)" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pesos'); window.onMoneyBlur(this, 'ARS')" placeholder="$"><div id="usd-calc-${grupoName}-${idx}" style="font-size:10px; color:var(--text-muted); text-align:center; margin-top:2px;">${dMep > 0 ? `U$D ${(dineroCalculado / dMep).toFixed(2)}` : ''}</div></div><select onchange="window.asignarAhorroObjetivo('${grupoName}', ${idx}, this.value)" style="width:110px; padding:4px; font-size:11px; background:var(--input-bg); color:var(--text-main); border:1px solid var(--card-border); border-radius:4px;"><option value="">-- Cuenta Ahorro --</option>${opcionesAhorroHTML}</select><button class="btn-icon" onclick="window.efectivizarAhorroObjetivo('${grupoName}', ${idx})" title="Ahorrar este monto">💰</button><button class="btn-icon" onclick="window.eliminarObjetivoLinea('${grupoName}', ${idx})">🗑️</button></div>`;
                 resHtml += `<span style="color: var(--text-main);">${it.nombre} (${Number(it.porc).toFixed(2)}%):</span> ${window.formatearDinero(dineroCalculado)}${dMep > 0 ? ` <span style="font-size:11px; color:var(--text-muted);">(U$D ${(dineroCalculado/dMep).toFixed(2)})</span>` : ''}<br>`;
             }
         });
-        htmlBlock += `</div><button class="btn-black" style="margin-top:10px; padding:4px 12px; font-size:12px; background-color:#f1f3f4; color:var(--text-main); border:1px solid #ccc;" onclick="window.agregarObjetivoLinea('${grupoName}')">➕ Añadir Ítem Objetivo</button></div>`;
+        htmlBlock += `</div><button class="btn-black" style="margin-top:10px; padding:4px 12px; font-size:12px; background-color:var(--highlight-bg); color:var(--text-main); border:1px solid var(--card-border);" onclick="window.agregarObjetivoLinea('${grupoName}')">➕ Añadir Ítem Objetivo</button></div>`;
         resHtml += `</div>`; divDist.innerHTML += htmlBlock;
     }
     resDist.innerHTML = `<div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: #4285F4;">Disponible Total Libre: ${window.formatearDinero(totalDistribuibleGlobal)}</div>` + resHtml;
@@ -1120,7 +1141,7 @@ function renderTablaIngresos(gastosProc) {
     const filter = document.getElementById('filtro-texto-ingresos').value.toLowerCase();
     
     if(listaIngresos) {
-        listaIngresos.sort((a, b) => b.monto - a.monto); // Orden descendente
+        listaIngresos.sort((a, b) => b.monto - a.monto);
 
         listaIngresos.forEach((data, index) => {
             if (filter && !data.nombre.toLowerCase().includes(filter)) return;
@@ -1130,15 +1151,13 @@ function renderTablaIngresos(gastosProc) {
 
             let gastosAsociados = gastosProc.filter(g => g.propietario !== 'Tercero' && getOrigenIdDeGasto(g) === data.id);
             const trMain = document.createElement('tr'); trMain.className = "tr-clickable"; 
-            
-            // Nueva logica: Click a la fila entera abre editor, click en el icono despliega el detalle.
             trMain.onclick = function() { window.prepararEdicionIngreso(data.id); };
             
-            trMain.innerHTML = `<td><div style="display:flex; align-items:center; gap:8px;"><button class="btn-icon" style="padding:0; font-size:10px; color:var(--text-muted);" onclick="event.stopPropagation(); window.toggleIngresoDetalle('${data.id}')" id="icon-ingreso-${data.id}">▶</button><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${assignedColor};"></span><strong>${data.nombre}</strong></div></td><td><span style="background:#e8eaed; padding:2px 6px; border-radius:4px; font-size:11px;">${data.grupo || 'Ninguno'}</span></td><td style="color:var(--text-muted);">${window.formatearDinero(data.monto)}</td><td style="font-weight:600; color:${disponibleReal < 0 ? '#d93025' : '#137333'}">${window.formatearDinero(disponibleReal)}</td><td style="white-space: nowrap;"><button class="btn-icon" onclick="event.stopPropagation(); window.borrarIngreso('${data.id}')">🗑️</button></td>`;
+            trMain.innerHTML = `<td><div style="display:flex; align-items:center; gap:8px;"><button class="btn-icon" style="padding:0; font-size:10px; color:var(--text-muted);" onclick="event.stopPropagation(); window.toggleIngresoDetalle('${data.id}')" id="icon-ingreso-${data.id}">▶</button><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${assignedColor};"></span><strong>${data.nombre}</strong></div></td><td><span style="background:var(--highlight-bg); padding:2px 6px; border-radius:4px; font-size:11px;">${data.grupo || 'Ninguno'}</span></td><td style="color:var(--text-muted);">${window.formatearDinero(data.monto)}</td><td style="font-weight:600; color:${disponibleReal < 0 ? '#d93025' : '#137333'}">${window.formatearDinero(disponibleReal)}</td><td style="white-space: nowrap;"><button class="btn-icon" onclick="event.stopPropagation(); window.borrarIngreso('${data.id}')">🗑️</button></td>`;
             tabla.appendChild(trMain);
 
             const trDetail = document.createElement('tr'); trDetail.id = `detalle-ingreso-${data.id}`; trDetail.className = "details-row"; trDetail.style.display = "none";
-            trDetail.innerHTML = `<td colspan="5" style="padding: 10px 15px; background-color: #fcfcfc; border-bottom: 2px solid var(--card-border);"><div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;"><span style="font-size: 13px; font-weight: 600;">Gastos de este origen</span><input type="text" placeholder="Buscar gasto..." style="padding: 4px 8px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px; width: 150px;" onkeyup="window.filtrarGastosIngreso('${data.id}', this.value)"></div><ul id="lista-gastos-ingreso-${data.id}" style="list-style: none; padding: 0; margin: 0; font-size: 12px; color: var(--text-muted); display:flex; flex-direction:column; gap:4px; max-height: 200px; overflow-y: auto;">${gastosAsociados.length > 0 ? gastosAsociados.map(g => `<li class="gasto-item-origen" data-nombre="${g.nombre.toLowerCase()}"><span style="display:inline-block; width:90px; font-weight:600; color:var(--text-main);">${window.formatearDinero(g.costoCalculado)}</span> - <span>${g.nombre} <i style="color:#aaa; font-size:10px;">(${g.categoria})</i></span></li>`).join('') : '<li style="color:#999; font-style:italic;">No hay gastos descontados de este origen</li>'}</ul></td>`;
+            trDetail.innerHTML = `<td colspan="5" style="padding: 10px 15px; background-color: var(--highlight-bg); border-bottom: 2px solid var(--card-border);"><div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;"><span style="font-size: 13px; font-weight: 600;">Gastos de este origen</span><input type="text" placeholder="Buscar gasto..." style="padding: 4px 8px; font-size: 11px; border: 1px solid var(--card-border); border-radius: 4px; width: 150px;" onkeyup="window.filtrarGastosIngreso('${data.id}', this.value)"></div><ul id="lista-gastos-ingreso-${data.id}" style="list-style: none; padding: 0; margin: 0; font-size: 12px; color: var(--text-muted); display:flex; flex-direction:column; gap:4px; max-height: 200px; overflow-y: auto;">${gastosAsociados.length > 0 ? gastosAsociados.map(g => `<li class="gasto-item-origen" data-nombre="${g.nombre.toLowerCase()}"><span style="display:inline-block; width:90px; font-weight:600; color:var(--text-main);">${window.formatearDinero(g.costoCalculado)}</span> - <span>${g.nombre} <i style="color:var(--text-muted); font-size:10px;">(${g.categoria})</i></span></li>`).join('') : '<li style="color:var(--text-muted); font-style:italic;">No hay gastos descontados de este origen</li>'}</ul></td>`;
             tabla.appendChild(trDetail);
         });
     }
