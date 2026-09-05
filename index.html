@@ -73,6 +73,7 @@
                     <button id="logout-btn-mobile" class="topbar-mobile-logout">Salir</button>
                 </div>
                 <div class="selectors">
+                    <button id="theme-toggle-btn" class="theme-toggle-btn" onclick="window.toggleTheme()" title="Modo Claro/Oscuro">🌙</button>
                     <select id="mes-selector">
                         <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option>
                         <option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option>
@@ -83,9 +84,8 @@
                 </div>
             </div>
 
-            <!-- CONTENEDOR DINÁMICO DE VISTAS (Aquí se inyecta todo por JS) -->
+            <!-- CONTENEDOR DINÁMICO DE VISTAS -->
             <div id="views-container"></div>
-
         </main>
         
         <nav class="bottom-nav" id="bottom-nav">
@@ -95,7 +95,6 @@
             <button class="nav-btn-bottom" onclick="window.switchView('ahorros', this)"><span class="icon">◆</span><span class="text">Ahorros</span></button>
             <button class="nav-btn-bottom" onclick="window.switchView('estadisticas', this)"><span class="icon">▤</span><span class="text">Estad.</span></button>
         </nav>
-        
     </div>
 
     <!-- Etiqueta de versión flotante -->
@@ -104,7 +103,6 @@
     <!-- CONTENEDOR DINÁMICO DE MODALES -->
     <div id="modals-container"></div>
 
-    <!-- CARGA DE NUESTRO MOTOR JAVASCRIPT -->
     <script type="module" src="./js/app.js"></script>
 </body>
 </html>
