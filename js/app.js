@@ -11,7 +11,7 @@ import { vistaModales } from '../vistas/modales.js';
 document.getElementById('views-container').innerHTML = vistaResumen + vistaGastos + vistaIngresos + vistaAhorros + vistaEstadisticas;
 document.getElementById('modals-container').innerHTML = vistaModales;
 
-const APP_VERSION = "v2.7.0";
+const APP_VERSION = "v2.7.5";
 window.APP_VERSION = APP_VERSION;
 
 const updateVersionTags = () => {
@@ -1278,9 +1278,19 @@ window.procesarCSV = async function() {
                     count++;
                 }
             }
-            if(count>0){ await batch.commit(); window.cerrarModal('modal-carga-masiva'); await actualizarDashboard(); }
-            else window.mostrarCargando(false);
-        } catch(e){ window.mostrarCargando(false); alert("Error CSV."); }
+            if (count > 0) {
+                await batch.commit();
+                window.cerrarModal('modal-carga-masiva');
+                await actualizarDashboard();
+                alert(`¡Éxito! Se cargaron ${count} gastos en lote.`);
+            } else {
+                window.mostrarCargando(false);
+                alert("No se identificaron gastos válidos en el archivo.");
+            }
+        } catch(e) {
+            window.mostrarCargando(false);
+            alert("Error al procesar el archivo CSV.");
+        }
     };
     reader.readAsText(input.files[0]);
 };
@@ -1289,30 +1299,40 @@ window.copiarMesAnterior = async function() {
     if(!confirm("¿Importar todos los datos y saldo acumulado de ahorros del mes anterior?")) return;
     window.mostrarCargando(true);
     let m = parseInt(mesSelector.value)-1, a = parseInt(anioSelector.value);
-    if(m===0){ m=12; a--; }
+    if(m === 0){ m = 12; a--; }
     const prev = `${a}-${m.toString().padStart(2, '0')}`, actual = obtenerMesId();
     try {
         const prevDocSnap = await getDoc(doc(db, "finanzas", prev));
         let prevData = prevDocSnap.exists() ? prevDocSnap.data() : { configuracion: {} };
         let prevConfig = prevData.configuracion || {}, dDebito = prevConfig.dolar_debito || 0, dImpuesto = prevConfig.dolar_impuesto || 0, prevTipos = prevConfig.tipos_gasto || {}, prevDist = prevConfig.grupos_distribucion || {}, prevCuentas = prevConfig.cuentas_ahorro || [];
-        let sumatoriaGastosPrev = {}; const snapG = await getDocs(collection(db, "finanzas", prev, "gastos"));
+        
+        let sumatoriaGastosPrev = {};
+        const snapG = await getDocs(collection(db, "finanzas", prev, "gastos"));
         let prevGastosToCopy = [];
+        
         snapG.forEach(d => {
             let g = d.data();
             g.id = d.id;
             
-            // Tratamiento inteligente de tarjetas y suscripciones en USD/ARS:
-            let esSuscripcionTarjeta = g.tipo === 'Tarjeta' && parseInt(g.cuotas_totales || 1) <= 1;
+            let cuotasTotales = parseInt(g.cuotas_totales);
+            if (isNaN(cuotasTotales) || cuotasTotales < 1) cuotasTotales = 1;
+            let cuotasPagadas = parseInt(g.cuotas_pagadas);
+            if (isNaN(cuotasPagadas) || cuotasPagadas < 1) cuotasPagadas = 1;
             
-            if (g.tipo === 'Tarjeta' && !esSuscripcionTarjeta) {
-                if (parseInt(g.cuotas_pagadas || 1) < parseInt(g.cuotas_totales || 1)) {
-                    let gCopy = { ...g };
-                    gCopy.cuotas_pagadas = parseInt(g.cuotas_pagadas || 1) + 1;
-                    prevGastosToCopy.push(gCopy);
+            let esSuscripcionTarjeta = (g.tipo === 'Tarjeta' || g.type === 'Tarjeta') && cuotasTotales <= 1;
+            
+            let gCopy = null;
+            if ((g.tipo === 'Tarjeta' || g.type === 'Tarjeta') && !esSuscripcionTarjeta) {
+                if (cuotasPagadas < cuotasTotales) {
+                    gCopy = { ...g };
+                    gCopy.cuotas_pagadas = cuotasPagadas + 1;
                 }
             } else if ((g.tipo === 'Fijo' || esSuscripcionTarjeta) && g.recurrente !== false) {
-                // Cualquier Gasto Fijo o Suscripción de 1 cuota marked "Recurrente" se copia
-                prevGastosToCopy.push({ ...g });
+                gCopy = { ...g };
+            }
+            
+            if (gCopy) {
+                prevGastosToCopy.push(gCopy);
             }
 
             if(g.propietario !== 'Tercero' && !g.ignorar_origen) {
@@ -1321,31 +1341,66 @@ window.copiarMesAnterior = async function() {
                 if (g.compartir_con && g.compartir_tipo) {
                     costo = g.compartir_tipo === 'divisor' ? cuotaTotal / (g.divisor || 2) : (g.monto_fijo || 0);
                 }
-                let origenesPanel = prevTipos[g.categoria || "Fijos"] || []; let origenId = g.id_origen || (origenesPanel.length > 0 ? origenesPanel[0] : null);
+                let origenesPanel = prevTipos[g.categoria || "Fijos"] || [];
+                let origenId = g.id_origen || (origenesPanel.length > 0 ? origenesPanel[0] : null);
                 if (origenId) sumatoriaGastosPrev[origenId] = (sumatoriaGastosPrev[origenId] || 0) + costo;
             }
         });
-        let sumPorGrupoPrev = {}; const snapI = await getDocs(collection(db, "finanzas", prev, "ingresos"));
+        
+        let sumPorGrupoPrev = {};
+        const snapI = await getDocs(collection(db, "finanzas", prev, "ingresos"));
         let prevIngresosToCopy = [];
+        
         snapI.forEach(d => {
             let ing = d.data();
             ing.id = d.id;
             prevIngresosToCopy.push(ing);
             if (ing.grupo) sumPorGrupoPrev[ing.grupo] = (sumPorGrupoPrev[ing.grupo] || 0) + (ing.monto - (sumatoriaGastosPrev[ing.id] || 0));
         });
+        
         let ahorrosSumaPrev = {};
         for(let gName in prevDist) {
             (Array.isArray(prevDist[gName]) ? prevDist[gName] : []).forEach(it => {
                 if (it && it.ahorro_id && it.ahorrado) ahorrosSumaPrev[it.ahorro_id] = (ahorrosSumaPrev[it.ahorro_id] || 0) + (it.monto_ahorrado || 0);
             });
         }
-        let nuevasCuentas = prevCuentas.map(c => { return { id: c.id, nombre: c.nombre, depositado: false, saldo_anterior: (c.saldo_anterior || 0) + (ahorrosSumaPrev[c.id] || 0) - (c.retiros || 0), retiros: 0 }; });
+        
+        let nuevasCuentas = prevCuentas.map(c => {
+            return { id: c.id, nombre: c.nombre, depositado: false, saldo_anterior: (c.saldo_anterior || 0) + (ahorrosSumaPrev[c.id] || 0) - (c.retiros || 0), retiros: 0 };
+        });
         prevConfig.cuentas_ahorro = nuevasCuentas;
-        await setDoc(doc(db, "finanzas", actual), { configuracion: prevConfig }, { merge: true });
-        for(const g of prevGastosToCopy) { let docId = g.id; delete g.id; await setDoc(doc(db, "finanzas", actual, "gastos", docId), g); }
-        for(const ing of prevIngresosToCopy) { let docId = ing.id; delete ing.id; await setDoc(doc(db, "finanzas", actual, "ingresos", docId), ing); }
+
+        // EJECUCIÓN ATÓMICA CON BATCH WRITE DE FIRESTORE
+        const batch = writeBatch(db);
+        const actualRef = doc(db, "finanzas", actual);
+        batch.set(actualRef, { configuracion: prevConfig }, { merge: true });
+        
+        let gCount = 0;
+        prevGastosToCopy.forEach(g => {
+            let docId = g.id;
+            delete g.id;
+            const ref = doc(collection(db, "finanzas", actual, "gastos"), docId);
+            batch.set(ref, g);
+            gCount++;
+        });
+        
+        let iCount = 0;
+        prevIngresosToCopy.forEach(ing => {
+            let docId = ing.id;
+            delete ing.id;
+            const ref = doc(collection(db, "finanzas", actual, "ingresos"), docId);
+            batch.set(ref, ing);
+            iCount++;
+        });
+
+        await batch.commit();
+        alert(`¡Importación exitosa! Se copiaron ${gCount} gastos (incluyendo suscripciones como Capcut) y ${iCount} ingresos.`);
         await actualizarDashboard();
-    } catch (e) { console.error(e); window.mostrarCargando(false); alert("Error al copiar datos: " + e.message); }
+    } catch (e) {
+        console.error(e);
+        window.mostrarCargando(false);
+        alert("Error al copiar datos: " + e.message);
+    }
 };
 
 if ('serviceWorker' in navigator) {
