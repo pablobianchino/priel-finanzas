@@ -21,10 +21,16 @@ export function formatearDinero(num, moneda = 'ARS') {
 }
 
 export function getCostoCalculado(g, dDebito, dImpuesto) {
-    let costoArsBase = g.monto;
+    let gMonto = typeof g.monto === 'number' ? g.monto : parseMoney(g.monto);
+    let costoArsBase = gMonto;
+    
     if (g.moneda === 'USD') {
-        costoArsBase = g.monto * dDebito;
+        let rate = typeof dDebito === 'number' ? dDebito : parseMoney(dDebito);
+        costoArsBase = gMonto * rate;
     }
-    // Solo devuelve la cuota total. La división la maneja app.js
-    return g.tipo === 'Tarjeta' ? (costoArsBase / (g.cuotas_totales || 1)) : costoArsBase;
+    
+    let cuotasTotales = parseInt(g.cuotas_totales);
+    if (isNaN(cuotasTotales) || cuotasTotales < 1) cuotasTotales = 1;
+    
+    return g.type === 'Tarjeta' || g.tipo === 'Tarjeta' ? (costoArsBase / cuotasTotales) : costoArsBase;
 }
