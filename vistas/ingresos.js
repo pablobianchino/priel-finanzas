@@ -1,5 +1,13 @@
 export const vistaIngresos = `
 <div id="ingresos" class="view">
+    <!-- PANEL RESUMEN USD (TERCEROS + PROPIOS) -->
+    <div id="panel-resumen-usd-ingresos" class="card" style="display:none; margin-bottom: 20px; border-top: 4px solid var(--primary-color);">
+        <div class="card-header-toggle" onclick="window.toggleCard(this)">
+            <h2 style="margin: 0; font-size: 16px;">Resumen Gastos en USD (Incluye Terceros)</h2><span class="toggle-icon">▼</span>
+        </div>
+        <div class="card-content" id="contenido-resumen-usd-ingresos"></div>
+    </div>
+
     <div class="card" style="margin-bottom: 20px; border-top: 4px solid var(--text-muted);">
         <div class="card-header-toggle" onclick="window.toggleCard(this)">
             <h2 style="margin: 0; font-size: 16px;">Configuración USD</h2><span class="toggle-icon">▼</span>
