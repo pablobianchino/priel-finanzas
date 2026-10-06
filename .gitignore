@@ -1,0 +1,6 @@
+# Variables de entorno y credenciales locales
+.env
+*.zip
+*.log
+.vscode/
+.system_generated/
