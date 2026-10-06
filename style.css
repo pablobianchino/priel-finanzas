@@ -140,6 +140,52 @@ body.dark-mode .saldo-danger { background-color: #441716; color: #f28b82; }
 .bottom-nav { display: none; }
 .topbar-mobile-logout { display: none; }
 
+.btn-ahorro-action {
+    flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    cursor: pointer; border: 1px solid transparent; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: 0.2s;
+}
+.btn-ahorro-ingresar {
+    background-color: #e6f4ea; color: #137333; border-color: #ceead6;
+}
+.btn-ahorro-ingresar:hover {
+    background-color: #ceead6;
+}
+body.dark-mode .btn-ahorro-ingresar {
+    background-color: #13381e; color: #81c995; border-color: #1b4d29;
+}
+body.dark-mode .btn-ahorro-ingresar:hover {
+    background-color: #1b4d29;
+}
+
+.btn-ahorro-retirar {
+    background-color: #fce8e6; color: #c5221f; border-color: #fad2cf;
+}
+.btn-ahorro-retirar:hover {
+    background-color: #fad2cf;
+}
+body.dark-mode .btn-ahorro-retirar {
+    background-color: #441716; color: #f28b82; border-color: #5c1f1e;
+}
+body.dark-mode .btn-ahorro-retirar:hover {
+    background-color: #5c1f1e;
+}
+
+.badge-mov {
+    padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; display: inline-block;
+}
+.badge-mov-ingreso {
+    background-color: #e6f4ea; color: #137333; border: 1px solid #ceead6;
+}
+body.dark-mode .badge-mov-ingreso {
+    background-color: #13381e; color: #81c995; border-color: #1b4d29;
+}
+.badge-mov-retiro {
+    background-color: #fce8e6; color: #c5221f; border: 1px solid #fad2cf;
+}
+body.dark-mode .badge-mov-retiro {
+    background-color: #441716; color: #f28b82; border-color: #5c1f1e;
+}
+
 .floating-version {
     position: fixed;
     bottom: 10px;

@@ -13,9 +13,9 @@ export const vistaAhorros = `
     </div>
 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
-        <h2 style="margin: 0;">Cuentas de Ahorro Histórico</h2>
+        <h2 style="margin: 0;">Cuentas de Ahorro</h2>
         <div style="display: flex; gap: 10px;">
-            <button onclick="window.abrirModalHistorial()" class="btn-black" style="background-color: var(--highlight-bg); color: var(--text-main); border: 1px solid var(--card-border);">🧾 Ver Historial</button>
+            <button onclick="window.abrirModalHistorial()" class="btn-black" style="background-color: var(--highlight-bg); color: var(--text-main); border: 1px solid var(--card-border);">🧾 Historial de Movimientos</button>
             <button onclick="window.crearCuentaAhorro()" class="btn-black">➕ Nueva Cuenta</button>
         </div>
     </div>
@@ -28,7 +28,7 @@ export const vistaAhorros = `
                     <div class="value" id="sum-ahorros-total" style="display: flex; flex-direction: column; gap: 5px; font-size: 22px;">$0,00</div>
                 </div>
                 <div style="text-align: right;">
-                    <h3 style="color: #137333;">Total Depositado (Mes Actual)</h3>
+                    <h3 style="color: #137333;">Movimientos del Mes</h3>
                     <div class="value" id="sum-ahorros-depositado" style="color: #137333; font-size: 22px; display: flex; flex-direction: column; gap: 5px;">$0,00</div>
                 </div>
             </div>

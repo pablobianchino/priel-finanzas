@@ -51,7 +51,7 @@ export const vistaIngresos = `
         </div>
         <div class="card" style="border-top: 4px solid #f29900;">
             <div class="card-header-toggle" onclick="window.toggleCard(this)">
-                <h3 style="font-size: 15px;">Distribución Directa de Objetivos</h3><span class="toggle-icon">▼</span>
+                <h3 style="font-size: 15px;">Distribución de Objetivos (Presupuesto)</h3><span class="toggle-icon">▼</span>
             </div>
             <div class="card-content" id="tabla-distribucion"></div>
         </div>

@@ -11,7 +11,7 @@ import { vistaModales } from '../vistas/modales.js';
 document.getElementById('views-container').innerHTML = vistaResumen + vistaGastos + vistaIngresos + vistaAhorros + vistaEstadisticas;
 document.getElementById('modals-container').innerHTML = vistaModales;
 
-const APP_VERSION = "v2.7.5";
+const APP_VERSION = "v2.8.0";
 window.APP_VERSION = APP_VERSION;
 
 const updateVersionTags = () => {
@@ -61,8 +61,7 @@ if (!yearExists) {
 anioSelector.value = currentYear;
 
 let totalGastosGlobal = 0, subtotalTerceros = 0, totalIngresosGlobal = 0, deudaFuturaTotal = 0;
-let totalAhorrosEfectivizados = 0;
-let listaGastos = [], listaIngresos = [], listaAhorros = [];
+let listaGastos = [], listaIngresos = [];
 let chartResumen = null, chartIngresos = null, chartEstadisticas = null;
 
 let gruposDistribucion = {};
@@ -229,7 +228,7 @@ async function actualizarDashboard() {
     window.mostrarCargando(true);
     try {
         await cargarConfiguracion();
-        await Promise.all([cargarGastosFetch(), cargarIngresosFetch(), cargarAhorrosFetch()]);
+        await Promise.all([cargarGastosFetch(), cargarIngresosFetch()]);
         window.recargarDatosVisuales();
     } catch(error) {
         console.error("Error cargando dashboard:", error);
@@ -244,13 +243,6 @@ window.recargarDatosVisuales = function() {
     
     let gastosProc = procesarListaGastos(dDebito, dImpuesto);
     calcularSaldosOrigenes(gastosProc);
-    
-    totalAhorrosEfectivizados = 0;
-    for(let g in gruposDistribucion) {
-        gruposDistribucion[g].forEach(it => {
-            if (it.ahorrado) totalAhorrosEfectivizados += (it.monto_ahorrado || 0);
-        });
-    }
 
     renderResumenUSD(gastosProc, dDebito);
     renderizacioDinamicaGastosPaneles(gastosProc, dDebito, dImpuesto);
@@ -339,14 +331,6 @@ async function cargarIngresosFetch() {
     } catch(e) { console.error(e); listaIngresos = []; }
 }
 
-async function cargarAhorrosFetch() {
-    try {
-        const snap = await getDocs(collection(db, "finanzas", obtenerMesId(), "ahorros"));
-        listaAhorros = [];
-        snap.forEach(d => listaAhorros.push({ id: d.id, ...d.data() }));
-    } catch(e) { console.error(e); listaAhorros = []; }
-}
-
 async function cargarConfiguracion() {
     try {
         const docSnap = await getDoc(doc(db, "finanzas", obtenerMesId()));
@@ -363,10 +347,16 @@ async function cargarConfiguracion() {
                 if (impEl) { impEl.dataset.raw = config.dolar_impuesto || 0; impEl.value = window.formatearDinero(config.dolar_impuesto || 0, 'ARS'); }
             });
             
+            // Migración y limpieza de Grupos de Distribución (Planificación pura)
             gruposDistribucion = config.grupos_distribucion || {};
             for (let g in gruposDistribucion) {
                 if (!Array.isArray(gruposDistribucion[g])) gruposDistribucion[g] = Object.values(gruposDistribucion[g]);
-                gruposDistribucion[g] = gruposDistribucion[g].filter(it => it !== null);
+                gruposDistribucion[g] = (gruposDistribucion[g] || []).filter(it => it !== null).map(it => {
+                    return {
+                        nombre: it.nombre || "Objetivo",
+                        porc: typeof it.porc === 'number' ? it.porc : (parseFloat(it.porc) || 0)
+                    };
+                });
             }
 
             let oldTipos = config.tipos_gasto || { "Fijos": [], "Tarjeta": [], "Terceros": [] };
@@ -813,131 +803,377 @@ window.toggleTercero = function(prefix = 'gasto') {
     if(isTercero) { document.getElementById(`${prefix}-compartir`).checked = false; window.toggleDivisor(prefix); }
 };
 
+// =========================================================================
+// FASE 2: GESTIÓN MANUAL DE CUENTAS DE AHORRO Y MOVIMIENTOS
+// =========================================================================
+
+function calcularTotalesCuenta(cuentaId) {
+    const c = cuentasAhorro.find(acc => acc.id === cuentaId) || {};
+    const movs = (historialAhorros || []).filter(m => m.cuenta_id === cuentaId);
+    const ingresos = movs.filter(m => m.tipo === 'ingreso').reduce((sum, m) => sum + (parseFloat(m.monto) || 0), 0);
+    const retiros = movs.filter(m => m.tipo === 'retiro').reduce((sum, m) => sum + (parseFloat(m.monto) || 0), 0);
+    const saldoAnt = parseFloat(c.saldo_anterior) || 0;
+    const saldoFinal = saldoAnt + ingresos - retiros;
+    return { saldoAnt, ingresos, retiros, netoMes: ingresos - retiros, saldoFinal };
+}
+
 window.crearCuentaAhorro = function() {
-    let n = prompt("Nombre de la nueva Cuenta de Ahorro (Histórico):");
-    if(n && n.trim() !== "") { cuentasAhorro.push({ id: 'ah_' + Date.now(), nombre: n.trim(), depositado: false, saldo_anterior: 0, retiros: 0 }); window.guardarConfiguracionAhorros(); }
+    let n = prompt("Nombre de la nueva Cuenta de Ahorro:");
+    if(n && n.trim() !== "") { 
+        cuentasAhorro.push({ id: 'ah_' + Date.now(), nombre: n.trim(), depositado: false, saldo_anterior: 0 }); 
+        window.guardarConfiguracionAhorros(); 
+    }
 }
 
 window.borrarCuentaAhorro = function(id) {
     let acc = cuentasAhorro.find(c => c.id === id);
     if(!acc) return;
-    if(!confirm("¿Seguro que quieres eliminar esta cuenta de ahorro? Se devolverán los ahorros a los saldos disponibles.")) return;
-    for(let g in gruposDistribucion) { 
-        (gruposDistribucion[g] || []).forEach(item => { 
-            if (item && item.ahorro_id === id) {
-                if (item.ahorrado) {
-                    historialAhorros.unshift({ id: Date.now(), fecha: new Date().toLocaleString(), accion: 'Devuelto (Cta. Eliminada)', objetivo: item.nombre, cuenta: acc.nombre, monto: item.monto_ahorrado });
-                    item.ahorrado = false;
-                    item.monto_ahorrado = 0;
-                }
-                item.ahorro_id = ""; 
-            }
-        }); 
-    }
+    if(!confirm(`¿Seguro que deseas eliminar la cuenta de ahorro '${acc.nombre}'? Sus movimientos en el historial se conservarán con el nombre de la cuenta.`)) return;
     cuentasAhorro = cuentasAhorro.filter(c => c.id !== id);
     window.guardarConfiguracionAhorros();
 }
 
 window.editarCuentaAhorro = function(id) {
     let acc = cuentasAhorro.find(c => c.id === id);
-    if(acc) { let n = prompt("Editar nombre:", acc.nombre); if(n && n.trim() !== "") { acc.nombre = n.trim(); window.guardarConfiguracionAhorros(); } }
+    if(acc) { 
+        let n = prompt("Editar nombre de la cuenta:", acc.nombre); 
+        if(n && n.trim() !== "") { 
+            acc.nombre = n.trim(); 
+            window.guardarConfiguracionAhorros(); 
+        } 
+    }
 }
 
 window.toggleDepositoCuenta = function(id) {
     let acc = cuentasAhorro.find(c => c.id === id);
-    if(acc) { acc.depositado = !acc.depositado; window.guardarConfiguracionAhorros(); }
-}
-
-window.rescatarAhorro = function(id) {
-    let acc = cuentasAhorro.find(c => c.id === id);
-    if(acc) {
-        let val = prompt(`¿Cuánto dinero quieres rescatar (retirar) de '${acc.nombre}'? Usa números negativos para deshacer.`);
-        if(val !== null && val.trim() !== "") {
-            let monto = window.parseMoney(val);
-            if(!isNaN(monto)) {
-                acc.retiros = (acc.retiros || 0) + monto;
-                historialAhorros.unshift({ id: Date.now(), fecha: new Date().toLocaleString(), accion: monto >= 0 ? 'Retiro' : 'Ajuste', objetivo: 'Manual', cuenta: acc.nombre, monto: monto });
-                window.guardarConfiguracionAhorros();
-            }
-        }
+    if(acc) { 
+        acc.depositado = !acc.depositado; 
+        window.guardarConfiguracionAhorros(); 
     }
 }
 
-window.guardarConfiguracionAhorros = async function() {
-    window.mostrarCargando(true);
-    await actualizarConfiguracionDB({ "configuracion.cuentas_ahorro": cuentasAhorro, "configuracion.grupos_distribucion": gruposDistribucion, "configuracion.historial_ahorros": historialAhorros });
-    await actualizarDashboard();
+window.abrirModalMovimiento = function(cuentaId, tipo) {
+    let acc = cuentasAhorro.find(c => c.id === cuentaId);
+    if (!acc) return;
+    document.getElementById('form-movimiento-ahorro').reset();
+    document.getElementById('movimiento-cuenta-id').value = cuentaId;
+    document.getElementById('movimiento-tipo').value = tipo;
+    document.getElementById('movimiento-cuenta-nombre').value = acc.nombre;
+    document.getElementById('movimiento-monto').dataset.raw = "";
+
+    const tituloEl = document.getElementById('titulo-modal-movimiento');
+    const submitBtn = document.getElementById('btn-submit-movimiento');
+    const ayudaEl = document.getElementById('movimiento-ayuda');
+
+    if (tipo === 'ingreso') {
+        tituloEl.innerText = `➕ Ingresar Dinero a ${acc.nombre}`;
+        submitBtn.innerText = "Confirmar Ingreso";
+        submitBtn.style.backgroundColor = "#137333";
+        ayudaEl.innerText = "Este monto se sumará al pozo acumulado de tu cuenta de ahorro.";
+    } else {
+        tituloEl.innerText = `➖ Retirar Dinero de ${acc.nombre}`;
+        submitBtn.innerText = "Confirmar Retiro";
+        submitBtn.style.backgroundColor = "#c5221f";
+        ayudaEl.innerText = "ℹ️ Al retirar, el sistema creará automáticamente un registro en tus 'Ingresos del Mes' como [Rescate - " + acc.nombre + "] sumando este dinero al Disponible para usar en tus gastos.";
+    }
+
+    document.getElementById('modal-movimiento-ahorro').style.display = 'flex';
 }
+
+document.getElementById('form-movimiento-ahorro').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const cuentaId = document.getElementById('movimiento-cuenta-id').value;
+    const tipo = document.getElementById('movimiento-tipo').value;
+    const monto = parseFloat(document.getElementById('movimiento-monto').dataset.raw || window.parseMoney(document.getElementById('movimiento-monto').value));
+    const motivo = document.getElementById('movimiento-motivo').value.trim();
+
+    if (isNaN(monto) || monto <= 0) {
+        return alert("Por favor ingresa un monto válido mayor a 0.");
+    }
+
+    let acc = cuentasAhorro.find(c => c.id === cuentaId);
+    if (!acc) return alert("Cuenta no encontrada.");
+
+    window.mostrarCargando(true);
+    const movId = 'mov_' + Date.now();
+    let idIngresoGenerado = null;
+
+    try {
+        if (tipo === 'retiro') {
+            // INYECCIÓN A DISPONIBLE: Se crea automáticamente el registro en la colección de ingresos del mes
+            const docRef = await addDoc(collection(db, "finanzas", obtenerMesId(), "ingresos"), {
+                nombre: `[Rescate - ${acc.nombre}]`,
+                monto: monto,
+                grupo: "",
+                es_rescate: true,
+                origen_movimiento_id: movId
+            });
+            idIngresoGenerado = docRef.id;
+        }
+
+        const nuevoMov = {
+            id: movId,
+            fecha: new Date().toLocaleString(),
+            tipo: tipo,
+            accion: tipo === 'ingreso' ? 'Ingreso' : 'Retiro',
+            cuenta_id: cuentaId,
+            cuenta: acc.nombre,
+            monto: monto,
+            motivo: motivo || (tipo === 'ingreso' ? 'Aporte a cuenta de ahorro' : 'Rescate para disponible'),
+            id_ingreso_generado: idIngresoGenerado
+        };
+
+        if (!Array.isArray(historialAhorros)) historialAhorros = [];
+        historialAhorros.unshift(nuevoMov);
+
+        await actualizarConfiguracionDB({
+            "configuracion.cuentas_ahorro": cuentasAhorro,
+            "configuracion.historial_ahorros": historialAhorros
+        });
+
+        window.cerrarModal('modal-movimiento-ahorro');
+        await actualizarDashboard();
+    } catch(err) {
+        console.error("Error al registrar movimiento:", err);
+        alert("Ocurrió un error al registrar el movimiento: " + err.message);
+        window.mostrarCargando(false);
+    }
+});
 
 window.abrirModalHistorial = function() {
     const container = document.getElementById('historial-lista');
     container.innerHTML = '';
-    if(!historialAhorros || historialAhorros.length === 0) container.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding: 20px;">No hay movimientos recientes.</p>';
-    else historialAhorros.forEach(h => {
-        container.innerHTML += `<div style="border-bottom: 1px solid var(--card-border); padding: 10px 0; display:flex; justify-content:space-between; align-items:center;"><div><div style="font-size:11px; color:var(--text-muted);">${h.fecha}</div><div style="font-weight:500;">${h.accion.includes('Ahorrado') ? '💰' : '🔙'} ${h.accion}: <span style="font-weight:normal;">${h.objetivo} -> ${h.cuenta}</span></div></div><div style="font-weight:bold; color:${h.accion.includes('Ahorrado') ? '#137333' : '#c5221f'};">${window.formatearDinero(h.monto)}</div></div>`;
-    });
+    
+    if(!historialAhorros || historialAhorros.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding: 20px;">No hay movimientos registrados en este mes.</p>';
+    } else {
+        historialAhorros.forEach(h => {
+            const esIngreso = h.tipo === 'ingreso' || (h.accion && h.accion.toLowerCase().includes('ingreso')) || (h.accion && h.accion.toLowerCase().includes('ahorrado'));
+            const badgeClass = esIngreso ? 'badge-mov-ingreso' : 'badge-mov-retiro';
+            const badgeText = esIngreso ? '🟢 Ingreso' : '🔴 Retiro';
+            const montoColor = esIngreso ? '#137333' : '#c5221f';
+            const prefixSign = esIngreso ? '+' : '-';
+            const detalleExtra = h.motivo || h.objetivo || '';
+            const rescateNotice = h.id_ingreso_generado ? `<span style="font-size:10px; color:#174ea6; display:block; margin-top:2px;">↳ Inyectado como Ingreso disponible</span>` : '';
+
+            container.innerHTML += `
+                <div style="border-bottom: 1px solid var(--card-border); padding: 12px 0; display:flex; justify-content:space-between; align-items:center; gap: 10px;">
+                    <div style="flex: 1;">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                            <span class="badge-mov ${badgeClass}">${badgeText}</span>
+                            <span style="font-size:11px; color:var(--text-muted);">${h.fecha}</span>
+                        </div>
+                        <div style="font-weight:600; font-size:14px; color:var(--text-main);">${h.cuenta || 'Cuenta'}</div>
+                        ${detalleExtra ? `<div style="font-size:12px; color:var(--text-muted);">${detalleExtra}</div>` : ''}
+                        ${rescateNotice}
+                    </div>
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <div style="font-weight:bold; font-size:15px; color:${montoColor}; white-space:nowrap;">${prefixSign} ${window.formatearDinero(h.monto)}</div>
+                        <div style="display:flex; gap:4px;">
+                            <button class="btn-icon" onclick="window.abrirModalEditarMovimiento('${h.id}')" title="Editar monto/motivo">✏️</button>
+                            <button class="btn-icon" onclick="window.eliminarMovimientoAhorro('${h.id}')" title="Eliminar movimiento">🗑️</button>
+                        </div>
+                    </div>
+                </div>`;
+        });
+    }
     document.getElementById('modal-historial').style.display = 'flex';
+}
+
+window.abrirModalEditarMovimiento = function(movId) {
+    const mov = (historialAhorros || []).find(m => m.id === movId);
+    if (!mov) return;
+    document.getElementById('edit-mov-id').value = mov.id;
+    document.getElementById('edit-mov-cuenta').value = `${mov.cuenta} (${mov.tipo === 'ingreso' ? 'Ingreso' : 'Retiro'})`;
+    document.getElementById('edit-mov-monto').dataset.raw = mov.monto;
+    document.getElementById('edit-mov-monto').value = window.formatearDinero(mov.monto, 'ARS');
+    document.getElementById('edit-mov-motivo').value = mov.motivo || mov.objetivo || '';
+    
+    const ayudaEl = document.getElementById('edit-mov-ayuda');
+    if (mov.id_ingreso_generado) {
+        ayudaEl.innerText = "ℹ️ Al actualizar este monto, se sincronizará automáticamente el ingreso [Rescate - " + mov.cuenta + "] correspondiente en tus Ingresos del Mes.";
+    } else {
+        ayudaEl.innerText = "";
+    }
+
+    document.getElementById('modal-editar-movimiento').style.display = 'flex';
+}
+
+document.getElementById('form-editar-movimiento').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const movId = document.getElementById('edit-mov-id').value;
+    const nuevoMonto = parseFloat(document.getElementById('edit-mov-monto').dataset.raw || window.parseMoney(document.getElementById('edit-mov-monto').value));
+    const nuevoMotivo = document.getElementById('edit-mov-motivo').value.trim();
+
+    if (isNaN(nuevoMonto) || nuevoMonto <= 0) {
+        return alert("Por favor ingresa un monto válido mayor a 0.");
+    }
+
+    const mov = (historialAhorros || []).find(m => m.id === movId);
+    if (!mov) return;
+
+    window.mostrarCargando(true);
+    try {
+        mov.monto = nuevoMonto;
+        mov.motivo = nuevoMotivo;
+
+        // Si fue un retiro que generó un ingreso en el mes, sincronizar monto en Firestore
+        if (mov.id_ingreso_generado) {
+            try {
+                await updateDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", mov.id_ingreso_generado), {
+                    monto: nuevoMonto
+                });
+            } catch(eIgnored) {}
+        }
+
+        await actualizarConfiguracionDB({
+            "configuracion.historial_ahorros": historialAhorros
+        });
+
+        window.cerrarModal('modal-editar-movimiento');
+        await actualizarDashboard();
+        window.abrirModalHistorial();
+    } catch(err) {
+        console.error("Error al editar movimiento:", err);
+        alert("Error al actualizar la transacción: " + err.message);
+        window.mostrarCargando(false);
+    }
+});
+
+window.eliminarMovimientoAhorro = async function(movId) {
+    const mov = (historialAhorros || []).find(m => m.id === movId);
+    if (!mov) return;
+
+    const confirmMsg = mov.id_ingreso_generado 
+        ? `¿Seguro que deseas eliminar este retiro de ${window.formatearDinero(mov.monto)}? También se eliminará el registro de Ingreso generado en el mes.`
+        : `¿Seguro que deseas eliminar este movimiento de ${window.formatearDinero(mov.monto)}?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    window.mostrarCargando(true);
+    try {
+        // Si generó un ingreso en el mes, eliminarlo de la colección de ingresos
+        if (mov.id_ingreso_generado) {
+            try {
+                await deleteDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", mov.id_ingreso_generado));
+            } catch(eIgnored) {}
+        }
+
+        historialAhorros = historialAhorros.filter(m => m.id !== movId);
+
+        await actualizarConfiguracionDB({
+            "configuracion.historial_ahorros": historialAhorros
+        });
+
+        await actualizarDashboard();
+        window.abrirModalHistorial();
+    } catch(err) {
+        console.error("Error al eliminar movimiento:", err);
+        alert("Error al eliminar la transacción: " + err.message);
+        window.mostrarCargando(false);
+    }
+};
+
+window.guardarConfiguracionAhorros = async function() {
+    window.mostrarCargando(true);
+    await actualizarConfiguracionDB({ 
+        "configuracion.cuentas_ahorro": cuentasAhorro, 
+        "configuracion.grupos_distribucion": gruposDistribucion, 
+        "configuracion.historial_ahorros": historialAhorros 
+    });
+    await actualizarDashboard();
 }
 
 function renderCuentasAhorro() {
     const cont = document.getElementById('contenedor-cuentas-ahorro');
     cont.innerHTML = '';
-    let totalAhorrosHistorico = 0, totalDepositadoMes = 0, ahorrosSumaMesActual = {}, ahorrosProyectado = {};
-    cuentasAhorro.forEach(c => { ahorrosSumaMesActual[c.id] = 0; ahorrosProyectado[c.id] = 0; });
     const dMep = parseFloat(document.getElementById('usd-mep').dataset.raw || 0);
 
-    for(let grupoName in gruposDistribucion) {
-        let totalGrupo = sumPorGrupo[grupoName] || 0;
-        (gruposDistribucion[grupoName] || []).forEach(it => {
-            if(it && it.ahorro_id && ahorrosSumaMesActual[it.ahorro_id] !== undefined) {
-                if (it.ahorrado) ahorrosSumaMesActual[it.ahorro_id] += (it.monto_ahorrado || 0);
-                else ahorrosProyectado[it.ahorro_id] += totalGrupo * (it.porc / 100);
-            }
-        });
-    }
-
+    let totalAhorrosHistorico = 0;
+    let totalNetoMes = 0;
     let htmlResumen = '';
-    
-    let cuentasOrdenadas = cuentasAhorro.map(c => {
-        let aporteMes = ahorrosSumaMesActual[c.id] || 0, proyMes = ahorrosProyectado[c.id] || 0, saldoAnt = c.saldo_anterior || 0, retiros = c.retiros || 0;
-        let sumaTotal = saldoAnt + aporteMes - retiros; 
-        return {...c, aporteMes, proyMes, saldoAnt, retiros, sumaTotal};
-    }).sort((a, b) => b.sumaTotal - a.sumaTotal);
 
-    cuentasOrdenadas.forEach(c => {
-        totalAhorrosHistorico += c.sumaTotal; if (c.depositado) totalDepositadoMes += c.aporteMes;
+    let cuentasCalculadas = cuentasAhorro.map(c => {
+        const totales = calcularTotalesCuenta(c.id);
+        return {
+            ...c,
+            ...totales
+        };
+    }).sort((a, b) => b.saldoFinal - a.saldoFinal);
 
-        if (c.aporteMes > 0 || c.proyMes > 0) htmlResumen += `<div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid var(--card-border); padding-bottom:5px;"><span>${c.nombre} ${c.depositado?'(Depositado)':''}</span> <strong style="color:#673ab7;">${window.formatearDinero(c.aporteMes)} <span style="font-size:10px; color:var(--text-muted); font-weight:normal;">+${window.formatearDinero(c.proyMes)} proy.</span></strong></div>`;
+    cuentasCalculadas.forEach(c => {
+        totalAhorrosHistorico += c.saldoFinal;
+        totalNetoMes += c.netoMes;
+
+        let netoTag = '';
+        if (c.netoMes > 0) {
+            netoTag = `<span style="font-size:11px; color:#137333; font-weight:600;"> (+${window.formatearDinero(c.netoMes)})</span>`;
+        } else if (c.netoMes < 0) {
+            netoTag = `<span style="font-size:11px; color:#c5221f; font-weight:600;"> (${window.formatearDinero(c.netoMes)})</span>`;
+        }
+
+        htmlResumen += `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid var(--card-border); padding-bottom:5px;">
+                <span>${c.nombre} ${c.depositado ? '✅' : ''}</span> 
+                <strong style="color:#673ab7;">${window.formatearDinero(c.saldoFinal)}${netoTag}</strong>
+            </div>`;
 
         cont.innerHTML += `
-            <div class="card tr-clickable" style="${c.depositado ? 'background-color: #e6f4ea; border: 2px solid #137333;' : 'border-top: 4px solid #673ab7; cursor: pointer;'} display:flex; flex-direction:column; justify-content:space-between;" onclick="window.toggleDepositoCuenta('${c.id}')">
+            <div class="card" style="${c.depositado ? 'background-color: #e6f4ea; border: 2px solid #137333;' : 'border-top: 4px solid #673ab7;'} display:flex; flex-direction:column; justify-content:space-between; gap: 15px;">
                 <div>
                     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                        <h3 style="font-size:15px; color:var(--text-main); font-weight:600; margin:0;">${c.depositado ? '✅ ' : '⏳ '}${c.nombre}</h3>
-                        <div onclick="event.stopPropagation();"><button class="btn-icon" onclick="window.rescatarAhorro('${c.id}')">💰</button><button class="btn-icon" onclick="window.editarCuentaAhorro('${c.id}')">✏️</button><button class="btn-icon" onclick="window.borrarCuentaAhorro('${c.id}')">🗑️</button></div>
+                        <h3 style="font-size:16px; color:var(--text-main); font-weight:600; margin:0; cursor:pointer;" onclick="window.toggleDepositoCuenta('${c.id}')" title="Clic para marcar/desmarcar conciliado">
+                            ${c.depositado ? '✅ ' : '⏳ '}${c.nombre}
+                        </h3>
+                        <div onclick="event.stopPropagation();">
+                            <button class="btn-icon" onclick="window.editarCuentaAhorro('${c.id}')" title="Editar nombre">✏️</button>
+                            <button class="btn-icon" onclick="window.borrarCuentaAhorro('${c.id}')" title="Eliminar cuenta">🗑️</button>
+                        </div>
                     </div>
-                    <div style="margin-top: 10px; display:flex; flex-direction:column; gap:2px;">
-                        ${c.saldoAnt > 0 ? `<div style="font-size:11px; color:var(--text-muted);">Saldo ant.: ${window.formatearDinero(c.saldoAnt)}</div>` : ''}
-                        <div style="font-size:11px; color:var(--text-muted);">Efectivizado mes: ${window.formatearDinero(c.aporteMes)}</div>
-                        ${c.proyMes > 0 ? `<div style="font-size:11px; color:#f29900;">Proyectado pendiente: ${window.formatearDinero(c.proyMes)}</div>` : ''}
-                        ${c.retiros !== 0 ? `<div style="font-size:11px; color:#d93025;">Retiros: -${window.formatearDinero(c.retiros)}</div>` : ''}
+                    
+                    <div style="margin-top: 12px; display:flex; flex-direction:column; gap:4px; font-size:12px;">
+                        <div style="color:var(--text-muted); display:flex; justify-content:space-between;">
+                            <span>Saldo ant. (inicial):</span> <b>${window.formatearDinero(c.saldoAnt)}</b>
+                        </div>
+                        ${c.ingresos > 0 ? `<div style="color:#137333; display:flex; justify-content:space-between;"><span>Ingresos del mes:</span> <b>+${window.formatearDinero(c.ingresos)}</b></div>` : ''}
+                        ${c.retiros > 0 ? `<div style="color:#c5221f; display:flex; justify-content:space-between;"><span>Retiros del mes:</span> <b>-${window.formatearDinero(c.retiros)}</b></div>` : ''}
                     </div>
-                    <div class="value" style="color:${c.depositado ? '#137333' : '#673ab7'}; font-size:24px; margin-top:5px;">${window.formatearDinero(c.sumaTotal)}</div>
-                    ${dMep > 0 ? `<div style="font-size:14px; color:var(--text-muted); margin-top:5px;">U$D ${(c.sumaTotal / dMep).toFixed(2)}</div>` : ''}
+
+                    <div style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed var(--card-border);">
+                        <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:600; letter-spacing:0.5px;">Saldo Total Acumulado</span>
+                        <div class="value" style="color:${c.depositado ? '#137333' : '#673ab7'}; font-size:24px; margin-top:2px;">${window.formatearDinero(c.saldoFinal)}</div>
+                        ${dMep > 0 ? `<div style="font-size:13px; color:var(--text-muted); margin-top:3px;">≈ U$D ${(c.saldoFinal / dMep).toFixed(2)}</div>` : ''}
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:8px; margin-top:5px;">
+                    <button class="btn-ahorro-action btn-ahorro-ingresar" onclick="window.abrirModalMovimiento('${c.id}', 'ingreso')">➕ Ingresar</button>
+                    <button class="btn-ahorro-action btn-ahorro-retirar" onclick="window.abrirModalMovimiento('${c.id}', 'retiro')">➖ Retirar</button>
                 </div>
             </div>`;
     });
-    if(cuentasOrdenadas.length === 0) cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro.</p>`;
-    document.getElementById('res-ahorros-list').innerHTML = htmlResumen === '' ? '<p style="color:var(--text-muted); font-size:13px;">No hay ahorros planificados este mes.</p>' : htmlResumen;
+
+    if(cuentasCalculadas.length === 0) {
+        cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro todavía. Haz clic en '➕ Nueva Cuenta' arriba.</p>`;
+    }
+
+    document.getElementById('res-ahorros-list').innerHTML = htmlResumen === '' ? '<p style="color:var(--text-muted); font-size:13px;">No hay cuentas de ahorro configuradas.</p>' : htmlResumen;
     document.getElementById('sum-ahorros-total').innerHTML = `<span>${window.formatearDinero(totalAhorrosHistorico)}</span> ${dMep > 0 ? `<span style="font-size:16px; color:var(--text-muted);">U$D ${(totalAhorrosHistorico / dMep).toFixed(2)}</span>` : ''}`;
-    document.getElementById('sum-ahorros-depositado').innerHTML = `<span>${window.formatearDinero(totalDepositadoMes)}</span> ${dMep > 0 ? `<span style="font-size:16px; color:var(--text-muted);">U$D ${(totalDepositadoMes / dMep).toFixed(2)}</span>` : ''}`;
+    
+    let mesNetoHtml = `${window.formatearDinero(totalNetoMes)}`;
+    if (totalNetoMes > 0) mesNetoHtml = `+${mesNetoHtml}`;
+    document.getElementById('sum-ahorros-depositado').innerHTML = `<span style="color:${totalNetoMes >= 0 ? '#137333' : '#c5221f'}">${mesNetoHtml}</span>`;
 }
 
+// =========================================================================
+// FASE 1: DISTRIBUCIÓN DE OBJETIVOS (PRESUPUESTO VISUAL)
+// =========================================================================
+
 window.crearNuevoGrupoDistribucion = function() {
-    const nombre = prompt("Nombre del nuevo Grupo de Distribución:");
+    const nombre = prompt("Nombre del nuevo Grupo de Distribución (Presupuesto):");
     if (nombre && nombre.trim() !== "") {
         if (gruposDistribucion[nombre.trim()]) return alert("Este grupo ya existe.");
-        gruposDistribucion[nombre.trim()] = [{ nombre: "Nuevo Objetivo", porc: 100, ahorrado: false, monto_ahorrado: 0 }];
+        gruposDistribucion[nombre.trim()] = [{ nombre: "Nuevo Objetivo", porc: 100 }];
         window.autoGuardarDistribucionEstructura(true);
     }
 };
@@ -958,138 +1194,191 @@ window.editarNombreGrupoDistribucion = async function(oldName) {
 }
 
 window.eliminarGrupoDistribucion = function(grupoName) {
-    if (confirm(`¿Estás seguro de borrar el grupo '${grupoName}'?`)) { delete gruposDistribucion[grupoName]; window.autoGuardarDistribucionEstructura(true); }
+    if (confirm(`¿Estás seguro de borrar el grupo de presupuesto '${grupoName}'?`)) { 
+        delete gruposDistribucion[grupoName]; 
+        window.autoGuardarDistribucionEstructura(true); 
+    }
 };
 
 window.agregarObjetivoLinea = function(grupoName) {
     if(!Array.isArray(gruposDistribucion[grupoName])) gruposDistribucion[grupoName] = [];
-    gruposDistribucion[grupoName].push({ nombre: "Nuevo Objetivo", porc: 0, ahorro_id: "", ahorrado: false, monto_ahorrado: 0 });
-    window.recargarDatosVisuales(); window.dispararDebounceAutoguardado();
+    gruposDistribucion[grupoName].push({ nombre: "Nuevo Objetivo", porc: 0 });
+    window.recargarDatosVisuales(); 
+    window.dispararDebounceAutoguardado();
 };
 
 window.eliminarObjetivoLinea = function(grupoName, index) {
-    if (confirm("¿Seguro que deseas eliminar este objetivo?")) { gruposDistribucion[grupoName].splice(index, 1); window.autoGuardarDistribucionEstructura(true); }
+    if (confirm("¿Seguro que deseas eliminar este objetivo?")) { 
+        gruposDistribucion[grupoName].splice(index, 1); 
+        window.autoGuardarDistribucionEstructura(true); 
+    }
 };
 
 window.actualizarDatoObjetivoMemory = function(grupoName, index, campo, valor) {
+    if (!gruposDistribucion[grupoName] || !gruposDistribucion[grupoName][index]) return;
     gruposDistribucion[grupoName][index][campo] = campo === 'porc' ? (parseFloat(window.parseMoney(valor)) || 0) : valor;
     window.dispararDebounceAutoguardado();
 };
 
-window.asignarAhorroObjetivo = function(grupoName, index, ahorroId) {
-    gruposDistribucion[grupoName][index].ahorro_id = ahorroId; window.dispararDebounceAutoguardado(); window.recargarDatosVisuales();
-}
-
-window.efectivizarAhorroObjetivo = async function(grupoName, index) {
-    let it = gruposDistribucion[grupoName][index];
-    if (!it.ahorro_id) return alert("Selecciona una Cuenta de Ahorro primero.");
-    
-    const totalDineroGrupo = sumPorGrupo[grupoName] || 0;
-    let monto = totalDineroGrupo * (it.porc / 100);
-
-    if (monto <= 0) return alert("No hay saldo disponible suficiente o el monto a guardar es 0.");
-
-    it.ahorrado = true; it.monto_ahorrado = monto;
-    let cuentaName = cuentasAhorro.find(c => c.id === it.ahorro_id)?.nombre || 'Cuenta eliminada';
-    
-    historialAhorros.unshift({ id: Date.now(), fecha: new Date().toLocaleString(), accion: 'Ahorrado', objetivo: it.nombre, cuenta: cuentaName, monto: monto });
-    window.autoGuardarDistribucionEstructura(true);
-};
-
-window.devolverAhorroObjetivo = async function(grupoName, index) {
-    if(!confirm("¿Deshacer este ahorro y devolver el dinero a Disponible?")) return;
-    let it = gruposDistribucion[grupoName][index];
-    let cuentaName = cuentasAhorro.find(c => c.id === it.ahorro_id)?.nombre || 'Cuenta eliminada';
-    historialAhorros.unshift({ id: Date.now(), fecha: new Date().toLocaleString(), accion: 'Devuelto', objetivo: it.nombre, cuenta: cuentaName, monto: it.monto_ahorrado });
-    it.ahorrado = false; it.monto_ahorrado = 0; window.autoGuardarDistribucionEstructura(true);
-};
-
 window.calcularBidireccionalLinea = function(grupoName, index, disparadoPor) {
-    const totalDineroGrupo = sumPorGrupo[grupoName] || 0, inpPct = document.getElementById(`pct-${grupoName}-${index}`), inpPesos = document.getElementById(`pesos-${grupoName}-${index}`);
+    const totalDineroGrupo = sumPorGrupo[grupoName] || 0;
+    const inpPct = document.getElementById(`pct-${grupoName}-${index}`);
+    const inpPesos = document.getElementById(`pesos-${grupoName}-${index}`);
+    if (!inpPct || !inpPesos) return;
+
     let pesosCalculados = 0;
     if (disparadoPor === 'pct') {
-        let pct = parseFloat(window.parseMoney(inpPct.value)) || 0; pesosCalculados = (totalDineroGrupo * (pct / 100));
-        inpPesos.dataset.raw = pesosCalculados; inpPesos.value = window.formatearDinero(pesosCalculados); gruposDistribucion[grupoName][index].porc = pct;
+        let pct = parseFloat(window.parseMoney(inpPct.value)) || 0; 
+        pesosCalculados = (totalDineroGrupo * (pct / 100));
+        inpPesos.dataset.raw = pesosCalculados; 
+        inpPesos.value = window.formatearDinero(pesosCalculados); 
+        if (gruposDistribucion[grupoName] && gruposDistribucion[grupoName][index]) {
+            gruposDistribucion[grupoName][index].porc = pct;
+        }
     } else {
-        pesosCalculados = parseFloat(window.parseMoney(inpPesos.value)) || 0; let pctCalculado = totalDineroGrupo > 0 ? ((pesosCalculados / totalDineroGrupo) * 100) : 0;
-        inpPct.dataset.raw = pctCalculado; inpPct.value = pctCalculado.toFixed(2); gruposDistribucion[grupoName][index].porc = parseFloat(pctCalculado);
+        pesosCalculados = parseFloat(window.parseMoney(inpPesos.value)) || 0; 
+        let pctCalculado = totalDineroGrupo > 0 ? ((pesosCalculados / totalDineroGrupo) * 100) : 0;
+        inpPct.dataset.raw = pctCalculado; 
+        inpPct.value = pctCalculado.toFixed(2); 
+        if (gruposDistribucion[grupoName] && gruposDistribucion[grupoName][index]) {
+            gruposDistribucion[grupoName][index].porc = parseFloat(pctCalculado);
+        }
     }
+
     const dMep = parseFloat(document.getElementById('usd-mep').dataset.raw || 0);
-    if (document.getElementById(`usd-calc-${grupoName}-${index}`) && dMep > 0) document.getElementById(`usd-calc-${grupoName}-${index}`).innerText = `U$D ${(pesosCalculados / dMep).toFixed(2)}`;
-    window.dispararDebounceAutoguardado(); window.recargarDatosVisuales();
+    const usdEl = document.getElementById(`usd-calc-${grupoName}-${index}`);
+    if (usdEl && dMep > 0) {
+        usdEl.innerText = `U$D ${(pesosCalculados / dMep).toFixed(2)}`;
+    }
+
+    window.dispararDebounceAutoguardado(); 
+    window.recargarDatosVisuales();
 };
 
 window.dispararDebounceAutoguardado = function() {
-    clearTimeout(debounceTimer); debounceTimer = setTimeout(() => { window.autoGuardarDistribucionEstructura(false); }, 800);
+    clearTimeout(debounceTimer); 
+    debounceTimer = setTimeout(() => { window.autoGuardarDistribucionEstructura(false); }, 800);
 }
 
 window.autoGuardarDistribucionEstructura = async function(recargarUI = false) {
     try {
         if(recargarUI) window.mostrarCargando(true);
-        await actualizarConfiguracionDB({ "configuracion.grupos_distribucion": gruposDistribucion, "configuracion.historial_ahorros": historialAhorros });
+        await actualizarConfiguracionDB({ 
+            "configuracion.grupos_distribucion": gruposDistribucion 
+        });
         if(recargarUI) await actualizarDashboard();
-    } catch(e) {}
+    } catch(e) {
+        console.error("Error al autoguardar distribucion:", e);
+    }
 }
 
 function renderDistribucionDirecta() {
-    const divDist = document.getElementById('tabla-distribucion'), resDist = document.getElementById('res-ingresos-dist');
+    const divDist = document.getElementById('tabla-distribucion');
+    const resDist = document.getElementById('res-ingresos-dist');
     divDist.innerHTML = '';
     const dMep = parseFloat(document.getElementById('usd-mep').dataset.raw || 0);
-    let totalDistribuibleGlobal = 0; sumPorGrupo = {};
     
-    if(listaIngresos) listaIngresos.forEach(ing => {
-        if (ing.grupo) {
-            let consumido = sumatoriaGastosPorOrigen[ing.id] || 0;
-            sumPorGrupo[ing.grupo] = (sumPorGrupo[ing.grupo] || 0) + (ing.monto - consumido);
-            totalDistribuibleGlobal += (ing.monto - consumido);
-        }
-    });
-    totalDistribuibleGlobal -= totalAhorrosEfectivizados;
+    let totalDistribuibleGlobal = 0; 
+    sumPorGrupo = {};
+    
+    if(listaIngresos) {
+        listaIngresos.forEach(ing => {
+            if (ing.grupo) {
+                let consumido = sumatoriaGastosPorOrigen[ing.id] || 0;
+                let disponible = ing.monto - consumido;
+                sumPorGrupo[ing.grupo] = (sumPorGrupo[ing.grupo] || 0) + disponible;
+                totalDistribuibleGlobal += disponible;
+            }
+        });
+    }
+
     let resHtml = '';
-    if(Object.keys(gruposDistribucion).length === 0) divDist.innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No hay grupos de distribución creados.</p>';
+    if(Object.keys(gruposDistribucion).length === 0) {
+        divDist.innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No hay grupos de distribución creados. Crea uno con el botón de arriba para presupuestar tus ingresos.</p>';
+    }
 
     for(let grupoName in gruposDistribucion) {
-        gruposDistribucion[grupoName].sort((a, b) => (b.porc || 0) - (a.porc || 0));
-        
         let totalGrupo = sumPorGrupo[grupoName] || 0;
         let cfgItems = Array.isArray(gruposDistribucion[grupoName]) ? gruposDistribucion[grupoName] : [];
-        let sumPorcentajesGrupo = cfgItems.reduce((acc, el) => acc + (el.porc || 0), 0);
+        cfgItems.sort((a, b) => (b.porc || 0) - (a.porc || 0));
         
-        let grupoAhorrado = 0; cfgItems.forEach(it => { if(it.ahorrado) grupoAhorrado += (it.monto_ahorrado || 0); });
-        let disponibleReal = totalGrupo - grupoAhorrado;
+        let sumPorcentajesGrupo = cfgItems.reduce((acc, el) => acc + (parseFloat(el.porc) || 0), 0);
+        let pctOk = Math.abs(sumPorcentajesGrupo - 100) < 0.1;
 
-        let htmlBlock = `<div style="background:var(--highlight-bg); border-radius:8px; padding:15px; margin-bottom:15px; border:1px solid var(--card-border);"><div style="display:flex; justify-content:space-between; margin-bottom:10px; align-items:center; flex-wrap:wrap; gap:5px;"><div style="display:flex; align-items:center; gap:5px;"><strong style="font-size:14px; color:var(--text-main);">${grupoName}</strong><button class="btn-icon" onclick="window.editarNombreGrupoDistribucion('${grupoName}')" style="font-size:12px;">✏️</button></div><div style="display:flex; align-items:center; gap:10px;"><span id="sum-card-pct-${grupoName}" style="font-size:12px; font-weight:bold; color:${Math.abs(sumPorcentajesGrupo - 100) < 0.1 ? 'green' : 'red'};">Total: ${sumPorcentajesGrupo.toFixed(2)}%</span><span style="font-weight:600; font-size:13px; color:#4285F4;">Disp. Restante: ${window.formatearDinero(disponibleReal)}</span><button class="btn-icon" onclick="window.eliminarGrupoDistribucion('${grupoName}')" title="Eliminar Grupo Completo">❌</button></div></div><div style="display:flex; flex-direction:column; gap:8px;">`;
+        let htmlBlock = `
+            <div style="background:var(--highlight-bg); border-radius:8px; padding:15px; margin-bottom:15px; border:1px solid var(--card-border);">
+                <div style="display:flex; justify-content:space-between; margin-bottom:12px; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <strong style="font-size:15px; color:var(--text-main);">${grupoName}</strong>
+                        <button class="btn-icon" onclick="window.editarNombreGrupoDistribucion('${grupoName}')" style="font-size:12px;" title="Editar nombre de grupo">✏️</button>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span id="sum-card-pct-${grupoName}" style="font-size:12px; font-weight:bold; color:${pctOk ? '#137333' : '#c5221f'};">
+                            Total: ${sumPorcentajesGrupo.toFixed(2)}%
+                        </span>
+                        <span style="font-weight:600; font-size:13px; color:#4285F4;">
+                            Disponible: ${window.formatearDinero(totalGrupo)}
+                        </span>
+                        <button class="btn-icon" onclick="window.eliminarGrupoDistribucion('${grupoName}')" title="Eliminar Grupo Completo">❌</button>
+                    </div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:8px;">`;
 
-        resHtml += `<strong style="font-size:13px; display:block; margin-top:10px;">${grupoName}:</strong><div style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">`;
+        resHtml += `<strong style="font-size:13px; display:block; margin-top:10px;">${grupoName} (${window.formatearDinero(totalGrupo)}):</strong><div style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">`;
 
         cfgItems.forEach((it, idx) => {
             if(!it) return;
-            let dineroCalculado = totalGrupo * ((it.porc || 0) / 100);
-            let opcionesAhorroHTML = cuentasAhorro.map(c => `<option value="${c.id}" ${it.ahorro_id === c.id ? 'selected':''}>${c.nombre}</option>`).join('');
+            let pctVal = parseFloat(it.porc) || 0;
+            let dineroCalculado = totalGrupo * (pctVal / 100);
 
-            if (it.ahorrado) {
-                htmlBlock += `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; background: #e6f4ea; padding: 8px; border-radius: 6px; border: 1px solid #137333;"><span style="flex:2; font-size:12px; font-weight:600; color:#137333;">🔒 ${it.nombre}</span><span style="width:60px; text-align:center; font-size:12px; color:#137333;">${Number(it.porc).toFixed(2)}%</span><span style="width:105px; font-size:13px; font-weight:bold; color:#137333;">${window.formatearDinero(it.monto_ahorrado)}</span><span style="width:110px; font-size:11px; color:#137333; font-style:italic;">-> ${cuentasAhorro.find(c => c.id === it.ahorro_id)?.nombre || 'Cta'}</span><button class="btn-icon" onclick="window.devolverAhorroObjetivo('${grupoName}', ${idx})" title="Deshacer">🔙</button></div>`;
-                resHtml += `<span style="color: #137333;">🔒 ${it.nombre} (${Number(it.porc).toFixed(2)}%):</span> ${window.formatearDinero(it.monto_ahorrado)}${dMep > 0 ? ` <span style="font-size:11px; color:var(--text-muted);">(U$D ${(it.monto_ahorrado/dMep).toFixed(2)})</span>` : ''}<br>`;
-            } else {
-                htmlBlock += `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;"><input type="text" value="${it.nombre}" style="flex:2; padding:5px; font-size:12px;" oninput="window.actualizarDatoObjetivoMemory('${grupoName}', ${idx}, 'nombre', this.value)" placeholder="Objetivo"><input type="text" id="pct-${grupoName}-${idx}" value="${Number(it.porc).toFixed(2)}" style="width:60px; padding:5px; font-size:12px; text-align:center;" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pct')" placeholder="%"><span style="font-size:11px;">%</span><div style="display:flex; flex-direction:column;"><input type="text" id="pesos-${grupoName}-${idx}" value="${window.formatearDinero(dineroCalculado)}" class="money-input" style="width:105px; padding:5px; font-size:12px;" data-raw="${dineroCalculado}" onfocus="window.onMoneyFocus(this)" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pesos'); window.onMoneyBlur(this, 'ARS')" placeholder="$"><div id="usd-calc-${grupoName}-${idx}" style="font-size:10px; color:var(--text-muted); text-align:center; margin-top:2px;">${dMep > 0 ? `U$D ${(dineroCalculado / dMep).toFixed(2)}` : ''}</div></div><select onchange="window.asignarAhorroObjetivo('${grupoName}', ${idx}, this.value)" style="width:110px; padding:4px; font-size:11px; background:var(--input-bg); color:var(--text-main); border:1px solid var(--card-border); border-radius:4px;"><option value="">-- Cuenta Ahorro --</option>${opcionesAhorroHTML}</select><button class="btn-icon" onclick="window.efectivizarAhorroObjetivo('${grupoName}', ${idx})" title="Ahorrar este monto">💰</button><button class="btn-icon" onclick="window.eliminarObjetivoLinea('${grupoName}', ${idx})">🗑️</button></div>`;
-                resHtml += `<span style="color: var(--text-main);">${it.nombre} (${Number(it.porc).toFixed(2)}%):</span> ${window.formatearDinero(dineroCalculado)}${dMep > 0 ? ` <span style="font-size:11px; color:var(--text-muted);">(U$D ${(dineroCalculado/dMep).toFixed(2)})</span>` : ''}<br>`;
-            }
+            htmlBlock += `
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <input type="text" value="${it.nombre}" style="flex:2; padding:6px; font-size:13px;" oninput="window.actualizarDatoObjetivoMemory('${grupoName}', ${idx}, 'nombre', this.value)" placeholder="Nombre del Objetivo">
+                    <div style="display:flex; align-items:center; gap:3px;">
+                        <input type="text" id="pct-${grupoName}-${idx}" value="${pctVal.toFixed(2)}" style="width:65px; padding:6px; font-size:13px; text-align:center;" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pct')" placeholder="%">
+                        <span style="font-size:12px; font-weight:600;">%</span>
+                    </div>
+                    <div style="display:flex; flex-direction:column;">
+                        <input type="text" id="pesos-${grupoName}-${idx}" value="${window.formatearDinero(dineroCalculado)}" class="money-input" style="width:115px; padding:6px; font-size:13px;" data-raw="${dineroCalculado}" onfocus="window.onMoneyFocus(this)" onblur="window.calcularBidireccionalLinea('${grupoName}', ${idx}, 'pesos'); window.onMoneyBlur(this, 'ARS')" placeholder="$">
+                        <div id="usd-calc-${grupoName}-${idx}" style="font-size:10px; color:var(--text-muted); text-align:center; margin-top:2px;">
+                            ${dMep > 0 ? `U$D ${(dineroCalculado / dMep).toFixed(2)}` : ''}
+                        </div>
+                    </div>
+                    <button class="btn-icon" onclick="window.eliminarObjetivoLinea('${grupoName}', ${idx})" title="Eliminar objetivo">🗑️</button>
+                </div>`;
+
+            resHtml += `<span style="color: var(--text-main);">${it.nombre} (${pctVal.toFixed(2)}%):</span> ${window.formatearDinero(dineroCalculado)}${dMep > 0 ? ` <span style="font-size:11px; color:var(--text-muted);">(U$D ${(dineroCalculado/dMep).toFixed(2)})</span>` : ''}<br>`;
         });
-        htmlBlock += `</div><button class="btn-black" style="margin-top:10px; padding:4px 12px; font-size:12px; background-color:var(--highlight-bg); color:var(--text-main); border:1px solid var(--card-border);" onclick="window.agregarObjetivoLinea('${grupoName}')">➕ Añadir Ítem Objetivo</button></div>`;
-        resHtml += `</div>`; divDist.innerHTML += htmlBlock;
+
+        htmlBlock += `</div><button class="btn-black" style="margin-top:12px; padding:5px 14px; font-size:12px; background-color:var(--highlight-bg); color:var(--text-main); border:1px solid var(--card-border);" onclick="window.agregarObjetivoLinea('${grupoName}')">➕ Añadir Objetivo</button></div>`;
+        resHtml += `</div>`; 
+        divDist.innerHTML += htmlBlock;
     }
-    resDist.innerHTML = `<div style="font-size: 18px; font-weight: bold; margin-bottom: 8px; color: #4285F4;">Disponible Total Libre: ${window.formatearDinero(totalDistribuibleGlobal)}</div>` + resHtml;
+
+    resDist.innerHTML = `<div style="font-size: 16px; font-weight: bold; margin-bottom: 8px; color: #4285F4;">Total Disponible en Grupos: ${window.formatearDinero(totalDistribuibleGlobal)}</div>` + resHtml;
 }
 
+// =========================================================================
+// INGRESOS Y GASTOS (CRUD Y PROCESAMIENTO)
+// =========================================================================
+
 window.abrirModalNuevoIngreso = function() {
-    document.getElementById('form-ingreso').reset(); document.getElementById('ingreso-id').value = ""; document.getElementById('titulo-modal-ingreso').innerText = "Nuevo Ingreso";
-    document.getElementById('ingreso-grupo').value = ""; document.getElementById('ingreso-monto').dataset.raw = ""; document.getElementById('modal-ingreso').style.display = 'flex';
+    document.getElementById('form-ingreso').reset(); 
+    document.getElementById('ingreso-id').value = ""; 
+    document.getElementById('titulo-modal-ingreso').innerText = "Nuevo Ingreso";
+    document.getElementById('ingreso-grupo').value = ""; 
+    document.getElementById('ingreso-monto').dataset.raw = ""; 
+    document.getElementById('modal-ingreso').style.display = 'flex';
 }
 
 window.abrirModalEditarIngreso = function(data) {
-    document.getElementById('ingreso-id').value = data.id; document.getElementById('ingreso-nombre').value = data.nombre;
-    document.getElementById('ingreso-monto').dataset.raw = data.monto; document.getElementById('ingreso-monto').value = window.formatearDinero(data.monto, 'ARS');
-    document.getElementById('ingreso-grupo').value = data.grupo || ""; document.getElementById('titulo-modal-ingreso').innerText = "Editar Ingreso"; document.getElementById('modal-ingreso').style.display = 'flex';
+    document.getElementById('ingreso-id').value = data.id; 
+    document.getElementById('ingreso-nombre').value = data.nombre;
+    document.getElementById('ingreso-monto').dataset.raw = data.monto; 
+    document.getElementById('ingreso-monto').value = window.formatearDinero(data.monto, 'ARS');
+    document.getElementById('ingreso-grupo').value = data.grupo || ""; 
+    document.getElementById('titulo-modal-ingreso').innerText = "Editar Ingreso"; 
+    document.getElementById('modal-ingreso').style.display = 'flex';
 }
 
 document.getElementById('form-gasto').addEventListener('submit', async (e) => {
@@ -1120,31 +1409,47 @@ document.getElementById('form-gasto').addEventListener('submit', async (e) => {
     if (idGasto) await updateDoc(doc(db, "finanzas", obtenerMesId(), "gastos", idGasto), datosGasto);
     else await addDoc(collection(db, "finanzas", obtenerMesId(), "gastos"), datosGasto);
     
-    window.cerrarModal('modal-gasto'); await actualizarDashboard();
+    window.cerrarModal('modal-gasto'); 
+    await actualizarDashboard();
 });
 
 document.getElementById('form-ingreso').addEventListener('submit', async (e) => {
-    e.preventDefault(); window.mostrarCargando(true);
+    e.preventDefault(); 
+    window.mostrarCargando(true);
     const id = document.getElementById('ingreso-id').value;
-    const data = { nombre: document.getElementById('ingreso-nombre').value, monto: parseFloat(document.getElementById('ingreso-monto').dataset.raw || window.parseMoney(document.getElementById('ingreso-monto').value)), grupo: document.getElementById('ingreso-grupo').value };
+    const data = { 
+        nombre: document.getElementById('ingreso-nombre').value, 
+        monto: parseFloat(document.getElementById('ingreso-monto').dataset.raw || window.parseMoney(document.getElementById('ingreso-monto').value)), 
+        grupo: document.getElementById('ingreso-grupo').value 
+    };
     if(id) await updateDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", id), data);
     else await addDoc(collection(db, "finanzas", obtenerMesId(), "ingresos"), data);
-    window.cerrarModal('modal-ingreso'); await actualizarDashboard();
+    window.cerrarModal('modal-ingreso'); 
+    await actualizarDashboard();
 });
 
 window.borrarIngreso = async function(id) { 
     if(!confirm("¿Estás seguro de eliminar este ingreso?")) return;
-    window.mostrarCargando(true); await deleteDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", id)); await actualizarDashboard(); 
+    window.mostrarCargando(true); 
+    await deleteDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", id)); 
+    await actualizarDashboard(); 
 };
 
 window.borrarGasto = async function(id) { 
     if(!confirm("¿Estás seguro de eliminar este gasto?")) return;
-    window.mostrarCargando(true); await deleteDoc(doc(db, "finanzas", obtenerMesId(), "gastos", id)); await actualizarDashboard(); 
+    window.mostrarCargando(true); 
+    await deleteDoc(doc(db, "finanzas", obtenerMesId(), "gastos", id)); 
+    await actualizarDashboard(); 
 };
 
 function renderTablaIngresos(gastosProc) {
-    const tabla = document.getElementById('tabla-ingresos'); tabla.innerHTML = ''; 
-    totalIngresosGlobal = 0; let totalDisponibleGlobalIngresos = 0; let chartLabels = []; let chartData = []; let chartColors = [];
+    const tabla = document.getElementById('tabla-ingresos'); 
+    tabla.innerHTML = ''; 
+    totalIngresosGlobal = 0; 
+    let totalDisponibleGlobalIngresos = 0; 
+    let chartLabels = []; 
+    let chartData = []; 
+    let chartColors = [];
 
     if (!Array.isArray(gastosProc)) {
         const dDebito = parseFloat(document.getElementById('usd-debito').dataset.raw || 0), dImpuesto = parseFloat(document.getElementById('usd-impuesto').dataset.raw || 0);
@@ -1157,18 +1462,30 @@ function renderTablaIngresos(gastosProc) {
 
         listaIngresos.forEach((data, index) => {
             if (filter && !data.nombre.toLowerCase().includes(filter)) return;
-            let assignedColor = colorPalette[index % colorPalette.length]; totalIngresosGlobal += data.monto;
-            let disponibleReal = data.monto - (sumatoriaGastosPorOrigen[data.id] || 0); totalDisponibleGlobalIngresos += disponibleReal;
-            chartLabels.push(data.nombre); chartData.push(data.monto); chartColors.push(assignedColor);
+            let assignedColor = colorPalette[index % colorPalette.length]; 
+            totalIngresosGlobal += data.monto;
+            
+            let disponibleReal = data.monto - (sumatoriaGastosPorOrigen[data.id] || 0); 
+            totalDisponibleGlobalIngresos += disponibleReal;
+            
+            chartLabels.push(data.nombre); 
+            chartData.push(data.monto); 
+            chartColors.push(assignedColor);
 
             let gastosAsociados = gastosProc.filter(g => g.propietario !== 'Tercero' && getOrigenIdDeGasto(g) === data.id);
-            const trMain = document.createElement('tr'); trMain.className = "tr-clickable"; 
+            const trMain = document.createElement('tr'); 
+            trMain.className = "tr-clickable"; 
             trMain.onclick = function() { window.prepararEdicionIngreso(data.id); };
             
-            trMain.innerHTML = `<td><div style="display:flex; align-items:center; gap:8px;"><button class="btn-icon" style="padding:0; font-size:10px; color:var(--text-muted);" onclick="event.stopPropagation(); window.toggleIngresoDetalle('${data.id}')" id="icon-ingreso-${data.id}">▶</button><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${assignedColor};"></span><strong>${data.nombre}</strong></div></td><td><span style="background:var(--highlight-bg); padding:2px 6px; border-radius:4px; font-size:11px;">${data.grupo || 'Ninguno'}</span></td><td style="color:var(--text-muted);">${window.formatearDinero(data.monto)}</td><td style="font-weight:600; color:${disponibleReal < 0 ? '#d93025' : '#137333'}">${window.formatearDinero(disponibleReal)}</td><td style="white-space: nowrap;"><button class="btn-icon" onclick="event.stopPropagation(); window.borrarIngreso('${data.id}')">🗑️</button></td>`;
+            let rescateTag = data.es_rescate ? ` <span style="font-size:10px; background:#e8f0fe; color:#174ea6; padding:2px 4px; border-radius:4px;">Ahorro Rescatado</span>` : '';
+
+            trMain.innerHTML = `<td><div style="display:flex; align-items:center; gap:8px;"><button class="btn-icon" style="padding:0; font-size:10px; color:var(--text-muted);" onclick="event.stopPropagation(); window.toggleIngresoDetalle('${data.id}')" id="icon-ingreso-${data.id}">▶</button><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${assignedColor};"></span><strong>${data.nombre}</strong>${rescateTag}</div></td><td><span style="background:var(--highlight-bg); padding:2px 6px; border-radius:4px; font-size:11px;">${data.grupo || 'Ninguno'}</span></td><td style="color:var(--text-muted);">${window.formatearDinero(data.monto)}</td><td style="font-weight:600; color:${disponibleReal < 0 ? '#d93025' : '#137333'}">${window.formatearDinero(disponibleReal)}</td><td style="white-space: nowrap;"><button class="btn-icon" onclick="event.stopPropagation(); window.borrarIngreso('${data.id}')">🗑️</button></td>`;
             tabla.appendChild(trMain);
 
-            const trDetail = document.createElement('tr'); trDetail.id = `detalle-ingreso-${data.id}`; trDetail.className = "details-row"; trDetail.style.display = "none";
+            const trDetail = document.createElement('tr'); 
+            trDetail.id = `detalle-ingreso-${data.id}`; 
+            trDetail.className = "details-row"; 
+            trDetail.style.display = "none";
             trDetail.innerHTML = `<td colspan="5" style="padding: 10px 15px; background-color: var(--highlight-bg); border-bottom: 2px solid var(--card-border);"><div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;"><span style="font-size: 13px; font-weight: 600;">Gastos de este origen</span><input type="text" placeholder="Buscar gasto..." style="padding: 4px 8px; font-size: 11px; border: 1px solid var(--card-border); border-radius: 4px; width: 150px;" onkeyup="window.filtrarGastosIngreso('${data.id}', this.value)"></div><ul id="lista-gastos-ingreso-${data.id}" style="list-style: none; padding: 0; margin: 0; font-size: 12px; color: var(--text-muted); display:flex; flex-direction:column; gap:4px; max-height: 200px; overflow-y: auto;">${gastosAsociados.length > 0 ? gastosAsociados.map(g => `<li class="gasto-item-origen" data-nombre="${g.nombre.toLowerCase()}"><span style="display:inline-block; width:90px; font-weight:600; color:var(--text-main);">${window.formatearDinero(g.costoCalculado)}</span> - <span>${g.nombre} <i style="color:var(--text-muted); font-size:10px;">(${g.categoria})</i></span></li>`).join('') : '<li style="color:var(--text-muted); font-style:italic;">No hay gastos descontados de este origen</li>'}</ul></td>`;
             tabla.appendChild(trDetail);
         });
@@ -1177,82 +1494,106 @@ function renderTablaIngresos(gastosProc) {
     document.getElementById('sum-ingresos-mes').innerText = window.formatearDinero(totalIngresosGlobal);
     document.getElementById('sum-ingresos-disponible').innerText = `${window.formatearDinero(totalDisponibleGlobalIngresos)} Disp.`;
     document.getElementById('res-ingresos-mes').innerText = window.formatearDinero(totalIngresosGlobal);
+    
     if (chartIngresos) chartIngresos.destroy();
-    chartIngresos = new Chart(document.getElementById('chart-ingresos-mes').getContext('2d'), { type: 'pie', data: { labels: chartLabels, datasets: [{ data: chartData, backgroundColor: chartColors }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
+    chartIngresos = new Chart(document.getElementById('chart-ingresos-mes').getContext('2d'), { 
+        type: 'pie', 
+        data: { labels: chartLabels, datasets: [{ data: chartData, backgroundColor: chartColors }] }, 
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } 
+    });
 }
 
 function calcularBalance() {
-    const balance = totalIngresosGlobal - totalGastosGlobal - totalAhorrosEfectivizados;
+    const balance = totalIngresosGlobal - totalGastosGlobal;
     const bElement = document.getElementById('res-balance');
     bElement.innerText = window.formatearDinero(balance);
     bElement.style.color = balance >= 0 ? '#137333' : '#d93025';
 
     if (chartResumen) chartResumen.destroy();
     chartResumen = new Chart(document.getElementById('chart-resumen').getContext('2d'), {
-        type: 'pie', data: { labels: ['Gastos Totales', 'Ahorrado Congelado', 'Disponible Libre'], datasets: [{ data: [totalGastosGlobal, totalAhorrosEfectivizados, balance > 0 ? balance : 0], backgroundColor: ['#EA4335', '#9c27b0', '#4285F4'] }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: {boxWidth: 10, font: {size: 10}} } } }
+        type: 'pie', 
+        data: { 
+            labels: ['Gastos Totales', 'Disponible Libre'], 
+            datasets: [{ 
+                data: [totalGastosGlobal, balance > 0 ? balance : 0], 
+                backgroundColor: ['#EA4335', '#34A853'] 
+            }] 
+        },
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            plugins: { legend: { position: 'right', labels: {boxWidth: 10, font: {size: 10}} } } 
+        }
     });
 }
 
 async function cargarEstadisticasAnuales() {
-    const anio = anioSelector.value; const meses = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']; const nombresMeses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const anio = anioSelector.value; 
+    const meses = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']; 
+    const nombresMeses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     let ingresosData = new Array(12).fill(0), gastosData = new Array(12).fill(0), ahorrosData = new Array(12).fill(0);
     window.mostrarCargando(true);
 
     const promesas = meses.map(async (mes, index) => {
-        const mesId = `${anio}-${mes}`; const docSnap = await getDoc(doc(db, "finanzas", mesId));
-        let dDebito = 0, dImpuesto = 0, gruposDistLocal = {}, tiposGastoLocal = {};
+        const mesId = `${anio}-${mes}`; 
+        const docSnap = await getDoc(doc(db, "finanzas", mesId));
+        let dDebito = 0, dImpuesto = 0, historialMes = [];
+        
         if (docSnap.exists() && docSnap.data().configuracion) {
-            dDebito = docSnap.data().configuracion.dolar_debito || 0; dImpuesto = docSnap.data().configuracion.dolar_impuesto || 0;
-            gruposDistLocal = docSnap.data().configuracion.grupos_distribucion || {};
-            let oldTipos = docSnap.data().configuracion.tipos_gasto || {};
-            for(let k in oldTipos) {
-                if (typeof oldTipos[k] === 'string') oldTipos[k] = oldTipos[k] !== "" ? [oldTipos[k]] : [];
-                else if (!Array.isArray(oldTipos[k])) oldTipos[k] = Object.values(oldTipos[k]);
-            }
-            tiposGastoLocal = oldTipos;
+            dDebito = docSnap.data().configuracion.dolar_debito || 0; 
+            dImpuesto = docSnap.data().configuracion.dolar_impuesto || 0;
+            historialMes = docSnap.data().configuracion.historial_ahorros || [];
         }
 
-        let sumatoriaGastosPorOrigenLocal = {}, totalGas = 0;
+        let totalGas = 0;
         const gasSnap = await getDocs(collection(db, "finanzas", mesId, "gastos"));
         gasSnap.forEach(d => {
-            let g = d.data(); if (g.propietario === 'Tercero') return;
+            let g = d.data(); 
+            if (g.propietario === 'Tercero') return;
             let cuotaTotal = getCostoCalculado(g, dDebito, dImpuesto);
             let costoCalculado = cuotaTotal;
             if (g.compartir_con && g.compartir_tipo) {
                 costoCalculado = g.compartir_tipo === 'divisor' ? cuotaTotal / (g.divisor || 2) : (g.monto_fijo || 0);
             }
             totalGas += costoCalculado;
-            if(!g.ignorar_origen) {
-                let origenesPanel = tiposGastoLocal[g.categoria || "Fijos"] || []; let origenId = g.id_origen || (origenesPanel.length > 0 ? origenesPanel[0] : null);
-                if (origenId) sumatoriaGastosPorOrigenLocal[origenId] = (sumatoriaGastosPorOrigenLocal[origenId] || 0) + costoCalculado;
-            }
         });
         gastosData[index] = totalGas;
 
-        let sumPorGrupoLocal = {}, totalIng = 0; 
+        let totalIng = 0; 
         const ingSnap = await getDocs(collection(db, "finanzas", mesId, "ingresos"));
         ingSnap.forEach(d => { 
-            let ing = {id: d.id, ...d.data()}; totalIng += ing.monto; 
-            if (ing.grupo) sumPorGrupoLocal[ing.grupo] = (sumPorGrupoLocal[ing.grupo] || 0) + (ing.monto - (sumatoriaGastosPorOrigenLocal[ing.id] || 0));
+            let ing = d.data(); 
+            totalIng += (parseFloat(ing.monto) || 0); 
         });
         ingresosData[index] = totalIng;
 
-        let totalAhorroMes = 0;
-        for(let gName in gruposDistLocal) {
-            (Array.isArray(gruposDistLocal[gName]) ? gruposDistLocal[gName] : []).forEach(it => {
-                if (it && it.ahorro_id && it.ahorrado) totalAhorroMes += (it.monto_ahorrado || 0);
-            });
-        }
-        ahorrosData[index] = totalAhorroMes;
+        let totalAhorroIngresado = 0;
+        historialMes.forEach(m => {
+            if (m.tipo === 'ingreso') totalAhorroIngresado += (parseFloat(m.monto) || 0);
+        });
+        ahorrosData[index] = totalAhorroIngresado;
     });
 
     await Promise.all(promesas);
 
     if (chartEstadisticas) chartEstadisticas.destroy();
     chartEstadisticas = new Chart(document.getElementById('chart-estadisticas').getContext('2d'), {
-        type: 'bar', data: { labels: nombresMeses, datasets: [{ label: 'Ingresos', data: ingresosData, backgroundColor: '#34A853' }, { label: 'Gastos Propios', data: gastosData, backgroundColor: '#EA4335' }, { label: 'Ahorro Planificado', data: ahorrosData, backgroundColor: '#9C27B0' }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } }, tooltips: { callbacks: { label: function(t, d) { return window.formatearDinero(t.yLabel); } } } }
+        type: 'bar', 
+        data: { 
+            labels: nombresMeses, 
+            datasets: [
+                { label: 'Ingresos', data: ingresosData, backgroundColor: '#34A853' }, 
+                { label: 'Gastos Propios', data: gastosData, backgroundColor: '#EA4335' }, 
+                { label: 'Ahorro Depositado', data: ahorrosData, backgroundColor: '#9C27B0' }
+            ] 
+        },
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            plugins: { legend: { position: 'bottom' } }, 
+            scales: { y: { beginAtZero: true } }, 
+            tooltips: { callbacks: { label: function(t, d) { return window.formatearDinero(t.yLabel); } } } 
+        }
     });
     window.mostrarCargando(false);
 }
@@ -1295,18 +1636,68 @@ window.procesarCSV = async function() {
     reader.readAsText(input.files[0]);
 };
 
+// =========================================================================
+// FASE 3: IMPORTACIÓN Y TRASPASO MENSUAL CON SALDOS HISTÓRICOS ABSOLUTOS
+// =========================================================================
+
 window.copiarMesAnterior = async function() {
-    if(!confirm("¿Importar todos los datos y saldo acumulado de ahorros del mes anterior?")) return;
+    if(!confirm("¿Importar todos los datos, gastos recurrentes, cuotas y arrastre de saldo final de ahorros del mes anterior?")) return;
     window.mostrarCargando(true);
-    let m = parseInt(mesSelector.value)-1, a = parseInt(anioSelector.value);
+    let m = parseInt(mesSelector.value) - 1, a = parseInt(anioSelector.value);
     if(m === 0){ m = 12; a--; }
     const prev = `${a}-${m.toString().padStart(2, '0')}`, actual = obtenerMesId();
+    
     try {
         const prevDocSnap = await getDoc(doc(db, "finanzas", prev));
         let prevData = prevDocSnap.exists() ? prevDocSnap.data() : { configuracion: {} };
-        let prevConfig = prevData.configuracion || {}, dDebito = prevConfig.dolar_debito || 0, dImpuesto = prevConfig.dolar_impuesto || 0, prevTipos = prevConfig.tipos_gasto || {}, prevDist = prevConfig.grupos_distribucion || {}, prevCuentas = prevConfig.cuentas_ahorro || [];
+        let prevConfig = prevData.configuracion || {};
+        let prevTipos = prevConfig.tipos_gasto || {};
+        let prevDist = prevConfig.grupos_distribucion || {};
+        let prevCuentas = prevConfig.cuentas_ahorro || [];
+        let prevHistorial = prevConfig.historial_ahorros || [];
         
-        let sumatoriaGastosPrev = {};
+        // 1. Limpieza de grupos de distribución para presupuesto limpio
+        let cleanDist = {};
+        for (let gName in prevDist) {
+            let items = Array.isArray(prevDist[gName]) ? prevDist[gName] : Object.values(prevDist[gName]);
+            cleanDist[gName] = items.filter(it => it !== null).map(it => ({
+                nombre: it.nombre || "Objetivo",
+                porc: typeof it.porc === 'number' ? it.porc : (parseFloat(it.porc) || 0)
+            }));
+        }
+
+        // 2. Cálculo del Saldo Final Absoluto de cada cuenta de ahorro del mes pasado
+        let nuevasCuentas = prevCuentas.map(c => {
+            let movsCuenta = prevHistorial.filter(m => m.cuenta_id === c.id);
+            let ingMes = movsCuenta.filter(m => m.tipo === 'ingreso').reduce((sum, m) => sum + (parseFloat(m.monto) || 0), 0);
+            let retMes = movsCuenta.filter(m => m.tipo === 'retiro').reduce((sum, m) => sum + (parseFloat(m.monto) || 0), 0);
+            let saldoAnt = parseFloat(c.saldo_anterior) || 0;
+            
+            // Soporte para datos legacy si existían
+            if (c.retiros) retMes += (parseFloat(c.retiros) || 0);
+
+            let saldoFinalAbsoluto = saldoAnt + ingMes - retMes;
+            return {
+                id: c.id,
+                nombre: c.nombre,
+                depositado: false,
+                saldo_anterior: saldoFinalAbsoluto
+            };
+        });
+
+        // 3. Preparar nueva configuración para el mes
+        let nuevaConfiguracion = {
+            dolar_mep: prevConfig.dolar_mep || 0,
+            dolar_debito: prevConfig.dolar_debito || 0,
+            dolar_impuesto: prevConfig.dolar_impuesto || 0,
+            tipos_gasto: prevTipos,
+            orden_paneles_gasto: prevConfig.orden_paneles_gasto || Object.keys(prevTipos),
+            grupos_distribucion: cleanDist,
+            cuentas_ahorro: nuevasCuentas,
+            historial_ahorros: [] // Inicia nuevo ciclo mensual de movimientos
+        };
+
+        // 4. Copiar Gastos (Incrementando cuotas y filtrando recurrentes)
         const snapG = await getDocs(collection(db, "finanzas", prev, "gastos"));
         let prevGastosToCopy = [];
         
@@ -1334,46 +1725,24 @@ window.copiarMesAnterior = async function() {
             if (gCopy) {
                 prevGastosToCopy.push(gCopy);
             }
-
-            if(g.propietario !== 'Tercero' && !g.ignorar_origen) {
-                let cuotaTotal = getCostoCalculado(g, dDebito, dImpuesto);
-                let costo = cuotaTotal;
-                if (g.compartir_con && g.compartir_tipo) {
-                    costo = g.compartir_tipo === 'divisor' ? cuotaTotal / (g.divisor || 2) : (g.monto_fijo || 0);
-                }
-                let origenesPanel = prevTipos[g.categoria || "Fijos"] || [];
-                let origenId = g.id_origen || (origenesPanel.length > 0 ? origenesPanel[0] : null);
-                if (origenId) sumatoriaGastosPrev[origenId] = (sumatoriaGastosPrev[origenId] || 0) + costo;
-            }
         });
         
-        let sumPorGrupoPrev = {};
+        // 5. Copiar Ingresos habituales (excluyendo rescates automáticos de un solo mes)
         const snapI = await getDocs(collection(db, "finanzas", prev, "ingresos"));
         let prevIngresosToCopy = [];
         
         snapI.forEach(d => {
             let ing = d.data();
             ing.id = d.id;
-            prevIngresosToCopy.push(ing);
-            if (ing.grupo) sumPorGrupoPrev[ing.grupo] = (sumPorGrupoPrev[ing.grupo] || 0) + (ing.monto - (sumatoriaGastosPrev[ing.id] || 0));
+            if (!ing.es_rescate) {
+                prevIngresosToCopy.push(ing);
+            }
         });
-        
-        let ahorrosSumaPrev = {};
-        for(let gName in prevDist) {
-            (Array.isArray(prevDist[gName]) ? prevDist[gName] : []).forEach(it => {
-                if (it && it.ahorro_id && it.ahorrado) ahorrosSumaPrev[it.ahorro_id] = (ahorrosSumaPrev[it.ahorro_id] || 0) + (it.monto_ahorrado || 0);
-            });
-        }
-        
-        let nuevasCuentas = prevCuentas.map(c => {
-            return { id: c.id, nombre: c.nombre, depositado: false, saldo_anterior: (c.saldo_anterior || 0) + (ahorrosSumaPrev[c.id] || 0) - (c.retiros || 0), retiros: 0 };
-        });
-        prevConfig.cuentas_ahorro = nuevasCuentas;
 
-        // EJECUCIÓN ATÓMICA CON BATCH WRITE DE FIRESTORE
+        // 6. Ejecución atómica en Firestore con writeBatch
         const batch = writeBatch(db);
         const actualRef = doc(db, "finanzas", actual);
-        batch.set(actualRef, { configuracion: prevConfig }, { merge: true });
+        batch.set(actualRef, { configuracion: nuevaConfiguracion }, { merge: true });
         
         let gCount = 0;
         prevGastosToCopy.forEach(g => {
@@ -1394,7 +1763,7 @@ window.copiarMesAnterior = async function() {
         });
 
         await batch.commit();
-        alert(`¡Importación exitosa! Se copiaron ${gCount} gastos (incluyendo suscripciones como Capcut) y ${iCount} ingresos.`);
+        alert(`¡Importación exitosa! Se copiaron ${gCount} gastos, ${iCount} ingresos y se actualizaron los saldos iniciales de las cuentas de ahorro.`);
         await actualizarDashboard();
     } catch (e) {
         console.error(e);

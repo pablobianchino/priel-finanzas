@@ -1,12 +1,67 @@
 export const vistaModales = `
 <!-- Modal Historial Ahorros -->
 <div id="modal-historial" class="modal-overlay">
-    <div class="modal-content" style="max-width: 600px;">
+    <div class="modal-content" style="max-width: 650px;">
         <div class="modal-header">
-            <h2 style="margin: 0; font-size: 18px;">Historial de Ahorros y Retiros</h2>
+            <h2 style="margin: 0; font-size: 18px;">Historial de Movimientos de Ahorro</h2>
             <button class="modal-close" onclick="window.cerrarModal('modal-historial')">✖</button>
         </div>
-        <div id="historial-lista" style="max-height: 400px; overflow-y: auto; font-size: 13px;"></div>
+        <div id="historial-lista" style="max-height: 450px; overflow-y: auto; font-size: 13px;"></div>
+    </div>
+</div>
+
+<!-- Modal Ingreso / Retiro Manual de Cuenta de Ahorro -->
+<div id="modal-movimiento-ahorro" class="modal-overlay">
+    <div class="modal-content" style="max-width: 450px;">
+        <div class="modal-header">
+            <h2 style="margin: 0; font-size: 18px;" id="titulo-modal-movimiento">Movimiento de Ahorro</h2>
+            <button class="modal-close" onclick="window.cerrarModal('modal-movimiento-ahorro')">✖</button>
+        </div>
+        <form id="form-movimiento-ahorro" style="display: flex; flex-direction: column; gap: 15px;">
+            <input type="hidden" id="movimiento-cuenta-id">
+            <input type="hidden" id="movimiento-tipo">
+            <div>
+                <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 5px;" id="label-cuenta-nombre">Cuenta:</label>
+                <input type="text" id="movimiento-cuenta-nombre" readonly style="width: 100%; font-weight: 600; background: var(--highlight-bg);">
+            </div>
+            <div>
+                <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 5px;">Monto:</label>
+                <input type="text" id="movimiento-monto" class="money-input" placeholder="Monto Total ARS" required onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')" style="width: 100%; font-size: 16px; font-weight: bold;">
+            </div>
+            <div>
+                <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 5px;">Motivo / Detalle (Opcional):</label>
+                <input type="text" id="movimiento-motivo" placeholder="Ej. Ahorro del mes, Rescate para gastos..." style="width: 100%;">
+            </div>
+            <p id="movimiento-ayuda" style="font-size: 11px; color: var(--text-muted); margin: 0;"></p>
+            <button type="submit" class="btn-black" id="btn-submit-movimiento" style="margin-top: 10px;">Confirmar</button>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Editar Movimiento de Ahorro -->
+<div id="modal-editar-movimiento" class="modal-overlay">
+    <div class="modal-content" style="max-width: 450px;">
+        <div class="modal-header">
+            <h2 style="margin: 0; font-size: 18px;" id="titulo-modal-editar-mov">Editar Transacción</h2>
+            <button class="modal-close" onclick="window.cerrarModal('modal-editar-movimiento')">✖</button>
+        </div>
+        <form id="form-editar-movimiento" style="display: flex; flex-direction: column; gap: 15px;">
+            <input type="hidden" id="edit-mov-id">
+            <div>
+                <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 5px;">Cuenta:</label>
+                <input type="text" id="edit-mov-cuenta" readonly style="width: 100%; font-weight: 600; background: var(--highlight-bg);">
+            </div>
+            <div>
+                <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 5px;">Monto:</label>
+                <input type="text" id="edit-mov-monto" class="money-input" required onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')" style="width: 100%; font-size: 16px; font-weight: bold;">
+            </div>
+            <div>
+                <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 5px;">Motivo / Detalle:</label>
+                <input type="text" id="edit-mov-motivo" placeholder="Detalle..." style="width: 100%;">
+            </div>
+            <p id="edit-mov-ayuda" style="font-size: 11px; color: var(--text-muted); margin: 0;"></p>
+            <button type="submit" class="btn-black" style="margin-top: 10px;">Guardar Cambios</button>
+        </form>
     </div>
 </div>
 
@@ -83,7 +138,7 @@ export const vistaModales = `
             <input type="text" id="ingreso-nombre" placeholder="Origen (ej. Mandala Ensambles)" required>
             <input type="text" id="ingreso-monto" class="money-input" placeholder="Monto Total ARS" required onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')">
             <div>
-                <label style="font-size: 13px; color: var(--text-muted);">Vincular a Grupo de Distribución:</label>
+                <label style="font-size: 13px; color: var(--text-muted);">Vincular a Grupo de Distribución (Presupuesto):</label>
                 <select id="ingreso-grupo" style="width:100%; margin-top:5px;"></select>
             </div>
             <button type="submit" class="btn-black" id="btn-submit-ingreso" style="margin-top: 10px;">Guardar Ingreso</button>
