@@ -34,14 +34,11 @@ body {
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
 #loading-screen {
-    display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(255,255,255,0.9); z-index: 4000; justify-content: center; align-items: center; flex-direction: column;
-}
-body.dark-mode #loading-screen {
-    background: rgba(18, 18, 18, 0.9);
+    display: flex; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: var(--bg-color); z-index: 4000; justify-content: center; align-items: center; flex-direction: column;
 }
 
-.login-wrapper { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; width: 100vw; background-color: var(--bg-color); position: absolute; top: 0; left: 0; z-index: 3000; }
+.login-wrapper { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100vh; width: 100vw; background-color: var(--bg-color); position: absolute; top: 0; left: 0; z-index: 3000; }
 .login-box { background: var(--card-bg); padding: 40px; border-radius: 16px; text-align: center; width: 280px; border: 1px solid var(--card-border); }
 .login-box h1 { margin-top: 0; font-size: 22px; font-weight: 600; color: var(--text-main); }
 .google-btn { background: var(--card-bg); color: var(--text-main); border: 1px solid var(--card-border); padding: 12px 20px; border-radius: 10px; font-size: 15px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; margin-top: 30px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }

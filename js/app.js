@@ -96,7 +96,12 @@ window.onMoneyFocus = function(el) {
     }
 };
 
-window.mostrarCargando = function(show) { document.getElementById('loading-screen').style.display = show ? 'flex' : 'none'; }
+window.mostrarCargando = function(show, text = "Cargando datos...") { 
+    const el = document.getElementById('loading-screen');
+    const txt = document.getElementById('loading-text');
+    if (txt && text) txt.innerText = text;
+    if (el) el.style.display = show ? 'flex' : 'none'; 
+}
 window.cerrarModal = function(id) { document.getElementById(id).style.display = 'none'; }
 
 window.toggleCard = function(headerEl) {
@@ -182,23 +187,41 @@ document.getElementById('login-btn-main').addEventListener('click', () => {
 document.getElementById('logout-btn').addEventListener('click', (e) => { e.preventDefault(); signOut(auth); });
 document.getElementById('logout-btn-mobile').addEventListener('click', (e) => { e.preventDefault(); signOut(auth); });
 
+let ultimaCarga = Date.now();
+
 onAuthStateChanged(auth, (user) => {
     if (user) {
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('app-container').style.display = 'flex';
         document.getElementById('user-email').innerText = user.email;
         document.getElementById('logout-btn').style.display = 'inline-block';
-        actualizarDashboard();
+        window.mostrarCargando(false);
+        actualizarDashboard(false);
     } else {
-        document.getElementById('login-screen').style.display = 'flex';
         document.getElementById('app-container').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'flex';
         window.mostrarCargando(false);
     }
 });
 
-mesSelector.addEventListener('change', actualizarDashboard);
+// Refresco silencioso e inteligente al volver a la app (móvil y web)
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && auth.currentUser) {
+        const ahora = Date.now();
+        if (ahora - ultimaCarga > 45000) {
+            actualizarDashboard(false);
+        }
+    }
+});
+window.addEventListener('focus', () => {
+    if (auth.currentUser && Date.now() - ultimaCarga > 45000) {
+        actualizarDashboard(false);
+    }
+});
+
+mesSelector.addEventListener('change', () => actualizarDashboard(true));
 anioSelector.addEventListener('change', () => {
-    actualizarDashboard();
+    actualizarDashboard(true);
     if (document.getElementById('estadisticas').classList.contains('active')) cargarEstadisticasAnuales();
 });
 
@@ -208,7 +231,7 @@ document.getElementById('filtro-texto-ingresos').addEventListener('input', () =>
 function obtenerMesId() { return `${anioSelector.value}-${mesSelector.value}`; }
 
 window.exportarBackupMes = async function() {
-    window.mostrarCargando(true);
+    window.mostrarCargando(true, "Generando archivo de backup...");
     try {
         let backup = { mes: obtenerMesId(), configuracion: {}, ingresos: listaIngresos, gastos: listaGastos };
         const docSnap = await getDoc(doc(db, "finanzas", obtenerMesId()));
@@ -223,17 +246,18 @@ window.exportarBackupMes = async function() {
     window.mostrarCargando(false);
 }
 
-async function actualizarDashboard() {
+async function actualizarDashboard(mostrarLoader = true) {
     if (!auth.currentUser) return;
-    window.mostrarCargando(true);
+    if (mostrarLoader) window.mostrarCargando(true, "Actualizando información...");
     try {
         await cargarConfiguracion();
         await Promise.all([cargarGastosFetch(), cargarIngresosFetch()]);
         window.recargarDatosVisuales();
+        ultimaCarga = Date.now();
     } catch(error) {
         console.error("Error cargando dashboard:", error);
     } finally {
-        window.mostrarCargando(false);
+        if (mostrarLoader) window.mostrarCargando(false);
     }
 }
 

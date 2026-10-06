@@ -1,18 +1,20 @@
-const CACHE_NAME = 'finanzas-priel-v2.0.1'; // Versión actualizada
+const CACHE_NAME = 'finanzas-priel-v2.8.0';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/js/app.js',
-  '/js/logica.js',
-  '/js/firebase.js',
-  '/vistas/resumen.js',
-  '/vistas/gastos.js',
-  '/vistas/ingresos.js',
-  '/vistas/ahorros.js',
-  '/vistas/estadisticas.js',
-  '/vistas/modales.js',
-  '/manifest.json'
+  './',
+  './index.html',
+  './style.css',
+  './js/app.js',
+  './js/logica.js',
+  './js/firebase.js',
+  './vistas/resumen.js',
+  './vistas/gastos.js',
+  './vistas/ingresos.js',
+  './vistas/ahorros.js',
+  './vistas/estadisticas.js',
+  './vistas/modales.js',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
 self.addEventListener('install', event => {
@@ -38,22 +40,30 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // SOLUCIÓN: Solo guardar en caché peticiones GET (Firebase usa POST y tira error si intentamos cachearlo)
+  // Solo interceptar peticiones GET
   if (event.request.method !== 'GET') return;
 
-  // Ignorar extensiones del navegador y peticiones externas raras
-  if (!event.request.url.startsWith('http')) return;
+  // Ignorar peticiones de Firebase, Google APIs u orígenes externos para no interferir con la autenticación o base de datos en tiempo real
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) {
+    return;
+  }
 
   event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        return caches.open(CACHE_NAME).then(cache => {
-          cache.put(event.request, response.clone());
-          return response;
-        });
-      })
-      .catch(() => {
-        return caches.match(event.request);
-      })
+    caches.match(event.request).then(cachedResponse => {
+      const fetchPromise = fetch(event.request).then(networkResponse => {
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        return networkResponse;
+      }).catch(() => {
+        return cachedResponse;
+      });
+
+      return cachedResponse || fetchPromise;
+    })
   );
 });
