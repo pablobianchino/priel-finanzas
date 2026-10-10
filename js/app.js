@@ -11,7 +11,7 @@ import { vistaModales } from '../vistas/modales.js';
 document.getElementById('views-container').innerHTML = vistaResumen + vistaGastos + vistaIngresos + vistaAhorros + vistaEstadisticas;
 document.getElementById('modals-container').innerHTML = vistaModales;
 
-const APP_VERSION = "v2.8.0";
+const APP_VERSION = "v2.9.0";
 window.APP_VERSION = APP_VERSION;
 
 const updateVersionTags = () => {
@@ -369,6 +369,8 @@ async function cargarConfiguracion() {
                 if (debEl) { debEl.dataset.raw = config.dolar_debito || 0; debEl.value = window.formatearDinero(config.dolar_debito || 0, 'ARS'); }
                 const impEl = document.getElementById(`usd-impuesto${s}`);
                 if (impEl) { impEl.dataset.raw = config.dolar_impuesto || 0; impEl.value = window.formatearDinero(config.dolar_impuesto || 0, 'ARS'); }
+                const comEl = document.getElementById(`usd-comision-mep${s}`);
+                if (comEl) { comEl.value = config.dolar_comision_mep !== undefined ? config.dolar_comision_mep : 0.6; }
             });
             
             // Migración y limpieza de Grupos de Distribución (Planificación pura)
@@ -415,6 +417,8 @@ function resetConfig() {
         if (debEl) { debEl.dataset.raw = 0; debEl.value = window.formatearDinero(0); }
         const impEl = document.getElementById(`usd-impuesto${s}`);
         if (impEl) { impEl.dataset.raw = 0; impEl.value = window.formatearDinero(0); }
+        const comEl = document.getElementById(`usd-comision-mep${s}`);
+        if (comEl) { comEl.value = 0.6; }
     });
     gruposDistribucion = {}; tiposGastoAsociaciones = { "Fijos": [], "Tarjeta": [], "Terceros": [] }; cuentasAhorro = []; ordenPanelesGasto = []; historialAhorros = [];
 }
@@ -438,6 +442,7 @@ async function actualizarConfiguracionDB(camposUpdate) {
                 dolar_mep: parseFloat(document.getElementById('usd-mep').dataset.raw || 0),
                 dolar_debito: parseFloat(document.getElementById('usd-debito').dataset.raw || 0),
                 dolar_impuesto: parseFloat(document.getElementById('usd-impuesto').dataset.raw || 0),
+                dolar_comision_mep: parseFloat(document.getElementById('usd-comision-mep')?.value || 0.6),
                 grupos_distribucion: gruposDistribucion,
                 tipos_gasto: tiposGastoAsociaciones,
                 cuentas_ahorro: cuentasAhorro,
@@ -549,13 +554,135 @@ window.toggleOrigenPanel = function(categoria, idOrigen, isChecked) {
     window.recargarDatosVisuales();
 }
 
+let ultimoMepConsultado = null;
+
+window.consultarMepEnVivo = async function(origenPanel) {
+    const panels = ['resumen', 'gastos', 'ingresos', 'ahorros'];
+    panels.forEach(p => {
+        const infoEl = document.getElementById(`mep-live-info-${p}`);
+        if (infoEl) infoEl.innerHTML = `<span style="color:#174ea6;">⏳ Consultando cotización de mercado en vivo...</span>`;
+    });
+
+    try {
+        // Consultar DolarApi (MEP Bolsa)
+        let response = await fetch('https://dolarapi.com/v1/dolares/bolsa');
+        let data = null;
+        if (response.ok) {
+            data = await response.json();
+        } else {
+            // Fallback con ArgentinaDatos o CriptoYa
+            const fbResp = await fetch('https://api.argentinadatos.com/v1/cotizaciones/dolares/bolsa');
+            if (fbResp.ok) {
+                const fbData = await fbResp.json();
+                const latest = Array.isArray(fbData) ? fbData[fbData.length - 1] : fbData;
+                data = { venta: latest.venta || latest.valor, fechaActualizacion: latest.fecha };
+            }
+        }
+
+        if (!data || !data.venta) {
+            throw new Error("No se pudo obtener la cotización.");
+        }
+
+        const mepMercado = parseFloat(data.venta);
+        ultimoMepConsultado = {
+            mercado: mepMercado,
+            fecha: data.fechaActualizacion ? new Date(data.fechaActualizacion).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        window.actualizarCalculoMepEnPantalla(origenPanel);
+    } catch(err) {
+        console.error("Error al consultar MEP en vivo:", err);
+        panels.forEach(p => {
+            const infoEl = document.getElementById(`mep-live-info-${p}`);
+            if (infoEl) infoEl.innerHTML = `<span style="color:#c5221f;">⚠️ No se pudo consultar la cotización en vivo. Intenta de nuevo en unos momentos.</span>`;
+        });
+    }
+};
+
+window.actualizarCalculoMepEnPantalla = function(origenPanel) {
+    if (!ultimoMepConsultado) return;
+    const panels = ['resumen', 'gastos', 'ingresos', 'ahorros'];
+    
+    // Obtener la comisión configurada en el panel activo
+    const suffix = origenPanel === 'resumen' ? '' : `-${origenPanel}`;
+    const comisionInp = document.getElementById(`usd-comision-mep${suffix}`);
+    const comisionPct = parseFloat(comisionInp?.value || 0.6);
+
+    // Sincronizar inputs de comisión en los demás paneles
+    panels.forEach(p => {
+        const s = p === 'resumen' ? '' : `-${p}`;
+        const inp = document.getElementById(`usd-comision-mep${s}`);
+        if (inp && inp !== comisionInp) inp.value = comisionPct;
+    });
+
+    const mepMercado = ultimoMepConsultado.mercado;
+    const recargoMonto = mepMercado * (comisionPct / 100);
+    const mepEfectivo = mepMercado + recargoMonto;
+    ultimoMepConsultado.efectivo = mepEfectivo;
+    ultimoMepConsultado.comisionPct = comisionPct;
+
+    panels.forEach(p => {
+        const infoEl = document.getElementById(`mep-live-info-${p}`);
+        const btnAplicar = document.getElementById(`btn-aplicar-mep-${p}`);
+        if (infoEl) {
+            infoEl.innerHTML = `
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <span>🏛️ <b>Mercado (Ahorros):</b> <span style="font-weight:700; color:var(--text-main);">${window.formatearDinero(mepMercado, 'ARS')}</span></span>
+                    <span style="color:var(--text-muted);">|</span>
+                    <span>📈 <b>+${comisionPct}% Broker:</b> +${window.formatearDinero(recargoMonto, 'ARS')}</span>
+                    <span style="color:var(--text-muted);">➔</span>
+                    <span style="background:#e6f4ea; color:#137333; padding:2px 8px; border-radius:6px; font-weight:bold; font-size:12px;">
+                        MEP Compra (Gastos): ${window.formatearDinero(mepEfectivo, 'ARS')}
+                    </span>
+                    <span style="font-size:11px; color:var(--text-muted);">(${ultimoMepConsultado.fecha})</span>
+                </div>`;
+        }
+        if (btnAplicar) {
+            btnAplicar.style.display = 'inline-flex';
+            btnAplicar.innerText = '✅ Aplicar Cotizaciones';
+        }
+    });
+};
+
+window.aplicarMepConsultado = async function(origenPanel) {
+    if (!ultimoMepConsultado || !ultimoMepConsultado.mercado) return;
+    const mepMercado = ultimoMepConsultado.mercado;
+    const mepEfectivo = ultimoMepConsultado.efectivo || mepMercado;
+    const panels = ['resumen', 'gastos', 'ingresos', 'ahorros'];
+
+    panels.forEach(p => {
+        const s = p === 'resumen' ? '' : `-${p}`;
+        const mepEl = document.getElementById(`usd-mep${s}`);
+        const debEl = document.getElementById(`usd-debito${s}`);
+        if (mepEl) {
+            // Valuación de Cartera/Ahorros: cotización limpia de mercado (idéntica a Inviu)
+            mepEl.dataset.raw = mepMercado;
+            mepEl.value = window.formatearDinero(mepMercado, 'ARS');
+        }
+        if (debEl) {
+            // Gastos / Compras: cotización efectiva con comisión de compra del broker
+            debEl.dataset.raw = mepEfectivo;
+            debEl.value = window.formatearDinero(mepEfectivo, 'ARS');
+        }
+    });
+
+    await window.guardarConfiguracionDolar(origenPanel);
+};
+
 window.guardarConfiguracionDolar = async function(origenPanel) {
     let suffix = origenPanel === 'resumen' ? '' : `-${origenPanel}`;
     let mep = window.parseMoney(document.getElementById(`usd-mep${suffix}`).value);
     let debito = window.parseMoney(document.getElementById(`usd-debito${suffix}`).value);
     let impuesto = window.parseMoney(document.getElementById(`usd-impuesto${suffix}`).value);
-    window.mostrarCargando(true);
-    await actualizarConfiguracionDB({ "configuracion.dolar_mep": mep, "configuracion.dolar_debito": debito, "configuracion.dolar_impuesto": impuesto });
+    let comision = parseFloat(document.getElementById(`usd-comision-mep${suffix}`)?.value || 0.6);
+
+    window.mostrarCargando(true, "Guardando cotizaciones USD...");
+    await actualizarConfiguracionDB({ 
+        "configuracion.dolar_mep": mep, 
+        "configuracion.dolar_debito": debito, 
+        "configuracion.dolar_impuesto": impuesto,
+        "configuracion.dolar_comision_mep": comision
+    });
     await actualizarDashboard();
 }
 
@@ -828,26 +955,519 @@ window.toggleTercero = function(prefix = 'gasto') {
 };
 
 // =========================================================================
-// FASE 2: GESTIÓN MANUAL DE CUENTAS DE AHORRO Y MOVIMIENTOS
+// FASE 2: GESTIÓN MANUAL DE CUENTAS DE AHORRO Y MOVIMIENTOS (CONVERSIÓN MEP)
 // =========================================================================
+
+function getDolarMep() {
+    const el = document.getElementById('usd-mep') || document.getElementById('usd-mep-ahorros');
+    return parseFloat(el?.dataset?.raw || window.parseMoney(el?.value) || 0);
+}
 
 function calcularTotalesCuenta(cuentaId) {
     const c = cuentasAhorro.find(acc => acc.id === cuentaId) || {};
+    const dMep = getDolarMep();
+    const esUsd = c.moneda === 'USD' || (c.nombre && (c.nombre.toLowerCase().includes('usd') || c.nombre.toLowerCase().includes('galileo')));
     const movs = (historialAhorros || []).filter(m => m.cuenta_id === cuentaId);
+    
+    let saldoAntUsd = 0;
+    let saldoAntArs = 0;
+
+    if (esUsd) {
+        saldoAntUsd = parseFloat(c.saldo_anterior_usd) || (dMep > 0 ? (parseFloat(c.saldo_anterior) / dMep) : 0);
+        saldoAntArs = dMep > 0 ? (saldoAntUsd * dMep) : (parseFloat(c.saldo_anterior) || 0);
+    } else {
+        saldoAntArs = parseFloat(c.saldo_anterior) || 0;
+        saldoAntUsd = dMep > 0 ? (saldoAntArs / dMep) : 0;
+    }
+
     const ingresos = movs.filter(m => m.tipo === 'ingreso').reduce((sum, m) => sum + (parseFloat(m.monto) || 0), 0);
     const retiros = movs.filter(m => m.tipo === 'retiro').reduce((sum, m) => sum + (parseFloat(m.monto) || 0), 0);
-    const saldoAnt = parseFloat(c.saldo_anterior) || 0;
-    const saldoFinal = saldoAnt + ingresos - retiros;
-    return { saldoAnt, ingresos, retiros, netoMes: ingresos - retiros, saldoFinal };
+    const netoMes = ingresos - retiros;
+
+    let saldoFinal = 0;
+    let saldoFinalUsd = 0;
+
+    if (esUsd) {
+        const ingresosUsd = dMep > 0 ? (ingresos / dMep) : 0;
+        const retirosUsd = dMep > 0 ? (retiros / dMep) : 0;
+        saldoFinalUsd = saldoAntUsd + (ingresosUsd - retirosUsd);
+        saldoFinal = dMep > 0 ? (saldoFinalUsd * dMep) : (saldoAntArs + netoMes);
+    } else {
+        saldoFinal = saldoAntArs + netoMes;
+        saldoFinalUsd = dMep > 0 ? (saldoFinal / dMep) : 0;
+    }
+
+    return { 
+        esUsd,
+        saldoAnt: saldoAntArs, 
+        saldoAntUsd,
+        ingresos, 
+        retiros, 
+        netoMes, 
+        saldoFinal,
+        saldoFinalUsd
+    };
 }
 
-window.crearCuentaAhorro = function() {
-    let n = prompt("Nombre de la nueva Cuenta de Ahorro:");
-    if(n && n.trim() !== "") { 
-        cuentasAhorro.push({ id: 'ah_' + Date.now(), nombre: n.trim(), depositado: false, saldo_anterior: 0 }); 
-        window.guardarConfiguracionAhorros(); 
+window.onCambiarMonedaCuenta = function(moneda) {
+    const labelBase = document.getElementById('label-saldo-base');
+    if (labelBase) {
+        labelBase.innerText = moneda === 'USD' ? 'Saldo Inicial / Base (Dólares):' : 'Saldo Inicial / Base (Pesos):';
     }
-}
+};
+
+// Helpers de conversión bidireccional ARS <-> USD para Cuenta de Ahorro
+window.onCuentaMontoInput = function(disparadoPor) {
+    const dMep = getDolarMep();
+    const inpArs = document.getElementById('cuenta-saldo-ars');
+    const inpUsd = document.getElementById('cuenta-saldo-usd');
+    if (!inpArs || !inpUsd) return;
+
+    if (disparadoPor === 'ars') {
+        const valArs = window.parseMoney(inpArs.value);
+        inpArs.dataset.raw = valArs;
+        if (dMep > 0) {
+            const valUsd = valArs / dMep;
+            inpUsd.dataset.raw = valUsd;
+            inpUsd.value = valUsd > 0 ? valUsd.toFixed(2) : '';
+        }
+    } else if (disparadoPor === 'usd') {
+        const valUsd = window.parseMoney(inpUsd.value);
+        inpUsd.dataset.raw = valUsd;
+        if (dMep > 0) {
+            const valArs = valUsd * dMep;
+            inpArs.dataset.raw = valArs;
+            inpArs.value = valArs > 0 ? valArs.toFixed(2) : '';
+        }
+    }
+};
+
+window.onCuentaMontoBlur = function(disparadoPor) {
+    const dMep = getDolarMep();
+    const inpArs = document.getElementById('cuenta-saldo-ars');
+    const inpUsd = document.getElementById('cuenta-saldo-usd');
+    if (!inpArs || !inpUsd) return;
+
+    const valArs = parseFloat(inpArs.dataset.raw || window.parseMoney(inpArs.value)) || 0;
+    inpArs.dataset.raw = valArs;
+    inpArs.value = window.formatearDinero(valArs, 'ARS');
+
+    if (dMep > 0) {
+        const valUsd = valArs / dMep;
+        inpUsd.dataset.raw = valUsd;
+        inpUsd.value = window.formatearDinero(valUsd, 'USD');
+    }
+};
+
+// Helpers de conversión bidireccional ARS <-> USD para Movimientos
+window.onMovimientoMontoInput = function(disparadoPor) {
+    const dMep = getDolarMep();
+    const inpArs = document.getElementById('movimiento-monto-ars');
+    const inpUsd = document.getElementById('movimiento-monto-usd');
+    if (!inpArs || !inpUsd) return;
+
+    if (disparadoPor === 'ars') {
+        const valArs = window.parseMoney(inpArs.value);
+        inpArs.dataset.raw = valArs;
+        if (dMep > 0) {
+            const valUsd = valArs / dMep;
+            inpUsd.dataset.raw = valUsd;
+            inpUsd.value = valUsd > 0 ? valUsd.toFixed(2) : '';
+        }
+    } else if (disparadoPor === 'usd') {
+        const valUsd = window.parseMoney(inpUsd.value);
+        inpUsd.dataset.raw = valUsd;
+        if (dMep > 0) {
+            const valArs = valUsd * dMep;
+            inpArs.dataset.raw = valArs;
+            inpArs.value = valArs > 0 ? valArs.toFixed(2) : '';
+        }
+    }
+};
+
+window.onMovimientoMontoBlur = function(disparadoPor) {
+    const dMep = getDolarMep();
+    const inpArs = document.getElementById('movimiento-monto-ars');
+    const inpUsd = document.getElementById('movimiento-monto-usd');
+    if (!inpArs || !inpUsd) return;
+
+    const valArs = parseFloat(inpArs.dataset.raw || window.parseMoney(inpArs.value)) || 0;
+    inpArs.dataset.raw = valArs;
+    inpArs.value = window.formatearDinero(valArs, 'ARS');
+
+    if (dMep > 0) {
+        const valUsd = valArs / dMep;
+        inpUsd.dataset.raw = valUsd;
+        inpUsd.value = window.formatearDinero(valUsd, 'USD');
+    }
+};
+
+// Helpers de conversión bidireccional ARS <-> USD para Editar Movimientos
+window.onEditMovMontoInput = function(disparadoPor) {
+    const dMep = getDolarMep();
+    const inpArs = document.getElementById('edit-mov-monto-ars');
+    const inpUsd = document.getElementById('edit-mov-monto-usd');
+    if (!inpArs || !inpUsd) return;
+
+    if (disparadoPor === 'ars') {
+        const valArs = window.parseMoney(inpArs.value);
+        inpArs.dataset.raw = valArs;
+        if (dMep > 0) {
+            const valUsd = valArs / dMep;
+            inpUsd.dataset.raw = valUsd;
+            inpUsd.value = valUsd > 0 ? valUsd.toFixed(2) : '';
+        }
+    } else if (disparadoPor === 'usd') {
+        const valUsd = window.parseMoney(inpUsd.value);
+        inpUsd.dataset.raw = valUsd;
+        if (dMep > 0) {
+            const valArs = valUsd * dMep;
+            inpArs.dataset.raw = valArs;
+            inpArs.value = valArs > 0 ? valArs.toFixed(2) : '';
+        }
+    }
+};
+
+window.onEditMovMontoBlur = function(disparadoPor) {
+    const dMep = getDolarMep();
+    const inpArs = document.getElementById('edit-mov-monto-ars');
+    const inpUsd = document.getElementById('edit-mov-monto-usd');
+    if (!inpArs || !inpUsd) return;
+
+    const valArs = parseFloat(inpArs.dataset.raw || window.parseMoney(inpArs.value)) || 0;
+    inpArs.dataset.raw = valArs;
+    inpArs.value = window.formatearDinero(valArs, 'ARS');
+
+    if (dMep > 0) {
+        const valUsd = valArs / dMep;
+        inpUsd.dataset.raw = valUsd;
+        inpUsd.value = window.formatearDinero(valUsd, 'USD');
+    }
+};
+
+// Helpers de conversión bidireccional ARS <-> USD para Sub-Cajas
+window.onSubcajaMontoInput = function(disparadoPor) {
+    const dMep = getDolarMep();
+    const inpArs = document.getElementById('subcaja-monto-ars');
+    const inpUsd = document.getElementById('subcaja-monto-usd');
+    if (!inpArs || !inpUsd) return;
+
+    if (disparadoPor === 'ars') {
+        const valArs = window.parseMoney(inpArs.value);
+        inpArs.dataset.raw = valArs;
+        if (dMep > 0) {
+            const valUsd = valArs / dMep;
+            inpUsd.dataset.raw = valUsd;
+            inpUsd.value = valUsd > 0 ? valUsd.toFixed(2) : '';
+        }
+    } else if (disparadoPor === 'usd') {
+        const valUsd = window.parseMoney(inpUsd.value);
+        inpUsd.dataset.raw = valUsd;
+        if (dMep > 0) {
+            const valArs = valUsd * dMep;
+            inpArs.dataset.raw = valArs;
+            inpArs.value = valArs > 0 ? valArs.toFixed(2) : '';
+        }
+    }
+};
+
+window.onSubcajaMontoBlur = function(disparadoPor) {
+    const dMep = getDolarMep();
+    const inpArs = document.getElementById('subcaja-monto-ars');
+    const inpUsd = document.getElementById('subcaja-monto-usd');
+    if (!inpArs || !inpUsd) return;
+
+    const valArs = parseFloat(inpArs.dataset.raw || window.parseMoney(inpArs.value)) || 0;
+    inpArs.dataset.raw = valArs;
+    inpArs.value = window.formatearDinero(valArs, 'ARS');
+
+    if (dMep > 0) {
+        const valUsd = valArs / dMep;
+        inpUsd.dataset.raw = valUsd;
+        inpUsd.value = window.formatearDinero(valUsd, 'USD');
+    }
+};
+
+window.abrirModalSubcaja = function(cuentaId, subcajaId = null) {
+    let acc = cuentasAhorro.find(c => c.id === cuentaId);
+    if (!acc) return;
+    const dMep = getDolarMep();
+    const esUsd = acc.moneda === 'USD' || (acc.nombre && (acc.nombre.toLowerCase().includes('usd') || acc.nombre.toLowerCase().includes('galileo')));
+
+    document.getElementById('form-subcaja').reset();
+    document.getElementById('subcaja-cuenta-id').value = cuentaId;
+    document.getElementById('subcaja-id').value = subcajaId || '';
+    document.getElementById('subcaja-cuenta-nombre').value = `${acc.nombre} (${esUsd ? 'USD' : 'ARS'})`;
+
+    const mepInfoEl = document.getElementById('subcaja-mep-info');
+    if (mepInfoEl) {
+        mepInfoEl.innerText = dMep > 0 ? `Cotiz. MEP: ${window.formatearDinero(dMep, 'ARS')}` : `MEP no configurado`;
+    }
+
+    const totales = calcularTotalesCuenta(cuentaId);
+    const subcajas = acc.sub_cajas || [];
+    let subcajaExistente = subcajaId ? subcajas.find(s => s.id === subcajaId) : null;
+
+    if (subcajaExistente) {
+        document.getElementById('titulo-modal-subcaja').innerText = `✏️ Editar Sub-Caja: ${subcajaExistente.nombre}`;
+        document.getElementById('subcaja-nombre').value = subcajaExistente.nombre;
+        document.getElementById('subcaja-color').value = subcajaExistente.color || '#1a73e8';
+
+        let montoArs = parseFloat(subcajaExistente.monto) || 0;
+        let montoUsd = parseFloat(subcajaExistente.monto_usd) || 0;
+
+        if (esUsd && (!montoUsd || montoUsd === 0) && dMep > 0 && montoArs > 0) {
+            montoUsd = montoArs / dMep;
+        } else if (!esUsd && (!montoArs || montoArs === 0) && dMep > 0 && montoUsd > 0) {
+            montoArs = montoUsd * dMep;
+        }
+
+        if (esUsd && montoUsd > 0 && dMep > 0) {
+            montoArs = montoUsd * dMep;
+        }
+
+        document.getElementById('subcaja-monto-ars').dataset.raw = montoArs;
+        document.getElementById('subcaja-monto-ars').value = window.formatearDinero(montoArs, 'ARS');
+        document.getElementById('subcaja-monto-usd').dataset.raw = montoUsd;
+        document.getElementById('subcaja-monto-usd').value = window.formatearDinero(montoUsd, 'USD');
+    } else {
+        document.getElementById('titulo-modal-subcaja').innerText = `➕ Nueva Sub-Caja en ${acc.nombre}`;
+        document.getElementById('subcaja-nombre').value = '';
+        document.getElementById('subcaja-color').value = '#1a73e8';
+        document.getElementById('subcaja-monto-ars').dataset.raw = '0';
+        document.getElementById('subcaja-monto-ars').value = window.formatearDinero(0, 'ARS');
+        document.getElementById('subcaja-monto-usd').dataset.raw = '0';
+        document.getElementById('subcaja-monto-usd').value = window.formatearDinero(0, 'USD');
+    }
+
+    // Calcular cuánto queda sin asignar en la cuenta
+    let totalAsignadoArs = 0;
+    let totalAsignadoUsd = 0;
+    subcajas.forEach(s => {
+        if (s.id === subcajaId) return;
+        if (esUsd) {
+            let sUsd = parseFloat(s.monto_usd) || (dMep > 0 ? (parseFloat(s.monto) / dMep) : 0);
+            totalAsignadoUsd += sUsd;
+            totalAsignadoArs += (dMep > 0 ? sUsd * dMep : (parseFloat(s.monto) || 0));
+        } else {
+            let sArs = parseFloat(s.monto) || 0;
+            totalAsignadoArs += sArs;
+            totalAsignadoUsd += (dMep > 0 ? sArs / dMep : 0);
+        }
+    });
+
+    const saldoTotalCuenta = esUsd ? totales.saldoFinalUsd : totales.saldoFinal;
+    const asignadoOtro = esUsd ? totalAsignadoUsd : totalAsignadoArs;
+    const disponible = Math.max(0, saldoTotalCuenta - asignadoOtro);
+
+    const infoDisp = document.getElementById('subcaja-disponible-info');
+    if (infoDisp) {
+        infoDisp.innerHTML = esUsd
+            ? `💡 Saldo libre en la cuenta para asignar: <b>${window.formatearDinero(disponible, 'USD')}</b> (≈ ${window.formatearDinero(disponible * dMep, 'ARS')})`
+            : `💡 Saldo libre en la cuenta para asignar: <b>${window.formatearDinero(disponible, 'ARS')}</b>`;
+    }
+
+    document.getElementById('modal-subcaja').style.display = 'flex';
+};
+
+window.eliminarSubcaja = async function(cuentaId, subcajaId) {
+    let acc = cuentasAhorro.find(c => c.id === cuentaId);
+    if (!acc) return;
+    let sub = (acc.sub_cajas || []).find(s => s.id === subcajaId);
+    if (!sub) return;
+
+    if (!confirm(`¿Seguro que deseas eliminar la sub-caja '${sub.nombre}'? Su monto volverá a quedar como 'Saldo Libre' en la cuenta madre.`)) return;
+
+    acc.sub_cajas = (acc.sub_cajas || []).filter(s => s.id !== subcajaId);
+    window.mostrarCargando(true);
+    await actualizarConfiguracionDB({
+        "configuracion.cuentas_ahorro": cuentasAhorro
+    });
+    await actualizarDashboard();
+};
+
+document.getElementById('form-subcaja').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const cuentaId = document.getElementById('subcaja-cuenta-id').value;
+    const subcajaId = document.getElementById('subcaja-id').value;
+    const nombre = document.getElementById('subcaja-nombre').value.trim();
+    const color = document.getElementById('subcaja-color').value || '#1a73e8';
+    const inpArs = document.getElementById('subcaja-monto-ars');
+    const inpUsd = document.getElementById('subcaja-monto-usd');
+    const dMep = getDolarMep();
+
+    if (!nombre) return alert("Por favor ingresa un nombre para la sub-caja.");
+
+    let acc = cuentasAhorro.find(c => c.id === cuentaId);
+    if (!acc) return alert("Cuenta madre no encontrada.");
+    const esUsd = acc.moneda === 'USD' || (acc.nombre && (acc.nombre.toLowerCase().includes('usd') || acc.nombre.toLowerCase().includes('galileo')));
+
+    let montoArs = parseFloat(inpArs.dataset.raw || window.parseMoney(inpArs.value)) || 0;
+    let montoUsd = parseFloat(inpUsd.dataset.raw || window.parseMoney(inpUsd.value)) || 0;
+
+    if (esUsd && dMep > 0 && (!montoArs || montoArs === 0)) {
+        montoArs = montoUsd * dMep;
+    } else if (!esUsd && dMep > 0 && (!montoUsd || montoUsd === 0)) {
+        montoUsd = montoArs / dMep;
+    }
+
+    if (!Array.isArray(acc.sub_cajas)) acc.sub_cajas = [];
+
+    window.mostrarCargando(true);
+    try {
+        if (!subcajaId) {
+            // Nueva sub-caja
+            acc.sub_cajas.push({
+                id: 'sub_' + Date.now(),
+                nombre: nombre,
+                monto: montoArs,
+                monto_usd: montoUsd,
+                color: color
+            });
+        } else {
+            // Edición
+            let sub = acc.sub_cajas.find(s => s.id === subcajaId);
+            if (sub) {
+                sub.nombre = nombre;
+                sub.monto = montoArs;
+                sub.monto_usd = montoUsd;
+                sub.color = color;
+            }
+        }
+
+        await actualizarConfiguracionDB({
+            "configuracion.cuentas_ahorro": cuentasAhorro
+        });
+
+        window.cerrarModal('modal-subcaja');
+        await actualizarDashboard();
+    } catch(err) {
+        console.error("Error guardando sub-caja:", err);
+        alert("Error al guardar la sub-caja: " + err.message);
+        window.mostrarCargando(false);
+    }
+});
+
+window.crearCuentaAhorro = function() {
+    const dMep = getDolarMep();
+    document.getElementById('form-cuenta-ahorro').reset();
+    document.getElementById('cuenta-ahorro-id').value = "";
+    document.getElementById('titulo-modal-cuenta-ahorro').innerText = "➕ Nueva Cuenta de Ahorro";
+    
+    document.getElementById('cuenta-moneda').value = "ARS";
+    window.onCambiarMonedaCuenta("ARS");
+
+    document.getElementById('cuenta-saldo-ars').dataset.raw = "0";
+    document.getElementById('cuenta-saldo-ars').value = window.formatearDinero(0, 'ARS');
+    document.getElementById('cuenta-saldo-usd').dataset.raw = "0";
+    document.getElementById('cuenta-saldo-usd').value = window.formatearDinero(0, 'USD');
+
+    const mepInfoEl = document.getElementById('cuenta-mep-info');
+    if (mepInfoEl) {
+        mepInfoEl.innerText = dMep > 0 ? `Cotiz. MEP: ${window.formatearDinero(dMep, 'ARS')}` : `MEP no configurado`;
+    }
+
+    document.getElementById('modal-cuenta-ahorro').style.display = 'flex';
+};
+
+window.editarCuentaAhorro = function(id) {
+    let acc = cuentasAhorro.find(c => c.id === id);
+    if (!acc) return;
+    const dMep = getDolarMep();
+
+    document.getElementById('cuenta-ahorro-id').value = acc.id;
+    document.getElementById('titulo-modal-cuenta-ahorro').innerText = `✏️ Editar Cuenta: ${acc.nombre}`;
+    document.getElementById('cuenta-ahorro-nombre').value = acc.nombre;
+
+    const esUsd = acc.moneda === 'USD' || (acc.nombre && (acc.nombre.toLowerCase().includes('usd') || acc.nombre.toLowerCase().includes('galileo')));
+    const selectMoneda = document.getElementById('cuenta-moneda');
+    if (selectMoneda) {
+        selectMoneda.value = esUsd ? 'USD' : (acc.moneda || 'ARS');
+    }
+    window.onCambiarMonedaCuenta(selectMoneda ? selectMoneda.value : 'ARS');
+
+    let saldoArs = parseFloat(acc.saldo_anterior) || 0;
+    let saldoUsd = parseFloat(acc.saldo_anterior_usd) || 0;
+
+    if (esUsd && (!saldoUsd || saldoUsd === 0) && dMep > 0 && saldoArs > 0) {
+        saldoUsd = saldoArs / dMep;
+    } else if (!esUsd && (!saldoArs || saldoArs === 0) && dMep > 0 && saldoUsd > 0) {
+        saldoArs = saldoUsd * dMep;
+    }
+
+    if (esUsd && saldoUsd > 0 && dMep > 0) {
+        saldoArs = saldoUsd * dMep;
+    }
+
+    document.getElementById('cuenta-saldo-ars').dataset.raw = saldoArs;
+    document.getElementById('cuenta-saldo-ars').value = window.formatearDinero(saldoArs, 'ARS');
+
+    document.getElementById('cuenta-saldo-usd').dataset.raw = saldoUsd;
+    document.getElementById('cuenta-saldo-usd').value = window.formatearDinero(saldoUsd, 'USD');
+
+    const mepInfoEl = document.getElementById('cuenta-mep-info');
+    if (mepInfoEl) {
+        mepInfoEl.innerText = dMep > 0 ? `Cotiz. MEP: ${window.formatearDinero(dMep, 'ARS')}` : `MEP no configurado`;
+    }
+
+    document.getElementById('modal-cuenta-ahorro').style.display = 'flex';
+};
+
+document.getElementById('form-cuenta-ahorro').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('cuenta-ahorro-id').value;
+    const nombre = document.getElementById('cuenta-ahorro-nombre').value.trim();
+    const moneda = document.getElementById('cuenta-moneda').value || 'ARS';
+    const inpArs = document.getElementById('cuenta-saldo-ars');
+    const inpUsd = document.getElementById('cuenta-saldo-usd');
+    const dMep = getDolarMep();
+
+    let saldoArs = parseFloat(inpArs.dataset.raw || window.parseMoney(inpArs.value)) || 0;
+    let saldoUsd = parseFloat(inpUsd.dataset.raw || window.parseMoney(inpUsd.value)) || 0;
+
+    if (moneda === 'USD' && dMep > 0 && (!saldoArs || saldoArs === 0)) {
+        saldoArs = saldoUsd * dMep;
+    } else if (moneda === 'ARS' && dMep > 0 && (!saldoUsd || saldoUsd === 0)) {
+        saldoUsd = saldoArs / dMep;
+    }
+
+    if (!nombre) return alert("Por favor ingresa un nombre para la cuenta.");
+
+    window.mostrarCargando(true);
+    try {
+        if (!id) {
+            // Nueva cuenta
+            cuentasAhorro.push({
+                id: 'ah_' + Date.now(),
+                nombre: nombre,
+                moneda: moneda,
+                depositado: false,
+                saldo_anterior: saldoArs,
+                saldo_anterior_usd: saldoUsd
+            });
+        } else {
+            // Edición de cuenta existente
+            let acc = cuentasAhorro.find(c => c.id === id);
+            if (acc) {
+                acc.nombre = nombre;
+                acc.moneda = moneda;
+                acc.saldo_anterior = saldoArs;
+                acc.saldo_anterior_usd = saldoUsd;
+            }
+        }
+
+        await actualizarConfiguracionDB({
+            "configuracion.cuentas_ahorro": cuentasAhorro
+        });
+
+        window.cerrarModal('modal-cuenta-ahorro');
+        await actualizarDashboard();
+    } catch(err) {
+        console.error("Error guardando cuenta de ahorro:", err);
+        alert("Error al guardar la cuenta: " + err.message);
+        window.mostrarCargando(false);
+    }
+});
 
 window.borrarCuentaAhorro = function(id) {
     let acc = cuentasAhorro.find(c => c.id === id);
@@ -855,17 +1475,6 @@ window.borrarCuentaAhorro = function(id) {
     if(!confirm(`¿Seguro que deseas eliminar la cuenta de ahorro '${acc.nombre}'? Sus movimientos en el historial se conservarán con el nombre de la cuenta.`)) return;
     cuentasAhorro = cuentasAhorro.filter(c => c.id !== id);
     window.guardarConfiguracionAhorros();
-}
-
-window.editarCuentaAhorro = function(id) {
-    let acc = cuentasAhorro.find(c => c.id === id);
-    if(acc) { 
-        let n = prompt("Editar nombre de la cuenta:", acc.nombre); 
-        if(n && n.trim() !== "") { 
-            acc.nombre = n.trim(); 
-            window.guardarConfiguracionAhorros(); 
-        } 
-    }
 }
 
 window.toggleDepositoCuenta = function(id) {
@@ -879,11 +1488,42 @@ window.toggleDepositoCuenta = function(id) {
 window.abrirModalMovimiento = function(cuentaId, tipo) {
     let acc = cuentasAhorro.find(c => c.id === cuentaId);
     if (!acc) return;
+    const dMep = getDolarMep();
+
     document.getElementById('form-movimiento-ahorro').reset();
     document.getElementById('movimiento-cuenta-id').value = cuentaId;
     document.getElementById('movimiento-tipo').value = tipo;
     document.getElementById('movimiento-cuenta-nombre').value = acc.nombre;
-    document.getElementById('movimiento-monto').dataset.raw = "";
+
+    // Sub-cajas selector
+    const boxSubcaja = document.getElementById('box-movimiento-subcaja');
+    const selectSubcaja = document.getElementById('movimiento-subcaja-id');
+    const labelSubcaja = document.getElementById('label-movimiento-subcaja');
+
+    if (boxSubcaja && selectSubcaja) {
+        const subcajas = acc.sub_cajas || [];
+        if (subcajas.length > 0) {
+            boxSubcaja.style.display = 'block';
+            if (labelSubcaja) {
+                labelSubcaja.innerText = tipo === 'ingreso' ? 'Asignar a Sub-Caja (Opcional):' : 'Descontar de Sub-Caja (Opcional):';
+            }
+            selectSubcaja.innerHTML = `<option value="">-- Saldo Libre / General --</option>` + 
+                subcajas.map(s => `<option value="${s.id}">${s.nombre}</option>`).join('');
+        } else {
+            boxSubcaja.style.display = 'none';
+            selectSubcaja.innerHTML = '';
+        }
+    }
+    
+    document.getElementById('movimiento-monto-ars').dataset.raw = "";
+    document.getElementById('movimiento-monto-ars').value = "";
+    document.getElementById('movimiento-monto-usd').dataset.raw = "";
+    document.getElementById('movimiento-monto-usd').value = "";
+
+    const mepInfoEl = document.getElementById('movimiento-mep-info');
+    if (mepInfoEl) {
+        mepInfoEl.innerText = dMep > 0 ? `Cotiz. MEP: ${window.formatearDinero(dMep, 'ARS')}` : `MEP no configurado`;
+    }
 
     const tituloEl = document.getElementById('titulo-modal-movimiento');
     const submitBtn = document.getElementById('btn-submit-movimiento');
@@ -908,11 +1548,13 @@ document.getElementById('form-movimiento-ahorro').addEventListener('submit', asy
     e.preventDefault();
     const cuentaId = document.getElementById('movimiento-cuenta-id').value;
     const tipo = document.getElementById('movimiento-tipo').value;
-    const monto = parseFloat(document.getElementById('movimiento-monto').dataset.raw || window.parseMoney(document.getElementById('movimiento-monto').value));
+    const subcajaId = document.getElementById('movimiento-subcaja-id')?.value || null;
+    const inpArs = document.getElementById('movimiento-monto-ars');
+    const monto = parseFloat(inpArs.dataset.raw || window.parseMoney(inpArs.value));
     const motivo = document.getElementById('movimiento-motivo').value.trim();
 
     if (isNaN(monto) || monto <= 0) {
-        return alert("Por favor ingresa un monto válido mayor a 0.");
+        return alert("Por favor ingresa un monto válido mayor a 0 en pesos o dólares.");
     }
 
     let acc = cuentasAhorro.find(c => c.id === cuentaId);
@@ -923,10 +1565,30 @@ document.getElementById('form-movimiento-ahorro').addEventListener('submit', asy
     let idIngresoGenerado = null;
 
     try {
+        let subcajaNombre = '';
+        if (subcajaId && Array.isArray(acc.sub_cajas)) {
+            let sub = acc.sub_cajas.find(s => s.id === subcajaId);
+            if (sub) {
+                subcajaNombre = sub.nombre;
+                const esUsd = acc.moneda === 'USD' || (acc.nombre && (acc.nombre.toLowerCase().includes('usd') || acc.nombre.toLowerCase().includes('galileo')));
+                const dMep = getDolarMep();
+                const montoUsd = dMep > 0 ? (monto / dMep) : 0;
+                
+                if (tipo === 'ingreso') {
+                    sub.monto = (parseFloat(sub.monto) || 0) + monto;
+                    if (esUsd) sub.monto_usd = (parseFloat(sub.monto_usd) || 0) + montoUsd;
+                } else if (tipo === 'retiro') {
+                    sub.monto = Math.max(0, (parseFloat(sub.monto) || 0) - monto);
+                    if (esUsd) sub.monto_usd = Math.max(0, (parseFloat(sub.monto_usd) || 0) - montoUsd);
+                }
+            }
+        }
+
         if (tipo === 'retiro') {
             // INYECCIÓN A DISPONIBLE: Se crea automáticamente el registro en la colección de ingresos del mes
+            const rescueName = subcajaNombre ? `[Rescate - ${acc.nombre} / ${subcajaNombre}]` : `[Rescate - ${acc.nombre}]`;
             const docRef = await addDoc(collection(db, "finanzas", obtenerMesId(), "ingresos"), {
-                nombre: `[Rescate - ${acc.nombre}]`,
+                nombre: rescueName,
                 monto: monto,
                 grupo: "",
                 es_rescate: true,
@@ -942,8 +1604,10 @@ document.getElementById('form-movimiento-ahorro').addEventListener('submit', asy
             accion: tipo === 'ingreso' ? 'Ingreso' : 'Retiro',
             cuenta_id: cuentaId,
             cuenta: acc.nombre,
+            subcaja_id: subcajaId,
+            subcaja: subcajaNombre,
             monto: monto,
-            motivo: motivo || (tipo === 'ingreso' ? 'Aporte a cuenta de ahorro' : 'Rescate para disponible'),
+            motivo: motivo || (subcajaNombre ? `${tipo === 'ingreso' ? 'Aporte a' : 'Rescate de'} ${subcajaNombre}` : (tipo === 'ingreso' ? 'Aporte a cuenta de ahorro' : 'Rescate para disponible')),
             id_ingreso_generado: idIngresoGenerado
         };
 
@@ -971,6 +1635,7 @@ window.abrirModalHistorial = function() {
     if(!historialAhorros || historialAhorros.length === 0) {
         container.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding: 20px;">No hay movimientos registrados en este mes.</p>';
     } else {
+        const dMep = getDolarMep();
         historialAhorros.forEach(h => {
             const esIngreso = h.tipo === 'ingreso' || (h.accion && h.accion.toLowerCase().includes('ingreso')) || (h.accion && h.accion.toLowerCase().includes('ahorrado'));
             const badgeClass = esIngreso ? 'badge-mov-ingreso' : 'badge-mov-retiro';
@@ -979,6 +1644,7 @@ window.abrirModalHistorial = function() {
             const prefixSign = esIngreso ? '+' : '-';
             const detalleExtra = h.motivo || h.objetivo || '';
             const rescateNotice = h.id_ingreso_generado ? `<span style="font-size:10px; color:#174ea6; display:block; margin-top:2px;">↳ Inyectado como Ingreso disponible</span>` : '';
+            const usdConversion = dMep > 0 ? `<span style="font-size:11px; color:var(--text-muted); display:block; text-align:right;">≈ U$D ${(h.monto / dMep).toFixed(2)}</span>` : '';
 
             container.innerHTML += `
                 <div style="border-bottom: 1px solid var(--card-border); padding: 12px 0; display:flex; justify-content:space-between; align-items:center; gap: 10px;">
@@ -992,7 +1658,10 @@ window.abrirModalHistorial = function() {
                         ${rescateNotice}
                     </div>
                     <div style="display:flex; align-items:center; gap:12px;">
-                        <div style="font-weight:bold; font-size:15px; color:${montoColor}; white-space:nowrap;">${prefixSign} ${window.formatearDinero(h.monto)}</div>
+                        <div>
+                            <div style="font-weight:bold; font-size:15px; color:${montoColor}; white-space:nowrap;">${prefixSign} ${window.formatearDinero(h.monto)}</div>
+                            ${usdConversion}
+                        </div>
                         <div style="display:flex; gap:4px;">
                             <button class="btn-icon" onclick="window.abrirModalEditarMovimiento('${h.id}')" title="Editar monto/motivo">✏️</button>
                             <button class="btn-icon" onclick="window.eliminarMovimientoAhorro('${h.id}')" title="Eliminar movimiento">🗑️</button>
@@ -1007,10 +1676,28 @@ window.abrirModalHistorial = function() {
 window.abrirModalEditarMovimiento = function(movId) {
     const mov = (historialAhorros || []).find(m => m.id === movId);
     if (!mov) return;
+    const dMep = getDolarMep();
+
     document.getElementById('edit-mov-id').value = mov.id;
     document.getElementById('edit-mov-cuenta').value = `${mov.cuenta} (${mov.tipo === 'ingreso' ? 'Ingreso' : 'Retiro'})`;
-    document.getElementById('edit-mov-monto').dataset.raw = mov.monto;
-    document.getElementById('edit-mov-monto').value = window.formatearDinero(mov.monto, 'ARS');
+    
+    document.getElementById('edit-mov-monto-ars').dataset.raw = mov.monto;
+    document.getElementById('edit-mov-monto-ars').value = window.formatearDinero(mov.monto, 'ARS');
+
+    if (dMep > 0) {
+        const usdVal = mov.monto / dMep;
+        document.getElementById('edit-mov-monto-usd').dataset.raw = usdVal;
+        document.getElementById('edit-mov-monto-usd').value = window.formatearDinero(usdVal, 'USD');
+    } else {
+        document.getElementById('edit-mov-monto-usd').dataset.raw = "0";
+        document.getElementById('edit-mov-monto-usd').value = window.formatearDinero(0, 'USD');
+    }
+
+    const mepInfoEl = document.getElementById('edit-mov-mep-info');
+    if (mepInfoEl) {
+        mepInfoEl.innerText = dMep > 0 ? `Cotiz. MEP: ${window.formatearDinero(dMep, 'ARS')}` : `MEP no configurado`;
+    }
+
     document.getElementById('edit-mov-motivo').value = mov.motivo || mov.objetivo || '';
     
     const ayudaEl = document.getElementById('edit-mov-ayuda');
@@ -1026,7 +1713,8 @@ window.abrirModalEditarMovimiento = function(movId) {
 document.getElementById('form-editar-movimiento').addEventListener('submit', async (e) => {
     e.preventDefault();
     const movId = document.getElementById('edit-mov-id').value;
-    const nuevoMonto = parseFloat(document.getElementById('edit-mov-monto').dataset.raw || window.parseMoney(document.getElementById('edit-mov-monto').value));
+    const inpArs = document.getElementById('edit-mov-monto-ars');
+    const nuevoMonto = parseFloat(inpArs.dataset.raw || window.parseMoney(inpArs.value));
     const nuevoMotivo = document.getElementById('edit-mov-motivo').value.trim();
 
     if (isNaN(nuevoMonto) || nuevoMonto <= 0) {
@@ -1142,22 +1830,152 @@ function renderCuentasAhorro() {
                 <strong style="color:#673ab7;">${window.formatearDinero(c.saldoFinal)}${netoTag}</strong>
             </div>`;
 
+        const monedaBadge = c.esUsd 
+            ? `<span style="font-size:10px; background:#e8f0fe; color:#174ea6; padding:2px 6px; border-radius:4px; font-weight:700; border:1px solid #c2e7ff; margin-left:5px;">🇺🇸 USD</span>`
+            : `<span style="font-size:10px; background:#f1f3f4; color:#5f6368; padding:2px 6px; border-radius:4px; font-weight:600; margin-left:5px;">🇦🇷 ARS</span>`;
+
+        let saldoAntDisplay = c.esUsd 
+            ? `${window.formatearDinero(c.saldoAntUsd, 'USD')} <span style="font-size:11px; color:var(--text-muted);">(${window.formatearDinero(c.saldoAnt, 'ARS')})</span>`
+            : `${window.formatearDinero(c.saldoAnt, 'ARS')}`;
+
+        let saldoFinalHtml = '';
+        if (c.esUsd) {
+            saldoFinalHtml = `
+                <div class="value" style="color:#174ea6; font-size:24px; margin-top:2px;">${window.formatearDinero(c.saldoFinalUsd, 'USD')}</div>
+                <div style="font-size:13px; color:var(--text-main); font-weight:600; margin-top:3px;">≈ ${window.formatearDinero(c.saldoFinal, 'ARS')} <span style="font-size:11px; color:var(--text-muted); font-weight:normal;">(al MEP actual)</span></div>
+            `;
+        } else {
+            saldoFinalHtml = `
+                <div class="value" style="color:${c.depositado ? '#137333' : '#673ab7'}; font-size:24px; margin-top:2px;">${window.formatearDinero(c.saldoFinal, 'ARS')}</div>
+                ${dMep > 0 ? `<div style="font-size:13px; color:var(--text-muted); margin-top:3px;">≈ ${window.formatearDinero(c.saldoFinalUsd, 'USD')}</div>` : ''}
+            `;
+        }
+
+        // Cálculo de Sub-Cajas y Estructura en Árbol
+        const subcajas = c.sub_cajas || [];
+        let totalSubcajasArs = 0;
+        let totalSubcajasUsd = 0;
+
+        subcajas.forEach(s => {
+            let sArs = 0;
+            let sUsd = 0;
+            if (c.esUsd) {
+                sUsd = parseFloat(s.monto_usd) || (dMep > 0 ? (parseFloat(s.monto) / dMep) : 0);
+                sArs = dMep > 0 ? (sUsd * dMep) : (parseFloat(s.monto) || 0);
+            } else {
+                sArs = parseFloat(s.monto) || 0;
+                sUsd = dMep > 0 ? (sArs / dMep) : 0;
+            }
+            totalSubcajasArs += sArs;
+            totalSubcajasUsd += sUsd;
+        });
+
+        const saldoBaseTotal = c.esUsd ? c.saldoFinalUsd : c.saldoFinal;
+        const asignadoTotal = c.esUsd ? totalSubcajasUsd : totalSubcajasArs;
+        const libreMonto = Math.max(0, saldoBaseTotal - asignadoTotal);
+        const libreArs = c.esUsd ? (libreMonto * dMep) : libreMonto;
+        const libreUsd = c.esUsd ? libreMonto : (dMep > 0 ? libreMonto / dMep : 0);
+
+        let progressBarSegments = '';
+        let treeBranchesHtml = '';
+
+        subcajas.forEach(s => {
+            let sMonto = c.esUsd ? (parseFloat(s.monto_usd) || (dMep > 0 ? parseFloat(s.monto)/dMep : 0)) : (parseFloat(s.monto) || 0);
+            let sArs = c.esUsd ? (sMonto * dMep) : sMonto;
+            let sUsd = c.esUsd ? sMonto : (dMep > 0 ? sMonto / dMep : 0);
+            let porc = saldoBaseTotal > 0 ? Math.min(100, (sMonto / saldoBaseTotal) * 100) : 0;
+            let sColor = s.color || '#1a73e8';
+
+            progressBarSegments += `<div class="subcajas-progress-segment" style="width: ${porc}%; background-color: ${sColor};" title="${s.nombre}: ${porc.toFixed(1)}%"></div>`;
+
+            let sMontoDisplay = c.esUsd 
+                ? `${window.formatearDinero(sUsd, 'USD')}`
+                : `${window.formatearDinero(sArs, 'ARS')}`;
+            
+            let sSecDisplay = c.esUsd
+                ? `≈ ${window.formatearDinero(sArs, 'ARS')} (${porc.toFixed(1)}%)`
+                : (dMep > 0 ? `≈ ${window.formatearDinero(sUsd, 'USD')} (${porc.toFixed(1)}%)` : `${porc.toFixed(1)}%`);
+
+            treeBranchesHtml += `
+                <div class="subcaja-branch">
+                    <div class="subcaja-card">
+                        <div class="subcaja-info">
+                            <span class="subcaja-dot" style="background-color: ${sColor};"></span>
+                            <span class="subcaja-name" title="${s.nombre}">${s.nombre}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div class="subcaja-values">
+                                <span class="subcaja-amount">${sMontoDisplay}</span>
+                                <span class="subcaja-secondary">${sSecDisplay}</span>
+                            </div>
+                            <div style="display: flex; gap: 2px;">
+                                <button class="btn-icon" onclick="window.abrirModalSubcaja('${c.id}', '${s.id}')" title="Editar Sub-Caja" style="font-size: 11px; padding: 2px 4px;">✏️</button>
+                                <button class="btn-icon" onclick="window.eliminarSubcaja('${c.id}', '${s.id}')" title="Eliminar Sub-Caja" style="font-size: 11px; padding: 2px 4px;">🗑️</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+        });
+
+        // Sub-caja libre/sin asignar si existe saldo remanente
+        if (libreMonto > 0.01) {
+            let librePorc = saldoBaseTotal > 0 ? (libreMonto / saldoBaseTotal) * 100 : 0;
+            progressBarSegments += `<div class="subcajas-progress-segment" style="width: ${librePorc}%; background-color: var(--card-border);" title="Libre: ${librePorc.toFixed(1)}%"></div>`;
+
+            let libreDisplay = c.esUsd 
+                ? `${window.formatearDinero(libreUsd, 'USD')}`
+                : `${window.formatearDinero(libreArs, 'ARS')}`;
+            
+            let libreSecDisplay = c.esUsd
+                ? `≈ ${window.formatearDinero(libreArs, 'ARS')} (${librePorc.toFixed(1)}%)`
+                : (dMep > 0 ? `≈ ${window.formatearDinero(libreUsd, 'USD')} (${librePorc.toFixed(1)}%)` : `${librePorc.toFixed(1)}%`);
+
+            treeBranchesHtml += `
+                <div class="subcaja-branch">
+                    <div class="subcaja-card libre">
+                        <div class="subcaja-info">
+                            <span class="subcaja-dot" style="background-color: #9aa0a6;"></span>
+                            <span class="subcaja-name" style="color: var(--text-muted); font-style: italic;">✨ Libre / Sin Asignar</span>
+                        </div>
+                        <div class="subcaja-values">
+                            <span class="subcaja-amount" style="color: var(--text-muted);">${libreDisplay}</span>
+                            <span class="subcaja-secondary">${libreSecDisplay}</span>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        let subcajasBlockHtml = `
+            <div class="subcajas-container">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                    <span style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Sub-Cajas (Destinos)</span>
+                    <button class="btn-black" style="font-size: 11px; padding: 2px 7px; background: var(--highlight-bg); color: var(--text-main); border: 1px solid var(--card-border);" onclick="window.abrirModalSubcaja('${c.id}')">➕ Sub-Caja</button>
+                </div>
+                ${subcajas.length > 0 ? `<div class="subcajas-progress-bar">${progressBarSegments}</div>` : ''}
+                <div class="subcajas-tree">
+                    ${treeBranchesHtml}
+                </div>
+            </div>`;
+
         cont.innerHTML += `
-            <div class="card" style="${c.depositado ? 'background-color: #e6f4ea; border: 2px solid #137333;' : 'border-top: 4px solid #673ab7;'} display:flex; flex-direction:column; justify-content:space-between; gap: 15px;">
+            <div class="card" style="${c.depositado ? 'background-color: #e6f4ea; border: 2px solid #137333;' : (c.esUsd ? 'border-top: 4px solid #174ea6;' : 'border-top: 4px solid #673ab7;')} display:flex; flex-direction:column; justify-content:space-between; gap: 15px;">
                 <div>
                     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                        <h3 style="font-size:16px; color:var(--text-main); font-weight:600; margin:0; cursor:pointer;" onclick="window.toggleDepositoCuenta('${c.id}')" title="Clic para marcar/desmarcar conciliado">
-                            ${c.depositado ? '✅ ' : '⏳ '}${c.nombre}
-                        </h3>
+                        <div style="display:flex; align-items:center; flex-wrap:wrap; cursor:pointer;" onclick="window.toggleDepositoCuenta('${c.id}')" title="Clic para marcar/desmarcar conciliado">
+                            <h3 style="font-size:16px; color:var(--text-main); font-weight:600; margin:0;">
+                                ${c.depositado ? '✅ ' : '⏳ '}${c.nombre}
+                            </h3>
+                            ${monedaBadge}
+                        </div>
                         <div onclick="event.stopPropagation();">
-                            <button class="btn-icon" onclick="window.editarCuentaAhorro('${c.id}')" title="Editar nombre">✏️</button>
+                            <button class="btn-icon" onclick="window.editarCuentaAhorro('${c.id}')" title="Editar cuenta / saldo">✏️</button>
                             <button class="btn-icon" onclick="window.borrarCuentaAhorro('${c.id}')" title="Eliminar cuenta">🗑️</button>
                         </div>
                     </div>
                     
                     <div style="margin-top: 12px; display:flex; flex-direction:column; gap:4px; font-size:12px;">
-                        <div style="color:var(--text-muted); display:flex; justify-content:space-between;">
-                            <span>Saldo ant. (inicial):</span> <b>${window.formatearDinero(c.saldoAnt)}</b>
+                        <div style="color:var(--text-muted); display:flex; justify-content:space-between; align-items:center;">
+                            <span>Saldo ant. (inicial):</span> <b>${saldoAntDisplay}</b>
                         </div>
                         ${c.ingresos > 0 ? `<div style="color:#137333; display:flex; justify-content:space-between;"><span>Ingresos del mes:</span> <b>+${window.formatearDinero(c.ingresos)}</b></div>` : ''}
                         ${c.retiros > 0 ? `<div style="color:#c5221f; display:flex; justify-content:space-between;"><span>Retiros del mes:</span> <b>-${window.formatearDinero(c.retiros)}</b></div>` : ''}
@@ -1165,9 +1983,10 @@ function renderCuentasAhorro() {
 
                     <div style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed var(--card-border);">
                         <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:600; letter-spacing:0.5px;">Saldo Total Acumulado</span>
-                        <div class="value" style="color:${c.depositado ? '#137333' : '#673ab7'}; font-size:24px; margin-top:2px;">${window.formatearDinero(c.saldoFinal)}</div>
-                        ${dMep > 0 ? `<div style="font-size:13px; color:var(--text-muted); margin-top:3px;">≈ U$D ${(c.saldoFinal / dMep).toFixed(2)}</div>` : ''}
+                        ${saldoFinalHtml}
                     </div>
+
+                    ${subcajasBlockHtml}
                 </div>
 
                 <div style="display:flex; gap:8px; margin-top:5px;">
@@ -1691,21 +2510,37 @@ window.copiarMesAnterior = async function() {
         }
 
         // 2. Cálculo del Saldo Final Absoluto de cada cuenta de ahorro del mes pasado
+        let dMepPrev = parseFloat(prevConfig.dolar_mep) || 0;
         let nuevasCuentas = prevCuentas.map(c => {
             let movsCuenta = prevHistorial.filter(m => m.cuenta_id === c.id);
             let ingMes = movsCuenta.filter(m => m.tipo === 'ingreso').reduce((sum, m) => sum + (parseFloat(m.monto) || 0), 0);
             let retMes = movsCuenta.filter(m => m.tipo === 'retiro').reduce((sum, m) => sum + (parseFloat(m.monto) || 0), 0);
             let saldoAnt = parseFloat(c.saldo_anterior) || 0;
-            
+            let saldoAntUsd = parseFloat(c.saldo_anterior_usd) || 0;
+            let esUsd = c.moneda === 'USD' || (c.nombre && (c.nombre.toLowerCase().includes('usd') || c.nombre.toLowerCase().includes('galileo')));
+
             // Soporte para datos legacy si existían
             if (c.retiros) retMes += (parseFloat(c.retiros) || 0);
 
             let saldoFinalAbsoluto = saldoAnt + ingMes - retMes;
+            let saldoFinalUsd = 0;
+            if (esUsd) {
+                let ingUsd = dMepPrev > 0 ? (ingMes / dMepPrev) : 0;
+                let retUsd = dMepPrev > 0 ? (retMes / dMepPrev) : 0;
+                saldoFinalUsd = saldoAntUsd + ingUsd - retUsd;
+            }
+
+            // Preservar estructura de sub-cajas
+            let subCajasCopiadas = (c.sub_cajas || []).map(s => ({ ...s }));
+
             return {
                 id: c.id,
                 nombre: c.nombre,
+                moneda: esUsd ? 'USD' : (c.moneda || 'ARS'),
                 depositado: false,
-                saldo_anterior: saldoFinalAbsoluto
+                saldo_anterior: saldoFinalAbsoluto,
+                saldo_anterior_usd: saldoFinalUsd,
+                sub_cajas: subCajasCopiadas
             };
         });
 
