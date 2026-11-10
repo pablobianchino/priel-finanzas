@@ -1,4 +1,28 @@
 export const vistaModales = `
+<!-- Modal Cotización del dólar (único para toda la app) -->
+<div id="modal-mep" class="modal-overlay">
+    <div class="modal-content" style="max-width: 420px;">
+        <div class="modal-header">
+            <h2 style="margin: 0; font-size: 16px;">Cotización del dólar</h2>
+            <button class="modal-close" onclick="window.cerrarModal('modal-mep')"><i class="ti ti-x"></i></button>
+        </div>
+        <div class="field-row"><span>MEP mercado <span class="sub">(ahorros)</span></span>
+            <input type="text" id="usd-mep" class="money-input" value="0" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></div>
+        <div class="field-row"><span>Comisión broker <span class="sub">(%)</span></span>
+            <input type="number" id="usd-comision-mep" step="0.1" min="0" max="10" value="0.6" onchange="window.recalcularMepTarjeta()"></div>
+        <div class="field-row"><span>MEP tarjeta <span class="sub">(gastos)</span></span>
+            <input type="text" id="usd-debito" class="money-input" value="0" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></div>
+        <div class="sub" style="margin: 8px 0 12px;">El MEP tarjeta se calcula como mercado + comisión; también podés ajustarlo a mano.
+            <a href="#" onclick="event.preventDefault(); window.recalcularMepTarjeta()">Recalcular</a></div>
+        <div id="mep-live-info-resumen" class="sub" style="margin-bottom: 14px;"></div>
+        <button id="btn-aplicar-mep-resumen" style="display:none;"></button>
+        <div style="display: flex; justify-content: space-between; gap: 10px;">
+            <button type="button" class="btn-black btn-sec" onclick="window.consultarMepEnVivo('resumen')"><i class="ti ti-refresh"></i>Traer del mercado</button>
+            <button type="button" class="btn-black" onclick="window.guardarConfiguracionDolar('resumen')">Guardar</button>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Historial Ahorros -->
 <div id="modal-historial" class="modal-overlay">
     <div class="modal-content" style="max-width: 650px;">
@@ -260,7 +284,10 @@ export const vistaModales = `
                 <input type="number" id="gasto-cuotas-totales" placeholder="Cuotas Tot" min="1" style="width: 100px;">
                 <input type="number" id="gasto-cuotas-pagadas" placeholder="Cuotas Pag" min="1" style="width: 100px;">
             </div>
-            <button type="submit" class="btn-black" id="btn-submit-gasto" style="margin-top: 10px;">Guardar Gasto</button>
+            <div style="display:flex; gap:10px; justify-content:space-between; align-items:center; margin-top: 10px;">
+                <button type="button" id="btn-eliminar-gasto" class="btn-black btn-sec btn-danger-text" style="display:none;" onclick="window.eliminarDesdeModal('gasto')"><i class="ti ti-trash"></i>Eliminar</button>
+                <button type="submit" class="btn-black" id="btn-submit-gasto" style="margin-left:auto;">Guardar gasto</button>
+            </div>
         </form>
     </div>
 </div>
@@ -280,7 +307,10 @@ export const vistaModales = `
                 <label style="font-size: 13px; color: var(--text-muted);">Vincular a Grupo de Distribución (Presupuesto):</label>
                 <select id="ingreso-grupo" style="width:100%; margin-top:5px;"></select>
             </div>
-            <button type="submit" class="btn-black" id="btn-submit-ingreso" style="margin-top: 10px;">Guardar Ingreso</button>
+            <div style="display:flex; gap:10px; justify-content:space-between; align-items:center; margin-top: 10px;">
+                <button type="button" id="btn-eliminar-ingreso" class="btn-black btn-sec btn-danger-text" style="display:none;" onclick="window.eliminarDesdeModal('ingreso')"><i class="ti ti-trash"></i>Eliminar</button>
+                <button type="submit" class="btn-black" id="btn-submit-ingreso" style="margin-left:auto;">Guardar ingreso</button>
+            </div>
         </form>
     </div>
 </div>

@@ -1,8 +1,12 @@
-const CACHE_NAME = 'finanzas-priel-v2.9.2';
+// Service worker: "network-first". Siempre intenta traer la versión más nueva de la red
+// (revalidando contra el servidor) y solo usa la copia guardada si no hay conexión.
+// Así una versión nueva llega apenas se publica, sin tener que subir números de caché a mano.
+const CACHE_NAME = 'finanzas-priel';
 const urlsToCache = [
   './',
   './index.html',
   './style.css',
+  './version.json',
   './js/app.js',
   './js/logica.js',
   './js/firebase.js',
@@ -20,50 +24,32 @@ const urlsToCache = [
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache.map(u => new Request(u, { cache: 'reload' })))).catch(() => {})
   );
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    caches.keys().then(names => Promise.all(names.filter(n => n !== CACHE_NAME).map(n => caches.delete(n))))
   );
   self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
-  // Solo interceptar peticiones GET
+  // Solo GET del mismo origen; Firebase, Google y CDNs no se tocan
   if (event.request.method !== 'GET') return;
-
-  // Ignorar peticiones de Firebase, Google APIs u orígenes externos para no interferir con la autenticación o base de datos en tiempo real
   const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin) {
-    return;
-  }
+  if (url.origin !== self.location.origin) return;
 
   event.respondWith(
-    caches.match(event.request).then(cachedResponse => {
-      const fetchPromise = fetch(event.request).then(networkResponse => {
+    fetch(event.request, { cache: 'no-cache' })
+      .then(networkResponse => {
         if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseToCache);
-          });
+          const copia = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copia));
         }
         return networkResponse;
-      }).catch(() => {
-        return cachedResponse;
-      });
-
-      return cachedResponse || fetchPromise;
-    })
+      })
+      .catch(() => caches.match(event.request))
   );
 });

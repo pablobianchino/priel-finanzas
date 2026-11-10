@@ -17,6 +17,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
@@ -50,13 +51,13 @@
         <div class="sidebar-overlay" id="sidebar-overlay" onclick="window.toggleSidebar()"></div>
         
         <nav class="sidebar" id="sidebar">
-            <button class="close-sidebar-btn" onclick="window.toggleSidebar()">✖</button>
-            <div class="logo">Finanzas Priel</div>
-            <button class="nav-btn active" onclick="window.switchView('resumen', this)">⊞ Resumen</button>
-            <button class="nav-btn" onclick="window.switchView('gastos', this)">▼ Gastos</button>
-            <button class="nav-btn" onclick="window.switchView('ingresos', this)">▲ Ingresos / Objetivos</button>
-            <button class="nav-btn" onclick="window.switchView('ahorros', this)">◆ Ahorros</button>
-            <button class="nav-btn" onclick="window.switchView('estadisticas', this)">▤ Estadísticas</button>
+            <button class="close-sidebar-btn" onclick="window.toggleSidebar()"><i class="ti ti-x"></i></button>
+            <div class="logo"><span class="logo-mark">F</span>Finanzas Priel</div>
+            <button class="nav-btn active" onclick="window.switchView('resumen', this)"><i class="ti ti-layout-dashboard"></i>Resumen</button>
+            <button class="nav-btn" onclick="window.switchView('gastos', this)"><i class="ti ti-arrow-down-right"></i>Gastos</button>
+            <button class="nav-btn" onclick="window.switchView('ingresos', this)"><i class="ti ti-arrow-up-right"></i>Ingresos y objetivos</button>
+            <button class="nav-btn" onclick="window.switchView('ahorros', this)"><i class="ti ti-pig-money"></i>Ahorros</button>
+            <button class="nav-btn" onclick="window.switchView('estadisticas', this)"><i class="ti ti-chart-bar"></i>Estadísticas</button>
             
             <div class="user-info">
                 <span id="user-email">No autenticado</span><br>
@@ -68,19 +69,31 @@
         <main class="main-content">
             <div class="topbar">
                 <div class="title">
-                    <button class="mobile-menu-btn" onclick="window.toggleSidebar()">☰</button>
+                    <button class="mobile-menu-btn" onclick="window.toggleSidebar()"><i class="ti ti-menu-2"></i></button>
                     <h1 id="view-title">Resumen</h1>
                     <button id="logout-btn-mobile" class="topbar-mobile-logout">Salir</button>
                 </div>
                 <div class="selectors">
-                    <button id="theme-toggle-btn" class="theme-toggle-btn" onclick="window.toggleTheme()" title="Modo Claro/Oscuro">🌙</button>
-                    <select id="mes-selector">
-                        <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option>
-                        <option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option>
-                        <option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option>
-                        <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
-                    </select>
-                    <select id="anio-selector"></select>
+                    <div class="period">
+                        <button class="step" onclick="window.cambiarPeriodo(-1)" title="Mes anterior" aria-label="Mes anterior"><i class="ti ti-chevron-left"></i></button>
+                        <select id="mes-selector" aria-label="Mes">
+                            <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option>
+                            <option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option>
+                            <option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option>
+                            <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+                        </select>
+                        <select id="anio-selector" aria-label="Año"></select>
+                        <button class="step" onclick="window.cambiarPeriodo(1)" title="Mes siguiente" aria-label="Mes siguiente"><i class="ti ti-chevron-right"></i></button>
+                    </div>
+                    <button class="chip-btn" id="mep-chip" onclick="window.abrirModalMep()" title="Cotización del dólar"><i class="ti ti-currency-dollar"></i><span id="mep-chip-text">MEP</span></button>
+                    <button id="theme-toggle-btn" class="theme-toggle-btn" onclick="window.toggleTheme()" title="Modo claro/oscuro"><i class="ti ti-moon"></i></button>
+                    <details class="menu" id="menu-acciones">
+                        <summary class="icon-box" title="Más acciones" aria-label="Más acciones"><i class="ti ti-dots"></i></summary>
+                        <div class="menu-pop">
+                            <button onclick="document.getElementById('menu-acciones').open=false; window.exportarBackupMes()"><i class="ti ti-download"></i>Descargar backup del mes</button>
+                            <button onclick="document.getElementById('menu-acciones').open=false; window.copiarMesAnterior()"><i class="ti ti-history"></i>Importar mes anterior</button>
+                        </div>
+                    </details>
                 </div>
             </div>
 
@@ -89,11 +102,11 @@
         </main>
         
         <nav class="bottom-nav" id="bottom-nav">
-            <button class="nav-btn-bottom active" onclick="window.switchView('resumen', this)"><span class="icon">⊞</span><span class="text">Resumen</span></button>
-            <button class="nav-btn-bottom" onclick="window.switchView('gastos', this)"><span class="icon">▼</span><span class="text">Gastos</span></button>
-            <button class="nav-btn-bottom" onclick="window.switchView('ingresos', this)"><span class="icon">▲</span><span class="text">Ingresos</span></button>
-            <button class="nav-btn-bottom" onclick="window.switchView('ahorros', this)"><span class="icon">◆</span><span class="text">Ahorros</span></button>
-            <button class="nav-btn-bottom" onclick="window.switchView('estadisticas', this)"><span class="icon">▤</span><span class="text">Estad.</span></button>
+            <button class="nav-btn-bottom active" onclick="window.switchView('resumen', this)"><span class="icon"><i class="ti ti-layout-dashboard"></i></span><span class="text">Resumen</span></button>
+            <button class="nav-btn-bottom" onclick="window.switchView('gastos', this)"><span class="icon"><i class="ti ti-arrow-down-right"></i></span><span class="text">Gastos</span></button>
+            <button class="nav-btn-bottom" onclick="window.switchView('ingresos', this)"><span class="icon"><i class="ti ti-arrow-up-right"></i></span><span class="text">Ingresos</span></button>
+            <button class="nav-btn-bottom" onclick="window.switchView('ahorros', this)"><span class="icon"><i class="ti ti-pig-money"></i></span><span class="text">Ahorros</span></button>
+            <button class="nav-btn-bottom" onclick="window.switchView('estadisticas', this)"><span class="icon"><i class="ti ti-chart-bar"></i></span><span class="text">Estad.</span></button>
         </nav>
     </div>
 

@@ -11,7 +11,7 @@ import { vistaModales } from '../vistas/modales.js';
 document.getElementById('views-container').innerHTML = vistaResumen + vistaGastos + vistaIngresos + vistaAhorros + vistaEstadisticas;
 document.getElementById('modals-container').innerHTML = vistaModales;
 
-const APP_VERSION = "v2.9.2";
+const APP_VERSION = "v2.10";
 window.APP_VERSION = APP_VERSION;
 
 const updateVersionTags = () => {
@@ -31,7 +31,7 @@ window.toggleTheme = function() {
 
 function actualizarIconoTema(isDark) {
     const btn = document.getElementById('theme-toggle-btn');
-    if (btn) btn.innerText = isDark ? '☀️' : '🌙';
+    if (btn) btn.innerHTML = isDark ? '<i class="ti ti-sun"></i>' : '<i class="ti ti-moon"></i>';
 }
 
 const savedTheme = localStorage.getItem('theme');
@@ -51,14 +51,41 @@ const currentMonth = String(today.getMonth() + 1).padStart(2, '0');
 const currentYear = String(today.getFullYear());
 
 mesSelector.value = currentMonth;
-let yearExists = Array.from(anioSelector.options).some(opt => opt.value === currentYear);
-if (!yearExists) {
-    anioSelector.add(new Option(currentYear, currentYear));
-    const opts = Array.from(anioSelector.options).sort((a, b) => a.value - b.value);
-    anioSelector.innerHTML = '';
-    opts.forEach(opt => anioSelector.add(opt));
+// Años disponibles: 4 hacia atrás y 1 hacia adelante, para poder navegar con las flechas del período
+for (let y = parseInt(currentYear) - 4; y <= parseInt(currentYear) + 1; y++) {
+    if (!Array.from(anioSelector.options).some(opt => opt.value === String(y))) anioSelector.add(new Option(String(y), String(y)));
 }
 anioSelector.value = currentYear;
+
+// Flechas ‹ › del período: mueve el mes (y el año si hace falta)
+window.cambiarPeriodo = function(delta) {
+    let m = parseInt(mesSelector.value) + delta, a = parseInt(anioSelector.value);
+    if (m < 1) { m = 12; a--; } else if (m > 12) { m = 1; a++; }
+    const cambioAnio = String(a) !== anioSelector.value;
+    if (!Array.from(anioSelector.options).some(opt => opt.value === String(a))) {
+        anioSelector.add(new Option(String(a), String(a)));
+        Array.from(anioSelector.options).sort((x, y) => x.value - y.value).forEach(opt => anioSelector.add(opt));
+    }
+    mesSelector.value = String(m).padStart(2, '0');
+    anioSelector.value = String(a);
+    (cambioAnio ? anioSelector : mesSelector).dispatchEvent(new Event('change'));
+};
+
+// Panel único de cotización del dólar (chip "MEP" de la barra superior)
+window.abrirModalMep = function() { document.getElementById('modal-mep').style.display = 'flex'; };
+function actualizarChipMep() {
+    const el = document.getElementById('mep-chip-text');
+    if (!el) return;
+    const mep = parseFloat(document.getElementById('usd-mep')?.dataset.raw || 0);
+    el.innerText = mep > 0 ? `MEP ${window.formatearDinero(mep).replace('$ ', '')}` : 'MEP sin cargar';
+}
+window.recalcularMepTarjeta = function() {
+    const mep = window.parseMoney(document.getElementById('usd-mep').value);
+    const com = parseFloat(document.getElementById('usd-comision-mep').value) || 0;
+    const deb = Math.round(mep * (1 + com / 100) * 100) / 100;
+    const el = document.getElementById('usd-debito');
+    el.dataset.raw = deb; el.value = window.formatearDinero(deb, 'ARS');
+};
 
 let totalGastosGlobal = 0, subtotalTerceros = 0, totalIngresosGlobal = 0, deudaFuturaTotal = 0;
 let aCobrarPorPersona = {};
@@ -119,7 +146,7 @@ window.toggleCard = function(headerEl) {
 };
 
 window.togglePanelGasto = function(toggleEl) {
-    const content = toggleEl.parentElement.nextElementSibling;
+    const content = toggleEl.closest('.card').querySelector('.card-content');
     const icon = toggleEl.querySelector('.toggle-icon');
     if (content.style.display === 'none') {
         content.style.display = 'block';
@@ -133,13 +160,9 @@ window.togglePanelGasto = function(toggleEl) {
 window.toggleIngresoDetalle = function(id) {
     const tr = document.getElementById(`detalle-ingreso-${id}`);
     const icon = document.getElementById(`icon-ingreso-${id}`);
-    if (tr.style.display === 'none') {
-        tr.style.display = 'table-row';
-        if (icon) icon.innerText = '▼';
-    } else {
-        tr.style.display = 'none';
-        if (icon) icon.innerText = '▶';
-    }
+    const abrir = tr.style.display === 'none';
+    tr.style.display = abrir ? 'table-row' : 'none';
+    if (icon) icon.className = abrir ? 'ti ti-chevron-down' : 'ti ti-chevron-right';
 }
 
 window.filtrarGastosIngreso = function(id, text) {
@@ -264,6 +287,7 @@ async function actualizarDashboard(mostrarLoader = true) {
 }
 
 window.recargarDatosVisuales = function() {
+    actualizarChipMep();
     const dDebito = parseFloat(document.getElementById('usd-debito').dataset.raw || 0);
     
     let gastosProc = procesarListaGastos(dDebito);
@@ -566,7 +590,7 @@ window.consultarMepEnVivo = async function(origenPanel) {
     const panels = ['resumen', 'gastos', 'ingresos', 'ahorros'];
     panels.forEach(p => {
         const infoEl = document.getElementById(`mep-live-info-${p}`);
-        if (infoEl) infoEl.innerHTML = `<span style="color:#174ea6;">⏳ Consultando cotización de mercado en vivo...</span>`;
+        if (infoEl) infoEl.innerHTML = `<span style="color:#174ea6;"><i class="ti ti-clock"></i> Consultando cotización de mercado en vivo...</span>`;
     });
 
     try {
@@ -600,7 +624,7 @@ window.consultarMepEnVivo = async function(origenPanel) {
         console.error("Error al consultar MEP en vivo:", err);
         panels.forEach(p => {
             const infoEl = document.getElementById(`mep-live-info-${p}`);
-            if (infoEl) infoEl.innerHTML = `<span style="color:#c5221f;">⚠️ No se pudo consultar la cotización en vivo. Intenta de nuevo en unos momentos.</span>`;
+            if (infoEl) infoEl.innerHTML = `<span style="color:#c5221f;">⚠ No se pudo consultar la cotización en vivo. Intenta de nuevo en unos momentos.</span>`;
         });
     }
 };
@@ -633,9 +657,9 @@ window.actualizarCalculoMepEnPantalla = function(origenPanel) {
         if (infoEl) {
             infoEl.innerHTML = `
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                    <span>🏛️ <b>Mercado (Ahorros):</b> <span style="font-weight:700; color:var(--text-main);">${window.formatearDinero(mepMercado, 'ARS')}</span></span>
+                    <span><i class="ti ti-building-bank"></i> <b>Mercado (Ahorros):</b> <span style="font-weight:700; color:var(--text-main);">${window.formatearDinero(mepMercado, 'ARS')}</span></span>
                     <span style="color:var(--text-muted);">|</span>
-                    <span>📈 <b>+${comisionPct}% Broker:</b> +${window.formatearDinero(recargoMonto, 'ARS')}</span>
+                    <span><i class="ti ti-trending-up"></i> <b>+${comisionPct}% Broker:</b> +${window.formatearDinero(recargoMonto, 'ARS')}</span>
                     <span style="color:var(--text-muted);">➔</span>
                     <span style="background:#e6f4ea; color:#137333; padding:2px 8px; border-radius:6px; font-weight:bold; font-size:12px;">
                         MEP Compra (Gastos): ${window.formatearDinero(mepEfectivo, 'ARS')}
@@ -643,11 +667,13 @@ window.actualizarCalculoMepEnPantalla = function(origenPanel) {
                     <span style="font-size:11px; color:var(--text-muted);">(${ultimoMepConsultado.fecha})</span>
                 </div>`;
         }
-        if (btnAplicar) {
-            btnAplicar.style.display = 'inline-flex';
-            btnAplicar.innerText = '✅ Aplicar Cotizaciones';
-        }
+        if (btnAplicar) btnAplicar.style.display = 'none';
     });
+
+    // Rellena los campos del panel (sin guardar): el usuario revisa y toca "Guardar"
+    const mepIn = document.getElementById('usd-mep'), debIn = document.getElementById('usd-debito');
+    if (mepIn) { mepIn.dataset.raw = mepMercado; mepIn.value = window.formatearDinero(mepMercado, 'ARS'); }
+    if (debIn) { const e = Math.round(mepEfectivo * 100) / 100; debIn.dataset.raw = e; debIn.value = window.formatearDinero(e, 'ARS'); }
 };
 
 window.aplicarMepConsultado = async function(origenPanel) {
@@ -681,6 +707,7 @@ window.guardarConfiguracionDolar = async function(origenPanel) {
     let debito = window.parseMoney(document.getElementById(`usd-debito${suffix}`).value);
     let comision = parseFloat(document.getElementById(`usd-comision-mep${suffix}`)?.value || 0.6);
 
+    window.cerrarModal('modal-mep');
     window.mostrarCargando(true, "Guardando cotizaciones USD...");
     await actualizarConfiguracionDB({ 
         "configuracion.dolar_mep": mep, 
@@ -758,14 +785,15 @@ function renderizacioDinamicaGastosPaneles(gastosProcesados, dDebito) {
         if (buscador && !matchesCatName && itemsPanel.length === 0) continue;
 
         itemsPanel.sort((a, b) => b.costoCalculado - a.costoCalculado);
-
         let totalPanel = itemsPanel.reduce((sum, g) => sum + g.costoCalculado, 0);
-        let saldoHtml = origenesDelPanel.length === 0 ? `<div class="saldo-ok" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; margin-bottom: 10px; display: inline-block;">Sin origen vinculado</div>` : `<div style="display: flex; flex-wrap: wrap; margin-bottom: 5px;">${origenesDelPanel.map(idInc => {
+
+        // Chips de saldo restante por cada ingreso que alimenta el panel
+        let saldoHtml = origenesDelPanel.map(idInc => {
             let io = listaIngresos.find(i => i.id === idInc);
             if (!io) return '';
             let restante = io.monto - (sumatoriaGastosPorOrigen[idInc] || 0);
-            return `<div style="background-color: ${restante < 0 ? '#fce8e6' : '#e6f4ea'}; color: ${restante < 0 ? '#c5221f' : '#137333'}; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; display: inline-block; margin-right: 8px; margin-bottom: 8px;">Restante de ${esc(io.nombre)}: ${window.formatearDinero(restante)}</div>`;
-        }).join('')}</div>`;
+            return `<span class="pill ${restante < 0 ? 'bad' : 'ok'}">${esc(io.nombre)}: ${restante < 0 ? 'faltan' : 'quedan'} ${window.formatearDinero(Math.abs(restante)).replace('$ ', '')}</span>`;
+        }).join('');
 
         panelesData.push({ categoria, totalPanel, itemsPanel, origenesDelPanel, saldoHtml });
     }
@@ -781,76 +809,97 @@ function renderizacioDinamicaGastosPaneles(gastosProcesados, dDebito) {
         let iconText = isOpen ? '▼' : '▶';
 
         let hasUnassociated = p.itemsPanel.some(g => !g.es_clon_destino && !g.ignorar_origen && ((p.origenesDelPanel.length > 1 && (!g.id_origen || !p.origenesDelPanel.includes(g.id_origen))) || p.origenesDelPanel.length === 0));
-        let alertBadge = hasUnassociated ? `<span style="background-color: #fce8e6; color: #c5221f; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 10px; vertical-align: text-bottom;">⚠️ Falta origen</span>` : '';
+        let alertBadge = hasUnassociated ? `<span class="pill warn"><i class="ti ti-alert-triangle"></i>Falta origen</span>` : '';
 
         let itemsHTML = p.itemsPanel.map(g => {
-            let originHtml = '';
-            let isUnassociated = false; 
+            const editId = g.es_clon_destino ? g.id.replace('_clon', '') : g.id;
+            const esTarjeta = g.tipo === 'Tarjeta';
+            const esSuscripcion = esTarjeta && parseInt(g.cuotas_totales || 1) <= 1;
 
-            if (!g.es_clon_destino) {
-                if (p.origenesDelPanel.length > 1) {
-                    originHtml = `<br><select onclick="event.stopPropagation()" onchange="window.cambiarOrigenGastoDirecto('${g.id}', this.value)" style="font-size:10px; padding:2px; margin-top:4px; max-width: 140px; border-radius:4px; border:1px solid var(--card-border); background:var(--input-bg); color:var(--text-main);"><option value="" ${!g.id_origen ? 'selected' : ''}>- Seleccionar Origen -</option>${p.origenesDelPanel.map(idInc => {
-                        let io = listaIngresos.find(i => i.id === idInc);
-                        return io ? `<option value="${io.id}" ${g.id_origen === idInc ? 'selected' : ''}>${esc(io.nombre)}</option>` : '';
-                    }).join('')}</select>`;
-                    if (!g.id_origen || !p.origenesDelPanel.includes(g.id_origen)) isUnassociated = true; 
-                } else if (p.origenesDelPanel.length === 1) {
-                    let io = listaIngresos.find(i=>i.id === p.origenesDelPanel[0]);
-                    if(io) originHtml = `<br><span style="font-size:10px; color:var(--text-muted);">De: ${esc(io.nombre)}</span>`;
-                } else isUnassociated = true; 
+            // --- Gasto: nombre + detalles en una sola línea secundaria ---
+            let detalles = [];
+            if (g.moneda === 'USD') detalles.push(`U$D ${Number(g.monto).toFixed(2)} × ${window.formatearDinero(dDebito).replace('$ ', '')}`);
+            if (g.es_clon_origen) detalles.push(`tu parte · compartido con ${esc(g.compartir_con)}`);
+            else if (g.es_clon_destino) detalles.push(`parte de ${esc(g.categoria.replace('Gastos de ', ''))}`);
+            else if (g.propietario === 'Tercero') detalles.push(`de ${esc(g.tercero_nombre || 'tercero')}`);
+            const detalleHtml = detalles.length ? ` <span class="sub">${detalles.join(' · ')}</span>` : '';
+
+            // --- Medio ---
+            const medioHtml = esTarjeta ? `<span class="pill info">${esc(g.tarjeta || 'Tarjeta')}</span>` : `<span class="pill">Fijo</span>`;
+
+            // --- Origen ---
+            let origenHtml = '';
+            if (g.es_clon_destino) {
+                origenHtml = `<span class="sub">A cobrar</span>`;
+            } else if (p.origenesDelPanel.length > 1) {
+                const sinOrigen = !g.id_origen || !p.origenesDelPanel.includes(g.id_origen);
+                origenHtml = `<select onclick="event.stopPropagation()" onchange="window.cambiarOrigenGastoDirecto('${g.id}', this.value)" style="font-size:12px; padding:3px 6px; max-width:150px; ${sinOrigen && !g.ignorar_origen ? 'border-color:var(--bad);' : ''}"><option value="" ${!g.id_origen ? 'selected' : ''}>Elegir origen</option>${p.origenesDelPanel.map(idInc => {
+                    let io = listaIngresos.find(i => i.id === idInc);
+                    return io ? `<option value="${io.id}" ${g.id_origen === idInc ? 'selected' : ''}>${esc(io.nombre)}</option>` : '';
+                }).join('')}</select>`;
+            } else if (p.origenesDelPanel.length === 1) {
+                const io = listaIngresos.find(i => i.id === p.origenesDelPanel[0]);
+                origenHtml = io ? esc(io.nombre) : '';
+            } else {
+                origenHtml = g.ignorar_origen
+                    ? `<span class="sub">Sin origen (ignorado)</span>`
+                    : `<span class="dn">Sin origen</span>`;
+            }
+            if (!g.es_clon_destino && !g.ignorar_origen && (p.origenesDelPanel.length === 0 || (p.origenesDelPanel.length > 1 && (!g.id_origen || !p.origenesDelPanel.includes(g.id_origen))))) {
+                origenHtml += ` <label class="sub" style="cursor:pointer;" onclick="event.stopPropagation()"><input type="checkbox" onchange="window.toggleIgnorarOrigenGasto('${g.id}', this.checked)" style="width:12px; height:12px; vertical-align:middle;"> ignorar</label>`;
+            } else if (!g.es_clon_destino && g.ignorar_origen) {
+                origenHtml += ` <label class="sub" style="cursor:pointer;" onclick="event.stopPropagation()"><input type="checkbox" checked onchange="window.toggleIgnorarOrigenGasto('${g.id}', this.checked)" style="width:12px; height:12px; vertical-align:middle;"> ignorado</label>`;
             }
 
-            if (!g.es_clon_destino && isUnassociated) {
-                originHtml += `<div style="margin-top: 4px; padding: 2px 4px; background: ${g.ignorar_origen ? 'var(--highlight-bg)' : '#fce8e6'}; border-radius: 4px; display: inline-block;"><label style="font-size:10px; color:${g.ignorar_origen ? 'var(--text-muted)' : '#c5221f'}; display:flex; align-items:center; gap:4px; cursor:pointer; margin:0;"><input type="checkbox" onclick="event.stopPropagation()" onchange="window.toggleIgnorarOrigenGasto('${g.id}', this.checked)" ${g.ignorar_origen ? 'checked' : ''} style="width:12px; height:12px; margin:0; cursor:pointer;"> ${g.ignorar_origen ? 'Aviso ignorado' : 'Ignorar falta de origen'}</label></div>`;
-            }
-            
-            let esSuscripcionTarjeta = g.tipo === 'Tarjeta' && parseInt(g.cuotas_totales || 1) <= 1;
-            let recCheckbox = (g.tipo === 'Tarjeta' && !esSuscripcionTarjeta) 
-                ? '<span style="color:var(--text-muted); font-size:10px;">N/A</span>' 
-                : `<input type="checkbox" style="cursor:pointer;" onclick="event.stopPropagation()" onchange="window.toggleRecurrenciaGasto('${g.id}', this.checked)" ${g.recurrente !== false ? 'checked' : ''}>`;
-            
-            let cuotasDetalle = (g.tipo === 'Tarjeta' && !esSuscripcionTarjeta) ? `<br><span style="font-size:11px; color:#174ea6;">${esc(g.tarjeta || 'Tarjeta')} (${g.cuotas_pagadas}/${g.cuotas_totales})</span>` : (g.tipo === 'Tarjeta' ? `<br><span style="font-size:11px; color:#174ea6;">${esc(g.tarjeta || 'Tarjeta')} (Suscripción)</span>` : '');
-            let bgRowStyle = g.tipo === 'Tarjeta' && !esSuscripcionTarjeta && parseInt(g.cuotas_pagadas) >= parseInt(g.cuotas_totales) ? 'background-color: var(--highlight-bg);' : '';
+            // --- Cuota ---
+            let cuotaHtml;
+            if (esTarjeta && !esSuscripcion) cuotaHtml = `${g.cuotas_pagadas} / ${g.cuotas_totales}`;
+            else cuotaHtml = `<span class="muted">${g.recurrente === false ? 'Único' : 'Mensual'}</span>`;
+            const terminada = esTarjeta && !esSuscripcion && parseInt(g.cuotas_pagadas) >= parseInt(g.cuotas_totales);
 
-            let usdBtn = '', breakdownHtml = '';
-            if (g.moneda === 'USD') {
-                let vDeb = g.monto * dDebito, totalCosto = vDeb;
-                usdBtn = `<br><span style="color:#174ea6; font-size:10px; cursor:pointer; text-decoration:underline;" onclick="event.stopPropagation(); document.getElementById('usd-detail-${g.id}').style.display = document.getElementById('usd-detail-${g.id}').style.display === 'none' ? 'table-row' : 'none'">Ver cálculo USD</span>`;
-                breakdownHtml = `<tr id="usd-detail-${g.id}" style="display:none; background-color:var(--highlight-bg);"><td colspan="4" style="padding: 10px; font-size:11px; color:var(--text-muted);"><strong>Cálculo USD:</strong><br>Monto original: U$D ${g.monto}<br>Monto x Dólar MEP Tarjeta (${dDebito}): $${(vDeb).toFixed(2)}<br><b>Subtotal: $${(totalCosto).toFixed(2)}</b>${(g.divisor && g.divisor > 1) ? `<br><i>Dividido en ${g.divisor} partes: $${(totalCosto/g.divisor).toFixed(2)}</i>` : ''}</td></tr>`;
-            }
+            const accion = g.es_clon_destino
+                ? `<i class="ti ti-lock row-act" title="Gasto compartido: se edita desde el original"></i>`
+                : `<i class="ti ti-pencil row-act"></i>`;
 
-            let actionsHtml = g.es_clon_destino ? `<span style="font-size:10px; color:#c5221f; font-weight:600;">🔒 Compartido (Edite original)</span>` : `<button class="btn-icon" onclick="event.stopPropagation(); window.borrarGasto('${g.id}')">🗑️</button>`;
-
-            return `<tr style="${bgRowStyle}" class="tr-clickable" onclick="window.prepararEdicionGasto('${g.es_clon_destino ? g.id.replace('_clon','') : g.id}')"><td><strong>${esc(g.nombre)}</strong>${cuotasDetalle}${originHtml}${usdBtn}</td><td style="font-weight:600;">${window.formatearDinero(g.costoCalculado)}</td><td style="text-align:center;">${recCheckbox}</td><td style="white-space:nowrap;">${actionsHtml}</td></tr>${breakdownHtml}`;
+            return `<tr class="tr-clickable" style="${terminada ? 'background-color: var(--highlight-bg);' : ''}" onclick="window.prepararEdicionGasto('${editId}')"><td>${esc(g.nombre)}${detalleHtml}</td><td>${medioHtml}</td><td>${origenHtml}</td><td class="num">${cuotaHtml}</td><td class="num">${window.formatearDinero(g.costoCalculado).replace('$ ', '')}</td><td class="num">${accion}</td></tr>`;
         }).join('');
 
+        const checksOrigen = listaIngresos.length === 0
+            ? '<div class="menu-item sub">Todavía no hay ingresos cargados.</div>'
+            : listaIngresos.map(ing => `<label class="menu-item" style="padding:6px 10px;"><input type="checkbox" onchange="window.toggleOrigenPanel('${jsq(p.categoria)}', '${ing.id}', this.checked)" ${p.origenesDelPanel.includes(ing.id) ? 'checked' : ''}> ${esc(ing.nombre)}</label>`).join('');
+
         contenedor.innerHTML += `
-            <div class="card panel-gasto-item" data-categoria="${esc(p.categoria)}" style="border-top: 4px solid var(--primary-color);">
-                <div style="display:flex; align-items:center;">
-                    <span class="drag-handle" style="cursor:grab; margin-right:10px; font-size:20px; color:var(--text-muted);">⠿</span>
-                    <div class="card-header-toggle" onclick="window.togglePanelGasto(this)" style="margin-bottom:0; flex:1; display:flex; justify-content:space-between; align-items:center;">
-                        <h2 style="margin:0; font-size:15px; flex:1;">${esc(p.categoria)} ${alertBadge}<span style="font-weight:normal; font-size:13px; color:var(--text-muted);"> | Total: <b style="color:var(--text-main);">${window.formatearDinero(p.totalPanel)}</b></span></h2>
-                        <span class="toggle-icon">${iconText}</span>
+            <div class="card panel-gasto-item" data-categoria="${esc(p.categoria)}">
+                <div class="panel-head">
+                    <div class="left">
+                        <span class="drag-handle" title="Arrastrar para reordenar"><i class="ti ti-grip-vertical"></i></span>
+                        <div class="card-header-toggle" onclick="window.togglePanelGasto(this)" style="margin:0; gap:8px; justify-content:flex-start; flex-wrap:wrap;">
+                            <span class="toggle-icon">${iconText}</span>
+                            <span class="card-title">${esc(p.categoria)}</span>
+                            <span class="pill">${p.itemsPanel.length} ${p.itemsPanel.length === 1 ? 'gasto' : 'gastos'}</span>
+                            ${p.saldoHtml}${alertBadge}
+                        </div>
+                    </div>
+                    <div class="right">
+                        <span class="panel-total">${window.formatearDinero(p.totalPanel)}</span>
+                        <button class="btn-black btn-sec btn-sm" onclick="window.abrirModalNuevoGasto('${jsq(p.categoria)}')"><i class="ti ti-plus"></i>Gasto</button>
+                        <details class="menu">
+                            <summary class="btn-icon" title="Opciones del panel" aria-label="Opciones del panel"><i class="ti ti-dots"></i></summary>
+                            <div class="menu-pop">
+                                <button onclick="window.editarNombreTipoGastoPanel('${jsq(p.categoria)}')"><i class="ti ti-pencil"></i>Renombrar panel</button>
+                                <button class="btn-danger-text" onclick="window.eliminarTipoGastoPanel('${jsq(p.categoria)}')"><i class="ti ti-trash"></i>Eliminar panel</button>
+                                <hr>
+                                <div class="menu-title">Ingresos que alimentan este panel</div>
+                                ${checksOrigen}
+                            </div>
+                        </details>
                     </div>
                 </div>
-                <div class="card-content" style="display:${displayStyle}; margin-top:15px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--card-border);">
-                        <button class="btn-black" style="padding: 4px 10px; font-size: 11px;" onclick="window.abrirModalNuevoGasto('${jsq(p.categoria)}')">➕ Añadir Gasto</button>
-                        <div style="display: flex; gap: 5px;">
-                            <button class="btn-icon" onclick="window.editarNombreTipoGastoPanel('${jsq(p.categoria)}')">✏️</button>
-                            <button class="btn-icon" onclick="window.eliminarTipoGastoPanel('${jsq(p.categoria)}')">🗑️</button>
-                        </div>
-                    </div>
-                    <div style="margin-top:10px; border-bottom:1px solid var(--card-border); padding-bottom:10px;">
-                        <label style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:5px;">Ingresos que alimentan este panel:</label>
-                        <div style="display:flex; flex-wrap:wrap; gap:5px;">
-                            ${listaIngresos.map(ing => `<label style="font-size:11px; background:var(--highlight-bg); padding:3px 6px; border-radius:4px; cursor:pointer;"><input type="checkbox" onchange="window.toggleOrigenPanel('${jsq(p.categoria)}', '${ing.id}', this.checked)" ${p.origenesDelPanel.includes(ing.id)?'checked':''}> ${esc(ing.nombre)}</label>`).join('')}
-                        </div>
-                    </div>
-                    ${p.saldoHtml}
-                    <table style="width:100%; margin-top:10px;">
-                        <thead><tr><th>Gasto</th><th>Costo Mes</th><th>Recurr.</th><th>⚙️</th></tr></thead>
-                        <tbody>${itemsHTML || '<tr><td colspan="4" style="color:var(--text-muted); text-align:center;">No hay gastos</td></tr>'}</tbody>
+                <div class="card-content" style="display:${displayStyle}; margin-top:10px;">
+                    <table>
+                        <thead><tr><th>Gasto</th><th>Medio</th><th>Origen</th><th class="num">Cuota</th><th class="num">Costo del mes</th><th style="width:34px;"></th></tr></thead>
+                        <tbody>${itemsHTML || '<tr><td colspan="6" class="sub" style="text-align:center;">No hay gastos en este panel</td></tr>'}</tbody>
+                        ${p.itemsPanel.length ? `<tfoot><tr><td colspan="4">Total del panel</td><td class="num">${window.formatearDinero(p.totalPanel).replace('$ ', '')}</td><td></td></tr></tfoot>` : ''}
                     </table>
                 </div>
             </div>`;
@@ -860,14 +909,14 @@ function renderizacioDinamicaGastosPaneles(gastosProcesados, dDebito) {
     if (typeof Sortable !== 'undefined') sortablePaneles = Sortable.create(contenedor, {
         handle: '.drag-handle', animation: 150,
         onEnd: function () {
-            ordenPanelesGasto = Array.from(contenedor.querySelectorAll('.panel-gasto-item')).map(el => el.getAttribute('data-categoria'));
+            ordenPanelesGasto = Array.from(contenedor.querySelectorAll('.panel-gasto-item')).map(el => el.dataset.categoria);
             window.guardarConfiguracionGlobalGlobal(false);
         }
     });
 }
 
 window.abrirModalNuevoGasto = function(categoriaPredefinida = '') {
-    document.getElementById('form-gasto').reset(); document.getElementById('gasto-id').value = ""; document.getElementById('titulo-modal-gasto').innerText = "Nuevo Gasto";
+    document.getElementById('form-gasto').reset(); document.getElementById('gasto-id').value = ""; document.getElementById('titulo-modal-gasto').innerText = "Nuevo gasto"; document.getElementById('btn-eliminar-gasto').style.display = 'none';
     window.toggleTercero('gasto'); window.toggleCamposTarjeta('gasto'); document.getElementById('gasto-compartir').checked = false; window.toggleDivisor('gasto'); document.getElementById('gasto-recurrente').checked = true; 
     document.getElementById('gasto-monto').dataset.raw = ""; document.getElementById('gasto-monto-fijo').dataset.raw = "";
     
@@ -890,7 +939,8 @@ window.abrirModalEditarGasto = function(data) {
     let catValue = data.categoria || "Fijos";
     if(!tiposGastoAsociaciones.hasOwnProperty(catValue)) catValue = Object.keys(tiposGastoAsociaciones)[0] || "";
     document.getElementById('gasto-categoria-select').value = catValue; document.getElementById('gasto-tipo').value = data.tipo;
-    document.getElementById('titulo-modal-gasto').innerText = "Editar Gasto";
+    document.getElementById('titulo-modal-gasto').innerText = "Editar gasto";
+    document.getElementById('btn-eliminar-gasto').style.display = 'inline-flex';
 
     window.toggleTercero('gasto');
     if (data.propietario !== 'Tercero') {
@@ -1697,8 +1747,8 @@ window.abrirModalHistorial = function() {
                             ${usdConversion}
                         </div>
                         <div style="display:flex; gap:4px;">
-                            <button class="btn-icon" onclick="window.abrirModalEditarMovimiento('${h.id}')" title="Editar monto/motivo">✏️</button>
-                            <button class="btn-icon" onclick="window.eliminarMovimientoAhorro('${h.id}')" title="Eliminar movimiento">🗑️</button>
+                            <button class="btn-icon" onclick="window.abrirModalEditarMovimiento('${h.id}')" title="Editar monto/motivo"><i class="ti ti-pencil"></i></button>
+                            <button class="btn-icon" onclick="window.eliminarMovimientoAhorro('${h.id}')" title="Eliminar movimiento"><i class="ti ti-trash"></i></button>
                         </div>
                     </div>
                 </div>`;
@@ -1880,15 +1930,20 @@ function renderCuentasAhorro() {
             netoTag = `<span style="font-size:11px; color:#c5221f; font-weight:600;"> (${window.formatearDinero(c.netoMes)})</span>`;
         }
 
+        const netoCelda = Math.abs(c.netoMes) < 0.005 ? '<span class="muted">—</span>'
+            : `<span class="${c.netoMes > 0 ? 'up' : 'dn'}">${c.netoMes > 0 ? '+' : '−'}${window.formatearDinero(Math.abs(c.netoMes)).replace('$ ', '')}</span>`;
         htmlResumen += `
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid var(--card-border); padding-bottom:5px;">
-                <span>${esc(c.nombre)} ${c.depositado ? '✅' : ''}</span> 
-                <strong style="color:#673ab7;">${window.formatearDinero(c.saldoFinal)}${netoTag}</strong>
-            </div>`;
+            <tr>
+                <td>${esc(c.nombre)}${c.depositado ? ' <i class="ti ti-circle-check up" title="Conciliada"></i>' : ''}</td>
+                <td style="text-align:center;"><span class="pill ${c.esUsd ? 'info' : ''}">${c.esUsd ? 'USD' : 'ARS'}</span></td>
+                <td class="num">${c.esUsd ? window.formatearDinero(c.saldoFinalUsd, 'USD').replace('U$D ', '') : window.formatearDinero(c.saldoFinal).replace('$ ', '')}</td>
+                <td class="num">${window.formatearDinero(c.saldoFinal).replace('$ ', '')}</td>
+                <td class="num">${netoCelda}</td>
+            </tr>`;
 
         const monedaBadge = c.esUsd 
-            ? `<span style="font-size:10px; background:#e8f0fe; color:#174ea6; padding:2px 6px; border-radius:4px; font-weight:700; border:1px solid #c2e7ff; margin-left:5px;">🇺🇸 USD</span>`
-            : `<span style="font-size:10px; background:#f1f3f4; color:#5f6368; padding:2px 6px; border-radius:4px; font-weight:600; margin-left:5px;">🇦🇷 ARS</span>`;
+            ? `<span style="font-size:10px; background:#e8f0fe; color:#174ea6; padding:2px 6px; border-radius:4px; font-weight:700; border:1px solid #c2e7ff; margin-left:5px;">USD</span>`
+            : `<span style="font-size:10px; background:#f1f3f4; color:#5f6368; padding:2px 6px; border-radius:4px; font-weight:600; margin-left:5px;">ARS</span>`;
 
         let saldoAntDisplay = c.esUsd 
             ? `${window.formatearDinero(c.saldoAntUsd, 'USD')} <span style="font-size:11px; color:var(--text-muted);">(${window.formatearDinero(c.saldoAnt, 'ARS')})</span>`
@@ -1965,8 +2020,8 @@ function renderCuentasAhorro() {
                                 <span class="subcaja-secondary">${sSecDisplay}</span>
                             </div>
                             <div style="display: flex; gap: 2px;">
-                                <button class="btn-icon" onclick="window.abrirModalSubcaja('${c.id}', '${s.id}')" title="Editar Sub-Caja" style="font-size: 11px; padding: 2px 4px;">✏️</button>
-                                <button class="btn-icon" onclick="window.eliminarSubcaja('${c.id}', '${s.id}')" title="Eliminar Sub-Caja" style="font-size: 11px; padding: 2px 4px;">🗑️</button>
+                                <button class="btn-icon" onclick="window.abrirModalSubcaja('${c.id}', '${s.id}')" title="Editar Sub-Caja" style="font-size: 11px; padding: 2px 4px;"><i class="ti ti-pencil"></i></button>
+                                <button class="btn-icon" onclick="window.eliminarSubcaja('${c.id}', '${s.id}')" title="Eliminar Sub-Caja" style="font-size: 11px; padding: 2px 4px;"><i class="ti ti-trash"></i></button>
                             </div>
                         </div>
                     </div>
@@ -1991,7 +2046,7 @@ function renderCuentasAhorro() {
                     <div class="subcaja-card libre">
                         <div class="subcaja-info">
                             <span class="subcaja-dot" style="background-color: #9aa0a6;"></span>
-                            <span class="subcaja-name" style="color: var(--text-muted); font-style: italic;">✨ Libre / Sin Asignar</span>
+                            <span class="subcaja-name" style="color: var(--text-muted); font-style: italic;"><i class="ti ti-sparkles"></i> Libre / Sin Asignar</span>
                         </div>
                         <div class="subcaja-values">
                             <span class="subcaja-amount" style="color: var(--text-muted);">${libreDisplay}</span>
@@ -2005,7 +2060,7 @@ function renderCuentasAhorro() {
             <div class="subcajas-container">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
                     <span style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Sub-Cajas (Destinos)</span>
-                    <button class="btn-black" style="font-size: 11px; padding: 2px 7px; background: var(--highlight-bg); color: var(--text-main); border: 1px solid var(--card-border);" onclick="window.abrirModalSubcaja('${c.id}')">➕ Sub-Caja</button>
+                    <button class="btn-black" style="font-size: 11px; padding: 2px 7px; background: var(--highlight-bg); color: var(--text-main); border: 1px solid var(--card-border);" onclick="window.abrirModalSubcaja('${c.id}')"><i class="ti ti-plus"></i> Sub-Caja</button>
                 </div>
                 ${subcajas.length > 0 ? `<div class="subcajas-progress-bar">${progressBarSegments}</div>` : ''}
                 <div class="subcajas-tree">
@@ -2024,8 +2079,8 @@ function renderCuentasAhorro() {
                             ${monedaBadge}
                         </div>
                         <div onclick="event.stopPropagation();">
-                            <button class="btn-icon" onclick="window.editarCuentaAhorro('${c.id}')" title="Editar cuenta / saldo">✏️</button>
-                            <button class="btn-icon" onclick="window.borrarCuentaAhorro('${c.id}')" title="Eliminar cuenta">🗑️</button>
+                            <button class="btn-icon" onclick="window.editarCuentaAhorro('${c.id}')" title="Editar cuenta / saldo"><i class="ti ti-pencil"></i></button>
+                            <button class="btn-icon" onclick="window.borrarCuentaAhorro('${c.id}')" title="Eliminar cuenta"><i class="ti ti-trash"></i></button>
                         </div>
                     </div>
                     
@@ -2046,17 +2101,23 @@ function renderCuentasAhorro() {
                 </div>
 
                 <div style="display:flex; gap:8px; margin-top:5px;">
-                    <button class="btn-ahorro-action btn-ahorro-ingresar" onclick="window.abrirModalMovimiento('${c.id}', 'ingreso')">➕ Ingresar</button>
-                    <button class="btn-ahorro-action btn-ahorro-retirar" onclick="window.abrirModalMovimiento('${c.id}', 'retiro')">➖ Retirar</button>
+                    <button class="btn-ahorro-action btn-ahorro-ingresar" onclick="window.abrirModalMovimiento('${c.id}', 'ingreso')"><i class="ti ti-plus"></i> Ingresar</button>
+                    <button class="btn-ahorro-action btn-ahorro-retirar" onclick="window.abrirModalMovimiento('${c.id}', 'retiro')"><i class="ti ti-minus"></i> Retirar</button>
                 </div>
             </div>`;
     });
 
     if(cuentasCalculadas.length === 0) {
-        cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro todavía. Haz clic en '➕ Nueva Cuenta' arriba.</p>`;
+        cont.innerHTML = `<p style="color:var(--text-muted); font-size:13px; margin:20px;">No has creado Cuentas de Ahorro todavía. Haz clic en '<i class="ti ti-plus"></i> Nueva Cuenta' arriba.</p>`;
     }
 
-    document.getElementById('res-ahorros-list').innerHTML = htmlResumen === '' ? '<p style="color:var(--text-muted); font-size:13px;">No hay cuentas de ahorro configuradas.</p>' : htmlResumen;
+    const mesTotalTxt = Math.abs(totalNetoMes) < 0.005 ? '<span class="muted">—</span>' : `<span class="${totalNetoMes > 0 ? 'up' : 'dn'}">${totalNetoMes > 0 ? '+' : '−'}${window.formatearDinero(Math.abs(totalNetoMes)).replace('$ ', '')}</span>`;
+    document.getElementById('res-ahorros-list').innerHTML = htmlResumen === '' ? '<p class="sub">No hay cuentas de ahorro configuradas.</p>' : `
+        <table>
+            <thead><tr><th>Cuenta</th><th style="text-align:center;">Moneda</th><th class="num">Saldo</th><th class="num">Equiv. ARS</th><th class="num">Mes</th></tr></thead>
+            <tbody>${htmlResumen}</tbody>
+            <tfoot><tr><td>Total</td><td></td><td></td><td class="num">${window.formatearDinero(totalAhorrosHistorico).replace('$ ', '')}</td><td class="num">${mesTotalTxt}</td></tr></tfoot>
+        </table>`;
     document.getElementById('sum-ahorros-total').innerHTML = `<span>${window.formatearDinero(totalAhorrosHistorico)}</span> ${dMep > 0 ? `<span style="font-size:16px; color:var(--text-muted);">U$D ${(totalAhorrosHistorico / dMep).toFixed(2)}</span>` : ''}`;
     
     let mesNetoHtml = `${window.formatearDinero(totalNetoMes)}`;
@@ -2176,10 +2237,10 @@ function renderDistribucionDirecta() {
     const resDist = document.getElementById('res-ingresos-dist');
     divDist.innerHTML = '';
     const dMep = parseFloat(document.getElementById('usd-mep').dataset.raw || 0);
-    
-    let totalDistribuibleGlobal = 0; 
+
+    let totalDistribuibleGlobal = 0;
     sumPorGrupo = {};
-    
+
     if(listaIngresos) {
         listaIngresos.forEach(ing => {
             if (ing.grupo) {
@@ -2193,68 +2254,75 @@ function renderDistribucionDirecta() {
 
     let resHtml = '';
     if(Object.keys(gruposDistribucion).length === 0) {
-        divDist.innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No hay grupos de distribución creados. Crea uno con el botón de arriba para presupuestar tus ingresos.</p>';
+        divDist.innerHTML = '<p class="sub">No hay grupos de distribución. Creá uno con "Nuevo grupo" para presupuestar tus ingresos.</p>';
+        resHtml = '<p class="sub">No hay grupos de distribución creados.</p>';
     }
 
     for(let grupoName in gruposDistribucion) {
         let totalGrupo = sumPorGrupo[grupoName] || 0;
         let cfgItems = Array.isArray(gruposDistribucion[grupoName]) ? gruposDistribucion[grupoName] : [];
-        cfgItems.sort((a, b) => (b.porc || 0) - (a.porc || 0));
-        
-        let sumPorcentajesGrupo = cfgItems.reduce((acc, el) => acc + (parseFloat(el.porc) || 0), 0);
+
+        let sumPorcentajesGrupo = cfgItems.reduce((acc, el) => acc + (parseFloat(el && el.porc) || 0), 0);
         let pctOk = Math.abs(sumPorcentajesGrupo - 100) < 0.1;
+        const faltaPct = 100 - sumPorcentajesGrupo;
 
-        let htmlBlock = `
-            <div style="background:var(--highlight-bg); border-radius:8px; padding:15px; margin-bottom:15px; border:1px solid var(--card-border);">
-                <div style="display:flex; justify-content:space-between; margin-bottom:12px; align-items:center; flex-wrap:wrap; gap:8px;">
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <strong style="font-size:15px; color:var(--text-main);">${esc(grupoName)}</strong>
-                        <button class="btn-icon" onclick="window.editarNombreGrupoDistribucion('${jsq(grupoName)}')" style="font-size:12px;" title="Editar nombre de grupo">✏️</button>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <span id="sum-card-pct-${esc(grupoName)}" style="font-size:12px; font-weight:bold; color:${pctOk ? '#137333' : '#c5221f'};">
-                            Total: ${sumPorcentajesGrupo.toFixed(2)}%
-                        </span>
-                        <span style="font-weight:600; font-size:13px; color:#4285F4;">
-                            Disponible: ${window.formatearDinero(totalGrupo)}
-                        </span>
-                        <button class="btn-icon" onclick="window.eliminarGrupoDistribucion('${jsq(grupoName)}')" title="Eliminar Grupo Completo">❌</button>
-                    </div>
-                </div>
-                <div style="display:flex; flex-direction:column; gap:8px;">`;
-
-        resHtml += `<strong style="font-size:13px; display:block; margin-top:10px;">${esc(grupoName)} (${window.formatearDinero(totalGrupo)}):</strong><div style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">`;
-
+        // ---- Editor (vista Ingresos): una fila por objetivo, mismo orden que en memoria ----
+        let filasEdit = '';
         cfgItems.forEach((it, idx) => {
             if(!it) return;
             let pctVal = parseFloat(it.porc) || 0;
             let dineroCalculado = totalGrupo * (pctVal / 100);
-
-            htmlBlock += `
-                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                    <input type="text" value="${esc(it.nombre)}" style="flex:2; padding:6px; font-size:13px;" oninput="window.actualizarDatoObjetivoMemory('${jsq(grupoName)}', ${idx}, 'nombre', this.value)" placeholder="Nombre del Objetivo">
-                    <div style="display:flex; align-items:center; gap:3px;">
-                        <input type="text" id="pct-${esc(grupoName)}-${idx}" value="${pctVal.toFixed(2)}" style="width:65px; padding:6px; font-size:13px; text-align:center;" onblur="window.calcularBidireccionalLinea('${jsq(grupoName)}', ${idx}, 'pct')" placeholder="%">
-                        <span style="font-size:12px; font-weight:600;">%</span>
-                    </div>
-                    <div style="display:flex; flex-direction:column;">
-                        <input type="text" id="pesos-${esc(grupoName)}-${idx}" value="${window.formatearDinero(dineroCalculado)}" class="money-input" style="width:115px; padding:6px; font-size:13px;" data-raw="${dineroCalculado}" onfocus="window.onMoneyFocus(this)" onblur="window.calcularBidireccionalLinea('${jsq(grupoName)}', ${idx}, 'pesos'); window.onMoneyBlur(this, 'ARS')" placeholder="$">
-                        <div id="usd-calc-${esc(grupoName)}-${idx}" style="font-size:10px; color:var(--text-muted); text-align:center; margin-top:2px;">
-                            ${dMep > 0 ? `U$D ${(dineroCalculado / dMep).toFixed(2)}` : ''}
-                        </div>
-                    </div>
-                    <button class="btn-icon" onclick="window.eliminarObjetivoLinea('${jsq(grupoName)}', ${idx})" title="Eliminar objetivo">🗑️</button>
-                </div>`;
-
-            resHtml += `<span style="color: var(--text-main);">${esc(it.nombre)} (${pctVal.toFixed(2)}%):</span> ${window.formatearDinero(dineroCalculado)}${dMep > 0 ? ` <span style="font-size:11px; color:var(--text-muted);">(U$D ${(dineroCalculado/dMep).toFixed(2)})</span>` : ''}<br>`;
+            filasEdit += `
+                <tr>
+                    <td><input type="text" value="${esc(it.nombre)}" style="width:100%; padding:6px 8px; font-size:13px;" oninput="window.actualizarDatoObjetivoMemory('${jsq(grupoName)}', ${idx}, 'nombre', this.value)" placeholder="Nombre del objetivo"></td>
+                    <td class="num"><input type="text" id="pct-${esc(grupoName)}-${idx}" value="${pctVal.toFixed(2)}" style="width:70px; padding:6px 8px; font-size:13px; text-align:right;" onblur="window.calcularBidireccionalLinea('${jsq(grupoName)}', ${idx}, 'pct')" placeholder="%"></td>
+                    <td class="num"><input type="text" id="pesos-${esc(grupoName)}-${idx}" value="${window.formatearDinero(dineroCalculado)}" class="money-input" style="width:130px; padding:6px 8px; font-size:13px; text-align:right;" data-raw="${dineroCalculado}" onfocus="window.onMoneyFocus(this)" onblur="window.calcularBidireccionalLinea('${jsq(grupoName)}', ${idx}, 'pesos'); window.onMoneyBlur(this, 'ARS')" placeholder="$"></td>
+                    <td class="num sub" id="usd-calc-${esc(grupoName)}-${idx}">${dMep > 0 ? `U$D ${(dineroCalculado / dMep).toFixed(2)}` : ''}</td>
+                    <td class="num"><button class="btn-icon" onclick="window.eliminarObjetivoLinea('${jsq(grupoName)}', ${idx})" title="Eliminar objetivo"><i class="ti ti-trash"></i></button></td>
+                </tr>`;
         });
 
-        htmlBlock += `</div><button class="btn-black" style="margin-top:12px; padding:5px 14px; font-size:12px; background-color:var(--highlight-bg); color:var(--text-main); border:1px solid var(--card-border);" onclick="window.agregarObjetivoLinea('${jsq(grupoName)}')">➕ Añadir Objetivo</button></div>`;
-        resHtml += `</div>`; 
-        divDist.innerHTML += htmlBlock;
+        divDist.innerHTML += `
+            <div style="border:1px solid var(--card-border); border-radius:10px; padding:12px 14px; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span class="card-title">${esc(grupoName)}</span>
+                        <button class="btn-icon" onclick="window.editarNombreGrupoDistribucion('${jsq(grupoName)}')" title="Renombrar grupo"><i class="ti ti-pencil"></i></button>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span class="pill ${pctOk ? 'ok' : 'bad'}" id="sum-card-pct-${esc(grupoName)}">Suma ${sumPorcentajesGrupo.toFixed(2)}%</span>
+                        <span class="sub">Disponible <b style="color:var(--text-main); font-weight:600;">${window.formatearDinero(totalGrupo)}</b></span>
+                        <button class="btn-icon" onclick="window.eliminarGrupoDistribucion('${jsq(grupoName)}')" title="Eliminar grupo"><i class="ti ti-trash"></i></button>
+                    </div>
+                </div>
+                <table>
+                    <thead><tr><th>Objetivo</th><th class="num">%</th><th class="num">Monto ARS</th><th class="num">USD</th><th></th></tr></thead>
+                    <tbody>${filasEdit || '<tr><td colspan="5" class="sub">Sin objetivos.</td></tr>'}</tbody>
+                </table>
+                <button class="btn-black btn-sec btn-sm" style="margin-top:8px;" onclick="window.agregarObjetivoLinea('${jsq(grupoName)}')"><i class="ti ti-plus"></i>Objetivo</button>
+            </div>`;
+
+        // ---- Resumen (vista Resumen): tabla de solo lectura, ordenada por porcentaje ----
+        const orden = cfgItems.filter(it => it).slice().sort((a, b) => (parseFloat(b.porc) || 0) - (parseFloat(a.porc) || 0));
+        let filasRes = '', sumMontos = 0;
+        orden.forEach(it => {
+            const p = parseFloat(it.porc) || 0, m = totalGrupo * (p / 100);
+            sumMontos += m;
+            filasRes += `<tr><td>${esc(it.nombre)}</td><td style="width:22%;"><div class="bar"><div style="width:${Math.min(100, p)}%"></div></div></td><td class="num">${p.toFixed(1)}</td><td class="num">${window.formatearDinero(m).replace('$ ', '')}</td><td class="num sub">${dMep > 0 ? window.formatearDinero(m / dMep, 'USD').replace('U$D ', '') : ''}</td></tr>`;
+        });
+        resHtml += `
+            <div style="${resHtml ? 'margin-top:16px;' : ''}">
+                <div style="display:flex; justify-content:space-between; align-items:baseline;"><span class="card-title">${esc(grupoName)}</span><span class="sub">Disponible <b style="color:var(--text-main); font-weight:600;">${window.formatearDinero(totalGrupo)}</b></span></div>
+                <table>
+                    <thead><tr><th>Objetivo</th><th>Avance</th><th class="num">%</th><th class="num">ARS</th><th class="num">USD</th></tr></thead>
+                    <tbody>${filasRes || '<tr><td colspan="5" class="sub">Sin objetivos.</td></tr>'}</tbody>
+                    <tfoot><tr><td>Total</td><td></td><td class="num ${pctOk ? '' : 'dn'}">${sumPorcentajesGrupo.toFixed(1)}</td><td class="num">${window.formatearDinero(sumMontos).replace('$ ', '')}</td><td class="num sub">${dMep > 0 ? window.formatearDinero(sumMontos / dMep, 'USD').replace('U$D ', '') : ''}</td></tr></tfoot>
+                </table>
+                ${pctOk ? '' : `<div class="alert warn"><i class="ti ti-alert-triangle"></i>Los porcentajes suman ${sumPorcentajesGrupo.toFixed(1)}%. ${faltaPct > 0 ? `Falta asignar ${faltaPct.toFixed(1)}% (${window.formatearDinero(totalGrupo * faltaPct / 100)}).` : `Se pasan ${(-faltaPct).toFixed(1)}%.`}</div>`}
+            </div>`;
     }
 
-    resDist.innerHTML = `<div style="font-size: 16px; font-weight: bold; margin-bottom: 8px; color: #4285F4;">Total Disponible en Grupos: ${window.formatearDinero(totalDistribuibleGlobal)}</div>` + resHtml;
+    resDist.innerHTML = resHtml;
 }
 
 // =========================================================================
@@ -2264,7 +2332,8 @@ function renderDistribucionDirecta() {
 window.abrirModalNuevoIngreso = function() {
     document.getElementById('form-ingreso').reset(); 
     document.getElementById('ingreso-id').value = ""; 
-    document.getElementById('titulo-modal-ingreso').innerText = "Nuevo Ingreso";
+    document.getElementById('titulo-modal-ingreso').innerText = "Nuevo ingreso";
+    document.getElementById('btn-eliminar-ingreso').style.display = 'none';
     document.getElementById('ingreso-grupo').value = ""; 
     document.getElementById('ingreso-monto').dataset.raw = ""; 
     document.getElementById('modal-ingreso').style.display = 'flex';
@@ -2276,7 +2345,8 @@ window.abrirModalEditarIngreso = function(data) {
     document.getElementById('ingreso-monto').dataset.raw = data.monto; 
     document.getElementById('ingreso-monto').value = window.formatearDinero(data.monto, 'ARS');
     document.getElementById('ingreso-grupo').value = data.grupo || ""; 
-    document.getElementById('titulo-modal-ingreso').innerText = "Editar Ingreso"; 
+    document.getElementById('titulo-modal-ingreso').innerText = "Editar ingreso";
+    document.getElementById('btn-eliminar-ingreso').style.display = 'inline-flex';
     document.getElementById('modal-ingreso').style.display = 'flex';
 }
 
@@ -2334,25 +2404,37 @@ document.getElementById('form-ingreso').addEventListener('submit', async (e) => 
 });
 
 window.borrarIngreso = async function(id) { 
-    if(!confirm("¿Estás seguro de eliminar este ingreso?")) return;
-    window.mostrarCargando(true); 
-    await deleteDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", id)); 
-    await actualizarDashboard(); 
+    if(!confirm("¿Estás seguro de eliminar este ingreso?")) return false;
+    window.mostrarCargando(true);
+    await deleteDoc(doc(db, "finanzas", obtenerMesId(), "ingresos", id));
+    await actualizarDashboard();
+    return true;
 };
 
-window.borrarGasto = async function(id) { 
-    if(!confirm("¿Estás seguro de eliminar este gasto?")) return;
-    window.mostrarCargando(true); 
-    await deleteDoc(doc(db, "finanzas", obtenerMesId(), "gastos", id)); 
-    await actualizarDashboard(); 
+// Eliminar desde el formulario de edición (el borrado ya no está en cada fila de la tabla)
+window.eliminarDesdeModal = async function(tipo) {
+    const id = document.getElementById(`${tipo}-id`).value;
+    if (!id) return;
+    const modalId = tipo === 'gasto' ? 'modal-gasto' : 'modal-ingreso';
+    const borrado = tipo === 'gasto' ? await window.borrarGasto(id) : await window.borrarIngreso(id);
+    if (borrado) window.cerrarModal(modalId);
+};
+
+window.borrarGasto = async function(id) {
+    if(!confirm("¿Estás seguro de eliminar este gasto?")) return false;
+    window.mostrarCargando(true);
+    await deleteDoc(doc(db, "finanzas", obtenerMesId(), "gastos", id));
+    await actualizarDashboard();
+    return true;
 };
 
 function renderTablaIngresos(gastosProc) {
     const tabla = document.getElementById('tabla-ingresos'); 
     tabla.innerHTML = ''; 
     totalIngresosGlobal = 0; 
-    let totalDisponibleGlobalIngresos = 0; 
-    let chartLabels = []; 
+    let totalDisponibleGlobalIngresos = 0;
+    let totalGastadoVisible = 0, totalBrutoVisible = 0, totalDispVisible = 0;
+    let chartLabels = [];
     let chartData = []; 
     let chartColors = [];
 
@@ -2372,8 +2454,9 @@ function renderTablaIngresos(gastosProc) {
             totalDisponibleGlobalIngresos += disponibleReal;
             if (filter && !data.nombre.toLowerCase().includes(filter)) return;
             let assignedColor = colorPalette[index % colorPalette.length];
-            
-            chartLabels.push(data.nombre); 
+            totalBrutoVisible += data.monto; totalDispVisible += disponibleReal;
+
+            chartLabels.push(data.nombre);
             chartData.push(data.monto); 
             chartColors.push(assignedColor);
 
@@ -2382,20 +2465,24 @@ function renderTablaIngresos(gastosProc) {
             trMain.className = "tr-clickable"; 
             trMain.onclick = function() { window.prepararEdicionIngreso(data.id); };
             
-            let rescateTag = data.es_rescate ? ` <span style="font-size:10px; background:#e8f0fe; color:#174ea6; padding:2px 4px; border-radius:4px;">Ahorro Rescatado</span>` : '';
+            let rescateTag = data.es_rescate ? ` <span class="pill info">Rescate</span>` : '';
+            const gastadoOrigen = sumatoriaGastosPorOrigen[data.id] || 0;
+            if (!filter || data.nombre.toLowerCase().includes(filter)) { totalGastadoVisible += gastadoOrigen; }
 
-            trMain.innerHTML = `<td><div style="display:flex; align-items:center; gap:8px;"><button class="btn-icon" style="padding:0; font-size:10px; color:var(--text-muted);" onclick="event.stopPropagation(); window.toggleIngresoDetalle('${data.id}')" id="icon-ingreso-${data.id}">▶</button><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${assignedColor};"></span><strong>${esc(data.nombre)}</strong>${rescateTag}</div></td><td><span style="background:var(--highlight-bg); padding:2px 6px; border-radius:4px; font-size:11px;">${esc(data.grupo || 'Ninguno')}</span></td><td style="color:var(--text-muted);">${window.formatearDinero(data.monto)}</td><td style="font-weight:600; color:${disponibleReal < 0 ? '#d93025' : '#137333'}">${window.formatearDinero(disponibleReal)}</td><td style="white-space: nowrap;"><button class="btn-icon" onclick="event.stopPropagation(); window.borrarIngreso('${data.id}')">🗑️</button></td>`;
+            trMain.innerHTML = `<td><div style="display:flex; align-items:center; gap:8px;"><button class="btn-icon" style="padding:0 2px;" onclick="event.stopPropagation(); window.toggleIngresoDetalle('${data.id}')" aria-label="Ver gastos de este origen"><i class="ti ti-chevron-right" id="icon-ingreso-${data.id}"></i></button><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background-color:${assignedColor}; flex-shrink:0;"></span><span>${esc(data.nombre)}</span>${rescateTag}</div></td><td>${data.grupo ? `<span class="pill">${esc(data.grupo)}</span>` : '<span class="sub">Sin grupo</span>'}</td><td class="num">${window.formatearDinero(data.monto).replace('$ ', '')}</td><td class="num">${window.formatearDinero(gastadoOrigen).replace('$ ', '')}</td><td class="num ${disponibleReal < 0 ? 'dn' : 'up'}">${window.formatearDinero(disponibleReal).replace('$ ', '')}</td><td class="num"><i class="ti ti-pencil row-act"></i></td>`;
             tabla.appendChild(trMain);
 
-            const trDetail = document.createElement('tr'); 
-            trDetail.id = `detalle-ingreso-${data.id}`; 
-            trDetail.className = "details-row"; 
+            const trDetail = document.createElement('tr');
+            trDetail.id = `detalle-ingreso-${data.id}`;
+            trDetail.className = "details-row";
             trDetail.style.display = "none";
-            trDetail.innerHTML = `<td colspan="5" style="padding: 10px 15px; background-color: var(--highlight-bg); border-bottom: 2px solid var(--card-border);"><div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;"><span style="font-size: 13px; font-weight: 600;">Gastos de este origen</span><input type="text" placeholder="Buscar gasto..." style="padding: 4px 8px; font-size: 11px; border: 1px solid var(--card-border); border-radius: 4px; width: 150px;" onkeyup="window.filtrarGastosIngreso('${data.id}', this.value)"></div><ul id="lista-gastos-ingreso-${data.id}" style="list-style: none; padding: 0; margin: 0; font-size: 12px; color: var(--text-muted); display:flex; flex-direction:column; gap:4px; max-height: 200px; overflow-y: auto;">${gastosAsociados.length > 0 ? gastosAsociados.map(g => `<li class="gasto-item-origen" data-nombre="${esc(g.nombre.toLowerCase())}"><span style="display:inline-block; width:90px; font-weight:600; color:var(--text-main);">${window.formatearDinero(g.costoCalculado)}</span> - <span>${esc(g.nombre)} <i style="color:var(--text-muted); font-size:10px;">(${esc(g.categoria)})</i></span></li>`).join('') : '<li style="color:var(--text-muted); font-style:italic;">No hay gastos descontados de este origen</li>'}</ul></td>`;
+            trDetail.innerHTML = `<td colspan="6" style="padding: 10px 14px; background-color: var(--highlight-bg);"><div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;"><span class="sub" style="font-weight:600;">Gastos de este origen</span><input type="text" placeholder="Buscar gasto..." style="padding: 4px 8px; font-size: 12px; width: 160px;" onkeyup="window.filtrarGastosIngreso('${data.id}', this.value)"></div><ul id="lista-gastos-ingreso-${data.id}" style="list-style: none; padding: 0; margin: 0; font-size: 12px; color: var(--text-muted); display:flex; flex-direction:column; gap:4px; max-height: 200px; overflow-y: auto;">${gastosAsociados.length > 0 ? gastosAsociados.map(g => `<li class="gasto-item-origen" data-nombre="${esc(g.nombre.toLowerCase())}"><span style="display:inline-block; width:100px; font-weight:600; color:var(--text-main);" class="num">${window.formatearDinero(g.costoCalculado)}</span> ${esc(g.nombre)} <span class="sub">(${esc(g.categoria)})</span></li>`).join('') : '<li class="sub">No hay gastos descontados de este origen</li>'}</ul></td>`;
             tabla.appendChild(trDetail);
         });
     }
 
+    const tfIng = document.getElementById('tfoot-ingresos');
+    if (tfIng) tfIng.innerHTML = listaIngresos && listaIngresos.length ? `<tr><td colspan="2">Total${filter ? ' (filtrado)' : ''}</td><td class="num">${window.formatearDinero(totalBrutoVisible).replace('$ ', '')}</td><td class="num">${window.formatearDinero(totalGastadoVisible).replace('$ ', '')}</td><td class="num ${totalDispVisible < 0 ? 'dn' : 'up'}">${window.formatearDinero(totalDispVisible).replace('$ ', '')}</td><td></td></tr>` : '';
     document.getElementById('sum-ingresos-mes').innerText = window.formatearDinero(totalIngresosGlobal);
     document.getElementById('sum-ingresos-disponible').innerText = `${window.formatearDinero(totalDisponibleGlobalIngresos)} Disp.`;
     const cobrarIng = totalACobrar();
@@ -2425,11 +2512,13 @@ function calcularBalance() {
         const personas = Object.entries(aCobrarPorPersona).filter(([, v]) => Math.abs(v) > 0.005)
             .map(([n, v]) => `${esc(n)}: ${window.formatearDinero(v)}`).join(' · ');
         detalle.innerHTML = aCobrar > 0.005
-            ? `<div style="display:flex; justify-content:space-between;"><span>Disponible en cuenta</span><b>${window.formatearDinero(balance - aCobrar)}</b></div>
-               <div style="display:flex; justify-content:space-between;"><span>A cobrar a terceros</span><b>${window.formatearDinero(aCobrar)}</b></div>
-               <div style="font-size:11px; margin-top:2px;">${personas}</div>`
-            : '';
+            ? `<div class="r"><span>En cuenta</span><b>${window.formatearDinero(balance - aCobrar)}</b></div>
+               <div class="r"><span>A cobrar</span><b>${window.formatearDinero(aCobrar)}</b></div>
+               <div>${personas}</div>`
+            : '<div>Sin gastos compartidos pendientes de cobro</div>';
     }
+    const pctEl = document.getElementById('res-gastos-pct');
+    if (pctEl) pctEl.innerText = totalIngresosGlobal > 0 ? `${(totalGastosGlobal / totalIngresosGlobal * 100).toFixed(0)}% de los ingresos` : 'Sin ingresos cargados';
 
     if (chartResumen) chartResumen.destroy();
     chartResumen = new Chart(document.getElementById('chart-resumen').getContext('2d'), {
@@ -2709,6 +2798,37 @@ window.copiarMesAnterior = async function() {
         alert("Error al copiar datos: " + e.message);
     }
 };
+
+// =========================================================================
+// AUTO-ACTUALIZACIÓN: compara version.json (siempre desde la red) con la versión cargada.
+// Si hay una nueva, limpia cachés y recarga sola. Se chequea al abrir, al volver a la app y cada 10 min.
+// =========================================================================
+async function verificarNuevaVersion() {
+    try {
+        // No interrumpir si hay un formulario abierto
+        if (Array.from(document.querySelectorAll('.modal-overlay')).some(m => m.style.display === 'flex')) return;
+        const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+        if (!r.ok) return;
+        const { version } = await r.json();
+        if (!version || version === APP_VERSION) { sessionStorage.removeItem('intentoActualizar'); return; }
+        // Un solo intento por versión nueva en esta pestaña (evita bucles de recarga)
+        if (sessionStorage.getItem('intentoActualizar') === version) return;
+        sessionStorage.setItem('intentoActualizar', version);
+        window.mostrarCargando(true, `Actualizando a ${version}...`);
+        if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map(reg => reg.update().catch(() => {})));
+        }
+        if (window.caches) {
+            const claves = await caches.keys();
+            await Promise.all(claves.map(k => caches.delete(k)));
+        }
+        location.reload();
+    } catch (e) { /* sin conexión: se reintenta más tarde */ }
+}
+window.addEventListener('load', () => setTimeout(verificarNuevaVersion, 1500));
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') verificarNuevaVersion(); });
+setInterval(verificarNuevaVersion, 10 * 60 * 1000);
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

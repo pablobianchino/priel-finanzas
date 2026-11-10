@@ -1,49 +1,21 @@
 export const vistaAhorros = `
 <div id="ahorros" class="view">
-    <div class="card" style="margin-bottom: 20px; border-top: 4px solid var(--text-muted);">
-        <div class="card-header-toggle" onclick="window.toggleCard(this)">
-            <h2 style="margin: 0; font-size: 16px;">Configuración Dólar MEP y Cotizaciones</h2><span class="toggle-icon">▼</span>
-        </div>
-        <div class="card-content" style="display: flex; flex-direction: column; gap: 12px;">
-            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                <label>MEP (Ahorros): <input type="text" id="usd-mep-ahorros" class="money-input" value="0" style="width: 105px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
-                <label>MEP Tarjeta (Gastos): <input type="text" id="usd-debito-ahorros" class="money-input" value="0" style="width: 105px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
-                <label>Comisión Inviu/Broker (%): <input type="number" id="usd-comision-mep-ahorros" step="0.1" min="0" max="10" value="0.6" style="width: 75px; padding: 6px;" onchange="window.actualizarCalculoMepEnPantalla('ahorros')"></label>
-                <button class="btn-black" style="padding: 6px 15px;" onclick="window.guardarConfiguracionDolar('ahorros')">Guardar Rates</button>
-            </div>
-
-            <div style="background: var(--highlight-bg); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                <div id="mep-live-info-ahorros" style="font-size: 12px; color: var(--text-main);">
-                    <span>⚡ Cotización MEP en vivo: <i>Haz clic en 'Consultar' para obtener el valor del mercado</i></span>
-                </div>
-                <div style="display: flex; gap: 8px;">
-                    <button class="btn-black" style="background-color: #174ea6; font-size: 12px; padding: 6px 12px;" onclick="window.consultarMepEnVivo('ahorros')">⚡ Consultar MEP en vivo</button>
-                    <button id="btn-aplicar-mep-ahorros" class="btn-black" style="background-color: #137333; font-size: 12px; padding: 6px 12px; display: none;" onclick="window.aplicarMepConsultado('ahorros')">✅ Aplicar Cotizaciones</button>
-                </div>
-            </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin: 0 0 12px; flex-wrap: wrap; gap:10px;">
+        <h2 style="margin: 0; font-size: 16px;">Cuentas de ahorro</h2>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button onclick="window.abrirModalHistorial()" class="btn-black btn-sec"><i class="ti ti-history"></i>Historial de movimientos</button>
+            <button onclick="window.crearCuentaAhorro()" class="btn-black"><i class="ti ti-plus"></i>Nueva cuenta</button>
         </div>
     </div>
 
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap:10px;">
-        <h2 style="margin: 0;">Cuentas de Ahorro</h2>
-        <div style="display: flex; gap: 10px;">
-            <button onclick="window.abrirModalHistorial()" class="btn-black" style="background-color: var(--highlight-bg); color: var(--text-main); border: 1px solid var(--card-border);">🧾 Historial de Movimientos</button>
-            <button onclick="window.crearCuentaAhorro()" class="btn-black">➕ Nueva Cuenta</button>
+    <div class="kpi-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 640px;">
+        <div class="card">
+            <h3>Total ahorrado (histórico)</h3>
+            <div class="value" id="sum-ahorros-total" style="display: flex; flex-direction: column; gap: 2px;">$0,00</div>
         </div>
-    </div>
-    
-    <div class="cards-grid">
-        <div class="card" style="border-top: 4px solid #9c27b0;">
-            <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px;">
-                <div>
-                    <h3>Total Global Ahorrado (Histórico)</h3>
-                    <div class="value" id="sum-ahorros-total" style="display: flex; flex-direction: column; gap: 5px; font-size: 22px;">$0,00</div>
-                </div>
-                <div style="text-align: right;">
-                    <h3 style="color: #137333;">Movimientos del Mes</h3>
-                    <div class="value" id="sum-ahorros-depositado" style="color: #137333; font-size: 22px; display: flex; flex-direction: column; gap: 5px;">$0,00</div>
-                </div>
-            </div>
+        <div class="card">
+            <h3>Movimientos del mes</h3>
+            <div class="value" id="sum-ahorros-depositado" style="display: flex; flex-direction: column; gap: 2px;">$0,00</div>
         </div>
     </div>
     <div id="contenedor-cuentas-ahorro" class="cards-grid"></div>
