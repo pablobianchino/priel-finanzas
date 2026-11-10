@@ -6,7 +6,6 @@ const urlsToCache = [
   './',
   './index.html',
   './style.css',
-  './version.json',
   './js/app.js',
   './js/logica.js',
   './js/firebase.js',
@@ -40,6 +39,12 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
+
+  // version.json: siempre desde la red y nunca cacheado; es lo que dispara la actualización automática
+  if (url.pathname.endsWith('version.json')) {
+    event.respondWith(fetch(event.request, { cache: 'no-store' }));
+    return;
+  }
 
   event.respondWith(
     fetch(event.request, { cache: 'no-cache' })

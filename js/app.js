@@ -11,7 +11,7 @@ import { vistaModales } from '../vistas/modales.js';
 document.getElementById('views-container').innerHTML = vistaResumen + vistaGastos + vistaIngresos + vistaAhorros + vistaEstadisticas;
 document.getElementById('modals-container').innerHTML = vistaModales;
 
-const APP_VERSION = "v2.10";
+const APP_VERSION = "v2.11";
 window.APP_VERSION = APP_VERSION;
 
 const updateVersionTags = () => {
@@ -101,6 +101,7 @@ let historialAhorros = [];
 let sumPorGrupo = {};
 let sumatoriaGastosPorOrigen = {};
 let debounceTimer;
+let autoguardadoPendiente = false;
 let sortablePaneles = null;
 
 window.parseMoney = parseMoney;
@@ -2216,8 +2217,9 @@ window.calcularBidireccionalLinea = function(grupoName, index, disparadoPor) {
 };
 
 window.dispararDebounceAutoguardado = function() {
-    clearTimeout(debounceTimer); 
-    debounceTimer = setTimeout(() => { window.autoGuardarDistribucionEstructura(false); }, 800);
+    clearTimeout(debounceTimer);
+    autoguardadoPendiente = true;
+    debounceTimer = setTimeout(() => { autoguardadoPendiente = false; window.autoGuardarDistribucionEstructura(false); }, 800);
 }
 
 window.autoGuardarDistribucionEstructura = async function(recargarUI = false) {
@@ -2800,40 +2802,79 @@ window.copiarMesAnterior = async function() {
 };
 
 // =========================================================================
-// AUTO-ACTUALIZACIÓN: compara version.json (siempre desde la red) con la versión cargada.
-// Si hay una nueva, limpia cachés y recarga sola. Se chequea al abrir, al volver a la app y cada 10 min.
+// AUTO-ACTUALIZACIÓN DE VERSIÓN (mismo mecanismo que Notas, Admisión y Festival)
+// Compara APP_VERSION con version.json (siempre desde la red); si difieren, limpia cachés y recarga sola.
+// Chequea: al arrancar, al volver a la pestaña, al recuperar conexión y cada 15 min.
 // =========================================================================
-async function verificarNuevaVersion() {
+const VERSION_LOOP_KEY = 'last_auto_reloaded_version';
+let versionActualizando = false;
+
+async function leerVersionRemota(timeoutMs) {
     try {
-        // No interrumpir si hay un formulario abierto
-        if (Array.from(document.querySelectorAll('.modal-overlay')).some(m => m.style.display === 'flex')) return;
-        const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
-        if (!r.ok) return;
-        const { version } = await r.json();
-        if (!version || version === APP_VERSION) { sessionStorage.removeItem('intentoActualizar'); return; }
-        // Un solo intento por versión nueva en esta pestaña (evita bucles de recarga)
-        if (sessionStorage.getItem('intentoActualizar') === version) return;
-        sessionStorage.setItem('intentoActualizar', version);
-        window.mostrarCargando(true, `Actualizando a ${version}...`);
-        if ('serviceWorker' in navigator) {
-            const regs = await navigator.serviceWorker.getRegistrations();
-            await Promise.all(regs.map(reg => reg.update().catch(() => {})));
-        }
-        if (window.caches) {
-            const claves = await caches.keys();
-            await Promise.all(claves.map(k => caches.delete(k)));
-        }
-        location.reload();
-    } catch (e) { /* sin conexión: se reintenta más tarde */ }
+        const c = new AbortController();
+        const t = timeoutMs ? setTimeout(() => c.abort(), timeoutMs) : null;
+        const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store', signal: c.signal });
+        if (t) clearTimeout(t);
+        if (!r.ok) return null;
+        const d = await r.json();
+        return (d && d.version) || null;
+    } catch (e) { return null; } // sin conexión: se reintenta luego
 }
-window.addEventListener('load', () => setTimeout(verificarNuevaVersion, 1500));
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') verificarNuevaVersion(); });
-setInterval(verificarNuevaVersion, 10 * 60 * 1000);
+
+// Devuelve true si inició una actualización (la página se va a recargar)
+async function chequearActualizacion(preventivo) {
+    if (versionActualizando) return true;
+    // No interrumpir un formulario abierto (se reintenta en el próximo chequeo)
+    if (!preventivo && Array.from(document.querySelectorAll('.modal-overlay')).some(m => m.style.display === 'flex')) return false;
+    const remota = await leerVersionRemota(preventivo ? 2000 : 0);
+    if (!remota) return false;
+    if (remota === APP_VERSION) { try { sessionStorage.removeItem(VERSION_LOOP_KEY); } catch (e) {} return false; }
+
+    // Protección contra bucle: si ya se recargó para esta versión en esta sesión, no insistir
+    let previa = null; try { previa = sessionStorage.getItem(VERSION_LOOP_KEY); } catch (e) {}
+    if (previa === remota) { console.warn('[Auto-Update] Ya se recargó para ' + remota + '. Se omite bucle.'); return false; }
+    try { sessionStorage.setItem(VERSION_LOOP_KEY, remota); } catch (e) {}
+    versionActualizando = true;
+
+    if (preventivo) {
+        const txt = document.getElementById('loading-text');
+        if (txt) txt.innerText = 'Actualizando a la versión ' + remota + '...';
+    } else {
+        const v = document.getElementById('update-version'); if (v) v.innerText = remota;
+        const b = document.getElementById('banner-update'); if (b) b.style.display = 'block';
+    }
+
+    // No perder cambios pendientes (autoguardado de la distribución)
+    try { if (autoguardadoPendiente) { clearTimeout(debounceTimer); autoguardadoPendiente = false; await window.autoGuardarDistribucionEstructura(false); } } catch (e) {}
+
+    try {
+        if (window.caches) { const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); }
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            const reg = await navigator.serviceWorker.getRegistration();
+            if (reg) await reg.update();
+        }
+    } catch (e) {}
+
+    setTimeout(() => window.location.reload(), preventivo ? 300 : 1200);
+    return true;
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        chequearActualizacion(false);
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.getRegistration().then(reg => reg && reg.update());
+        }
+    }
+});
+window.addEventListener('online', () => chequearActualizacion(false));
+setInterval(() => chequearActualizacion(false), 15 * 60 * 1000);
+chequearActualizacion(true); // al arrancar, antes de que el usuario empiece a trabajar
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').then(reg => {
-            console.log('SW registrado correctamente.');
-        }).catch(err => console.log('Error registrando SW: ', err));
+        navigator.serviceWorker.register(`sw.js?v=${APP_VERSION}`).then(reg => reg.update()).catch(err => console.log('Error registrando SW: ', err));
     });
+    // Un service worker nuevo tomó el control: verificar si corresponde actualizar
+    navigator.serviceWorker.addEventListener('controllerchange', () => chequearActualizacion(false));
 }
