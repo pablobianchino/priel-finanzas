@@ -14,7 +14,6 @@ export const vistaResumen = `
                 <label>MEP (Ahorros): <input type="text" id="usd-mep" class="money-input" value="0" style="width: 105px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
                 <label>MEP Tarjeta (Gastos): <input type="text" id="usd-debito" class="money-input" value="0" style="width: 105px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
                 <label>Comisión Inviu/Broker (%): <input type="number" id="usd-comision-mep" step="0.1" min="0" max="10" value="0.6" style="width: 75px; padding: 6px;" onchange="window.actualizarCalculoMepEnPantalla('resumen')"></label>
-                <label style="display:none;">Impuesto (Gastos): <input type="text" id="usd-impuesto" class="money-input" value="0" style="width: 80px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
                 <button class="btn-black" style="padding: 6px 15px;" onclick="window.guardarConfiguracionDolar('resumen')">Guardar Rates</button>
             </div>
 
@@ -63,8 +62,9 @@ export const vistaResumen = `
             </div>
 
             <div class="card" style="border-top: 4px solid #EA4335;">
-                <h3>Saldo a favor general</h3>
+                <h3>Saldo neto a favor (ingresos − gastos propios − ahorrado)</h3>
                 <div class="value" id="res-balance">$0,00</div>
+                <div id="res-balance-detalle" style="font-size:12px; color:var(--text-muted); margin-top:8px; display:flex; flex-direction:column; gap:3px;"></div>
                 <div class="chart-container" style="height: 150px; margin-top: 15px;"><canvas id="chart-resumen"></canvas></div>
             </div>
         </div>

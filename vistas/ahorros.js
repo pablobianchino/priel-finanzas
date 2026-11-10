@@ -9,7 +9,6 @@ export const vistaAhorros = `
                 <label>MEP (Ahorros): <input type="text" id="usd-mep-ahorros" class="money-input" value="0" style="width: 105px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
                 <label>MEP Tarjeta (Gastos): <input type="text" id="usd-debito-ahorros" class="money-input" value="0" style="width: 105px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
                 <label>Comisión Inviu/Broker (%): <input type="number" id="usd-comision-mep-ahorros" step="0.1" min="0" max="10" value="0.6" style="width: 75px; padding: 6px;" onchange="window.actualizarCalculoMepEnPantalla('ahorros')"></label>
-                <label style="display:none;">Impuesto (Gastos): <input type="text" id="usd-impuesto-ahorros" class="money-input" value="0" style="width: 80px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
                 <button class="btn-black" style="padding: 6px 15px;" onclick="window.guardarConfiguracionDolar('ahorros')">Guardar Rates</button>
             </div>
 

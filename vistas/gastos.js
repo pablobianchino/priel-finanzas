@@ -9,7 +9,6 @@ export const vistaGastos = `
                 <label>MEP (Ahorros): <input type="text" id="usd-mep-gastos" class="money-input" value="0" style="width: 105px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
                 <label>MEP Tarjeta (Gastos): <input type="text" id="usd-debito-gastos" class="money-input" value="0" style="width: 105px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
                 <label>Comisión Inviu/Broker (%): <input type="number" id="usd-comision-mep-gastos" step="0.1" min="0" max="10" value="0.6" style="width: 75px; padding: 6px;" onchange="window.actualizarCalculoMepEnPantalla('gastos')"></label>
-                <label style="display:none;">Impuesto (Gastos): <input type="text" id="usd-impuesto-gastos" class="money-input" value="0" style="width: 80px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
                 <button class="btn-black" style="padding: 6px 15px;" onclick="window.guardarConfiguracionDolar('gastos')">Guardar Rates</button>
             </div>
 
@@ -49,7 +48,8 @@ export const vistaGastos = `
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
             <button onclick="window.crearNuevoTipoGastoPanel()" class="btn-black">➕ Crear Panel</button>
             <button onclick="window.abrirModalNuevoGasto()" class="btn-black" style="background-color: #202124;">➕ Nuevo Ítem Gasto</button>
-            <button onclick="window.abrirModalCargaMasiva()" class="btn-black" style="background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">Carga CSV</button>
+            <!-- Carga CSV oculta por ahora (no se usa). Para reactivarla, quitar style="display:none" -->
+            <button onclick="window.abrirModalCargaMasiva()" class="btn-black" style="display:none; background-color: #f1f3f4; color: #202124; border: 1px solid var(--card-border);">Carga CSV</button>
         </div>
     </div>
 

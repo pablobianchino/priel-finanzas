@@ -17,7 +17,6 @@ export const vistaIngresos = `
                 <label>MEP (Ahorros): <input type="text" id="usd-mep-ingresos" class="money-input" value="0" style="width: 105px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
                 <label>MEP Tarjeta (Gastos): <input type="text" id="usd-debito-ingresos" class="money-input" value="0" style="width: 105px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
                 <label>Comisión Inviu/Broker (%): <input type="number" id="usd-comision-mep-ingresos" step="0.1" min="0" max="10" value="0.6" style="width: 75px; padding: 6px;" onchange="window.actualizarCalculoMepEnPantalla('ingresos')"></label>
-                <label style="display:none;">Impuesto (Gastos): <input type="text" id="usd-impuesto-ingresos" class="money-input" value="0" style="width: 80px; padding: 6px;" onfocus="window.onMoneyFocus(this)" onblur="window.onMoneyBlur(this, 'ARS')"></label>
                 <button class="btn-black" style="padding: 6px 15px;" onclick="window.guardarConfiguracionDolar('ingresos')">Guardar Rates</button>
             </div>
 
@@ -50,6 +49,7 @@ export const vistaIngresos = `
                     <div style="display:flex; flex-direction:column; text-align:right;">
                         <span style="font-size: 11px; color:var(--text-muted);">Total Bruto: <span id="sum-ingresos-mes"></span></span>
                         <span class="value" id="sum-ingresos-disponible" style="font-size: 16px; margin: 0; color:#137333;">$0,00 Disp.</span>
+                        <span id="sum-ingresos-cobrar" style="font-size: 11px; color:var(--text-muted);"></span>
                     </div>
                     <span class="toggle-icon">▼</span>
                 </div>

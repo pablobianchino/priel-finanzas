@@ -1,4 +1,4 @@
-const CACHE_NAME = 'finanzas-priel-v2.9.0';
+const CACHE_NAME = 'finanzas-priel-v2.9.2';
 const urlsToCache = [
   './',
   './index.html',
