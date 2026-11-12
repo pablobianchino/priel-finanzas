@@ -79,6 +79,33 @@ export const vistaModales = `
     </div>
 </div>
 
+<!-- Modal Corregir saldo de una cuenta de ahorro (ajuste manual) -->
+<div id="modal-ajuste-saldo" class="modal-overlay">
+    <div class="modal-content" style="max-width: 460px;">
+        <div class="modal-header">
+            <h2 style="margin: 0; font-size: 16px;" id="titulo-modal-ajuste">Corregir saldo</h2>
+            <button class="modal-close" onclick="window.cerrarModal('modal-ajuste-saldo')"><i class="ti ti-x"></i></button>
+        </div>
+        <form id="form-ajuste-saldo" style="display: flex; flex-direction: column; gap: 14px;">
+            <input type="hidden" id="ajuste-cuenta-id">
+            <input type="hidden" id="ajuste-moneda">
+            <div class="field-row" style="padding-top:0;"><span>Saldo que muestra la app</span><b id="ajuste-saldo-actual" style="font-variant-numeric: tabular-nums;"></b></div>
+            <div>
+                <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 5px;" id="label-ajuste-real">Saldo real de la cuenta:</label>
+                <input type="text" id="ajuste-saldo-real" class="money-input" style="width: 100%; font-size: 16px; font-weight: 600;" required
+                    onfocus="window.onMoneyFocus(this)" oninput="window.onAjusteInput()" onblur="window.onMoneyBlur(this, document.getElementById('ajuste-moneda').value); window.onAjusteInput()">
+            </div>
+            <div id="ajuste-diferencia" class="sub"></div>
+            <div>
+                <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 5px;">Motivo (opcional):</label>
+                <input type="text" id="ajuste-motivo" placeholder="Corrección de saldo" style="width: 100%;">
+            </div>
+            <p class="sub" style="margin: 0;">Queda registrado en el historial como "Ajuste" y no cuenta como ingreso ni retiro del mes. Se puede eliminar para deshacerlo.</p>
+            <button type="submit" class="btn-black">Guardar corrección</button>
+        </form>
+    </div>
+</div>
+
 <!-- Modal Crear / Editar Sub-Caja (Bolsillo) -->
 <div id="modal-subcaja" class="modal-overlay">
     <div class="modal-content" style="max-width: 480px;">

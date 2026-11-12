@@ -11,7 +11,7 @@ import { vistaModales } from '../vistas/modales.js';
 document.getElementById('views-container').innerHTML = vistaResumen + vistaGastos + vistaIngresos + vistaAhorros + vistaEstadisticas;
 document.getElementById('modals-container').innerHTML = vistaModales;
 
-const APP_VERSION = "v2.11";
+const APP_VERSION = "v2.12";
 window.APP_VERSION = APP_VERSION;
 
 const updateVersionTags = () => {
@@ -1054,14 +1054,19 @@ function calcularTotalesCuenta(cuentaId) {
     const ingresosUsd = movs.filter(m => m.tipo === 'ingreso').reduce((sum, m) => sum + usdDeMov(m, dMep), 0);
     const retirosUsd = movs.filter(m => m.tipo === 'retiro').reduce((sum, m) => sum + usdDeMov(m, dMep), 0);
 
+    // Ajustes manuales de saldo (correcciones): montos con signo, no cuentan como ingreso ni retiro del mes
+    const ajustes = movs.filter(m => m.tipo === 'ajuste');
+    const ajusteArs = ajustes.reduce((sum, m) => sum + (parseFloat(m.monto) || 0), 0);
+    const ajusteUsd = ajustes.reduce((sum, m) => sum + usdDeMov(m, dMep), 0);
+
     let saldoFinal = 0;
     let saldoFinalUsd = 0;
 
     if (esUsd) {
-        saldoFinalUsd = saldoAntUsd + (ingresosUsd - retirosUsd);
-        saldoFinal = dMep > 0 ? (saldoFinalUsd * dMep) : (saldoAntArs + netoMes);
+        saldoFinalUsd = saldoAntUsd + (ingresosUsd - retirosUsd) + ajusteUsd;
+        saldoFinal = dMep > 0 ? (saldoFinalUsd * dMep) : (saldoAntArs + netoMes + ajusteArs);
     } else {
-        saldoFinal = saldoAntArs + netoMes;
+        saldoFinal = saldoAntArs + netoMes + ajusteArs;
         saldoFinalUsd = dMep > 0 ? (saldoFinal / dMep) : 0;
     }
 
@@ -1073,6 +1078,8 @@ function calcularTotalesCuenta(cuentaId) {
         retiros,
         ingresosUsd,
         retirosUsd,
+        ajusteArs,
+        ajusteUsd,
         netoMes,
         saldoFinal,
         saldoFinalUsd
@@ -1712,6 +1719,100 @@ document.getElementById('form-movimiento-ahorro').addEventListener('submit', asy
     }
 });
 
+// =========================================================================
+// CORREGIR SALDO: ajuste manual que deja el saldo exactamente en el valor real
+// =========================================================================
+function asignadoEnSubcajas(acc, esUsd, dMep) {
+    return (acc.sub_cajas || []).reduce((sum, s) => {
+        if (esUsd) return sum + (parseFloat(s.monto_usd) || (dMep > 0 ? (parseFloat(s.monto) || 0) / dMep : 0));
+        return sum + (parseFloat(s.monto) || 0);
+    }, 0);
+}
+
+window.abrirModalAjusteSaldo = function(cuentaId) {
+    const acc = cuentasAhorro.find(c => c.id === cuentaId);
+    if (!acc) return;
+    const t = calcularTotalesCuenta(cuentaId);
+    const moneda = t.esUsd ? 'USD' : 'ARS';
+    const actual = t.esUsd ? t.saldoFinalUsd : t.saldoFinal;
+    document.getElementById('ajuste-cuenta-id').value = cuentaId;
+    document.getElementById('ajuste-moneda').value = moneda;
+    document.getElementById('titulo-modal-ajuste').innerText = `Corregir saldo: ${acc.nombre}`;
+    document.getElementById('ajuste-saldo-actual').innerText = window.formatearDinero(actual, moneda);
+    document.getElementById('label-ajuste-real').innerText = `Saldo real de la cuenta (${moneda === 'USD' ? 'dólares' : 'pesos'}):`;
+    const inp = document.getElementById('ajuste-saldo-real');
+    inp.dataset.raw = Math.round(actual * 100) / 100;
+    inp.value = window.formatearDinero(actual, moneda);
+    document.getElementById('ajuste-motivo').value = '';
+    document.getElementById('ajuste-diferencia').innerHTML = '';
+    document.getElementById('modal-ajuste-saldo').style.display = 'flex';
+    setTimeout(() => { inp.focus(); inp.select(); }, 50);
+};
+
+window.onAjusteInput = function() {
+    const cuentaId = document.getElementById('ajuste-cuenta-id').value;
+    const acc = cuentasAhorro.find(c => c.id === cuentaId);
+    if (!acc) return;
+    const t = calcularTotalesCuenta(cuentaId);
+    const moneda = document.getElementById('ajuste-moneda').value;
+    const actual = t.esUsd ? t.saldoFinalUsd : t.saldoFinal;
+    const real = window.parseMoney(document.getElementById('ajuste-saldo-real').value);
+    const diff = real - actual;
+    const el = document.getElementById('ajuste-diferencia');
+    if (Math.abs(diff) < 0.005) { el.innerHTML = 'El saldo ya coincide, no hay nada que corregir.'; return; }
+    let html = `Diferencia a registrar: <b class="${diff > 0 ? 'up' : 'dn'}">${diff > 0 ? '+' : '−'}${window.formatearDinero(Math.abs(diff), moneda)}</b>`;
+    const asignado = asignadoEnSubcajas(acc, t.esUsd, getDolarMep());
+    if (real + 0.005 < asignado) html += `<div class="alert warn"><i class="ti ti-alert-triangle"></i>Las sub-cajas suman ${window.formatearDinero(asignado, moneda)}, más que el saldo real. Revisalas después de guardar.</div>`;
+    el.innerHTML = html;
+};
+
+document.getElementById('form-ajuste-saldo').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const cuentaId = document.getElementById('ajuste-cuenta-id').value;
+    const acc = cuentasAhorro.find(c => c.id === cuentaId);
+    if (!acc) return alert("Cuenta no encontrada.");
+    const t = calcularTotalesCuenta(cuentaId);
+    const dMep = getDolarMep();
+    const real = window.parseMoney(document.getElementById('ajuste-saldo-real').value);
+    if (real < 0) return alert("El saldo real no puede ser negativo.");
+    const actual = t.esUsd ? t.saldoFinalUsd : t.saldoFinal;
+    const diff = Math.round((real - actual) * 100) / 100;
+    if (Math.abs(diff) < 0.005) return alert("El saldo ya coincide, no hay nada que corregir.");
+    if (t.esUsd && !(dMep > 0)) return alert("Cargá primero la cotización MEP para corregir una cuenta en dólares.");
+
+    // Montos con signo: ARS y USD del ajuste, con el MEP de este momento
+    const diffArs = t.esUsd ? diff * dMep : diff;
+    const diffUsd = t.esUsd ? diff : (dMep > 0 ? diff / dMep : null);
+    const motivo = document.getElementById('ajuste-motivo').value.trim() || 'Corrección de saldo';
+
+    window.mostrarCargando(true);
+    try {
+        if (!Array.isArray(historialAhorros)) historialAhorros = [];
+        historialAhorros.unshift({
+            id: 'mov_' + Date.now(),
+            fecha: new Date().toLocaleString(),
+            tipo: 'ajuste',
+            accion: 'Ajuste',
+            cuenta_id: cuentaId,
+            cuenta: acc.nombre,
+            subcaja_id: null,
+            subcaja: '',
+            monto: diffArs,
+            monto_usd: diffUsd,
+            tc: dMep > 0 ? dMep : null,
+            motivo: `${motivo} (saldo anterior ${window.formatearDinero(actual, t.esUsd ? 'USD' : 'ARS')} → ${window.formatearDinero(real, t.esUsd ? 'USD' : 'ARS')})`,
+            id_ingreso_generado: null
+        });
+        await actualizarConfiguracionDB({ "configuracion.historial_ahorros": historialAhorros });
+        window.cerrarModal('modal-ajuste-saldo');
+        await actualizarDashboard();
+    } catch (err) {
+        console.error("Error al corregir saldo:", err);
+        alert("No se pudo guardar la corrección: " + err.message);
+        window.mostrarCargando(false);
+    }
+});
+
 window.abrirModalHistorial = function() {
     const container = document.getElementById('historial-lista');
     container.innerHTML = '';
@@ -1721,14 +1822,16 @@ window.abrirModalHistorial = function() {
     } else {
         const dMep = getDolarMep();
         historialAhorros.forEach(h => {
-            const esIngreso = h.tipo === 'ingreso' || (h.accion && h.accion.toLowerCase().includes('ingreso')) || (h.accion && h.accion.toLowerCase().includes('ahorrado'));
-            const badgeClass = esIngreso ? 'badge-mov-ingreso' : 'badge-mov-retiro';
-            const badgeText = esIngreso ? '🟢 Ingreso' : '🔴 Retiro';
-            const montoColor = esIngreso ? '#137333' : '#c5221f';
-            const prefixSign = esIngreso ? '+' : '-';
+            const esAjuste = h.tipo === 'ajuste';
+            const esIngreso = esAjuste ? (parseFloat(h.monto) || 0) >= 0 : (h.tipo === 'ingreso' || (h.accion && h.accion.toLowerCase().includes('ingreso')) || (h.accion && h.accion.toLowerCase().includes('ahorrado')));
+            const badgeClass = esAjuste ? 'badge-mov' : (esIngreso ? 'badge-mov-ingreso' : 'badge-mov-retiro');
+            const badgeText = esAjuste ? '<i class="ti ti-adjustments"></i> Ajuste' : (esIngreso ? 'Ingreso' : 'Retiro');
+            const montoColor = esIngreso ? 'var(--ok)' : 'var(--bad)';
+            const prefixSign = esIngreso ? '+' : '−';
+            const montoMostrado = Math.abs(parseFloat(h.monto) || 0);
             const detalleExtra = h.motivo || h.objetivo || '';
             const rescateNotice = h.id_ingreso_generado ? `<span style="font-size:10px; color:#174ea6; display:block; margin-top:2px;">↳ Inyectado como Ingreso disponible</span>` : '';
-            const usdMov = usdDeMov(h, dMep);
+            const usdMov = Math.abs(usdDeMov(h, dMep));
             const usdConversion = usdMov > 0 ? `<span style="font-size:11px; color:var(--text-muted); display:block; text-align:right;">U$D ${usdMov.toFixed(2)}${h.tc ? ` · MEP ${window.formatearDinero(h.tc)}` : ''}</span>` : '';
 
             container.innerHTML += `
@@ -1744,11 +1847,11 @@ window.abrirModalHistorial = function() {
                     </div>
                     <div style="display:flex; align-items:center; gap:12px;">
                         <div>
-                            <div style="font-weight:bold; font-size:15px; color:${montoColor}; white-space:nowrap;">${prefixSign} ${window.formatearDinero(h.monto)}</div>
+                            <div style="font-weight:bold; font-size:15px; color:${montoColor}; white-space:nowrap;">${prefixSign} ${window.formatearDinero(montoMostrado)}</div>
                             ${usdConversion}
                         </div>
                         <div style="display:flex; gap:4px;">
-                            <button class="btn-icon" onclick="window.abrirModalEditarMovimiento('${h.id}')" title="Editar monto/motivo"><i class="ti ti-pencil"></i></button>
+                            ${esAjuste ? '' : `<button class="btn-icon" onclick="window.abrirModalEditarMovimiento('${h.id}')" title="Editar monto/motivo"><i class="ti ti-pencil"></i></button>`}
                             <button class="btn-icon" onclick="window.eliminarMovimientoAhorro('${h.id}')" title="Eliminar movimiento"><i class="ti ti-trash"></i></button>
                         </div>
                     </div>
@@ -2085,18 +2188,25 @@ function renderCuentasAhorro() {
                         </div>
                     </div>
                     
-                    <div style="margin-top: 12px; display:flex; flex-direction:column; gap:4px; font-size:12px;">
-                        <div style="color:var(--text-muted); display:flex; justify-content:space-between; align-items:center;">
-                            <span>Saldo ant. (inicial):</span> <b>${saldoAntDisplay}</b>
+                    <div style="margin-top: 12px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:12px; color:var(--text-muted); font-weight:500;">Saldo actual</span>
+                            <button class="btn-black btn-sec btn-sm" onclick="window.abrirModalAjusteSaldo('${c.id}')" title="Fijar el saldo real de esta cuenta"><i class="ti ti-adjustments"></i>Corregir saldo</button>
                         </div>
-                        ${c.ingresos > 0 ? `<div style="color:#137333; display:flex; justify-content:space-between;"><span>Ingresos del mes:</span> <b>+${c.esUsd ? window.formatearDinero(c.ingresosUsd, 'USD') + ' ' : ''}<span style="font-weight:normal;">${c.esUsd ? '(' : ''}${window.formatearDinero(c.ingresos)}${c.esUsd ? ')' : ''}</span></b></div>` : ''}
-                        ${c.retiros > 0 ? `<div style="color:#c5221f; display:flex; justify-content:space-between;"><span>Retiros del mes:</span> <b>-${c.esUsd ? window.formatearDinero(c.retirosUsd, 'USD') + ' ' : ''}<span style="font-weight:normal;">${c.esUsd ? '(' : ''}${window.formatearDinero(c.retiros)}${c.esUsd ? ')' : ''}</span></b></div>` : ''}
-                    </div>
-
-                    <div style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed var(--card-border);">
-                        <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:600; letter-spacing:0.5px;">Saldo Total Acumulado</span>
                         ${saldoFinalHtml}
                     </div>
+
+                    <details style="margin-top: 8px; font-size:12px;">
+                        <summary style="cursor:pointer; color:var(--text-muted); list-style:none; display:flex; align-items:center; gap:4px;"><i class="ti ti-chevron-right"></i>Cómo se calcula (detalle del mes)</summary>
+                        <div style="margin-top: 8px; display:flex; flex-direction:column; gap:4px;">
+                            <div style="color:var(--text-muted); display:flex; justify-content:space-between; align-items:center;">
+                                <span>Saldo inicial del mes:</span> <b>${saldoAntDisplay}</b>
+                            </div>
+                            ${c.ingresos > 0 ? `<div style="color:var(--ok); display:flex; justify-content:space-between;"><span>Ingresos del mes:</span> <b>+${c.esUsd ? window.formatearDinero(c.ingresosUsd, 'USD') + ' ' : ''}<span style="font-weight:normal;">${c.esUsd ? '(' : ''}${window.formatearDinero(c.ingresos)}${c.esUsd ? ')' : ''}</span></b></div>` : ''}
+                            ${c.retiros > 0 ? `<div style="color:var(--bad); display:flex; justify-content:space-between;"><span>Retiros del mes:</span> <b>-${c.esUsd ? window.formatearDinero(c.retirosUsd, 'USD') + ' ' : ''}<span style="font-weight:normal;">${c.esUsd ? '(' : ''}${window.formatearDinero(c.retiros)}${c.esUsd ? ')' : ''}</span></b></div>` : ''}
+                            <div style="border-top:1px dashed var(--card-border); padding-top:4px; display:flex; justify-content:space-between;"><span>Saldo actual:</span> <b>${c.esUsd ? window.formatearDinero(c.saldoFinalUsd, 'USD') : window.formatearDinero(c.saldoFinal)}</b></div>
+                        </div>
+                    </details>
 
                     ${subcajasBlockHtml}
                 </div>
@@ -2693,12 +2803,15 @@ window.copiarMesAnterior = async function() {
             // Soporte para datos legacy si existían
             if (c.retiros) retMes += (parseFloat(c.retiros) || 0);
 
-            let saldoFinalAbsoluto = saldoAnt + ingMes - retMes;
+            // Los ajustes manuales de saldo del mes también se arrastran al mes siguiente
+            const ajusteMesArs = movsCuenta.filter(m => m.tipo === 'ajuste').reduce((sum, m) => sum + (parseFloat(m.monto) || 0), 0);
+            let saldoFinalAbsoluto = saldoAnt + ingMes - retMes + ajusteMesArs;
             let saldoFinalUsd = 0;
             if (esUsd) {
                 let ingUsd = movsCuenta.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + usdDeMov(m, dMepPrev), 0);
                 let retUsd = movsCuenta.filter(m => m.tipo === 'retiro').reduce((s, m) => s + usdDeMov(m, dMepPrev), 0);
-                saldoFinalUsd = saldoAntUsd + ingUsd - retUsd;
+                const ajusteMesUsd = movsCuenta.filter(m => m.tipo === 'ajuste').reduce((s, m) => s + usdDeMov(m, dMepPrev), 0);
+                saldoFinalUsd = saldoAntUsd + ingUsd - retUsd + ajusteMesUsd;
             }
 
             // Preservar estructura de sub-cajas
